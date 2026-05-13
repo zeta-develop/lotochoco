@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
+          # remove cache here to avoid setup-node trying to run pnpm before it's available
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
