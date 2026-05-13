@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { endOfDay, startOfDay } from 'date-fns'
 import type { SalesReport } from '@/lib/types'
 import {
+  OFFLINE_DB_UPDATED_EVENT,
   bootstrapOfflineData,
   getOfflineCancellations,
   getOfflineDailyReport,
@@ -10,6 +12,30 @@ import {
   getOfflineSalesReport,
   getOfflineWeeklyReport,
 } from '@/lib/local-db'
+
+function useReportAutoRefresh(refresh: () => Promise<void>) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleUpdated = () => {
+      void refresh()
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh()
+      }
+    }
+
+    window.addEventListener(OFFLINE_DB_UPDATED_EVENT, handleUpdated)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.removeEventListener(OFFLINE_DB_UPDATED_EVENT, handleUpdated)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [refresh])
+}
 
 export function useSalesReport(options?: {
   startDate?: string
@@ -26,25 +52,30 @@ export function useSalesReport(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const parsedStartDate = options?.startDate ? startOfDay(new Date(options.startDate)) : undefined
+  const parsedEndDate = options?.endDate ? endOfDay(new Date(options.endDate)) : undefined
+
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setReport(
         getOfflineSalesReport({
-          startDate: options?.startDate ? new Date(options.startDate) : undefined,
-          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+          startDate: parsedStartDate,
+          endDate: parsedEndDate,
         })
       )
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte'))
     }
-  }
+  }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
     bootstrapOfflineData()
     setIsLoading(true)
     void refresh().finally(() => setIsLoading(false))
-  }, [options?.startDate, options?.endDate])
+  }, [options?.startDate, options?.endDate, refresh])
+
+  useReportAutoRefresh(refresh)
 
   return {
     report,
@@ -66,20 +97,22 @@ export function useDailyReport(date?: string) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setReport(getOfflineDailyReport(date ? new Date(date) : new Date()))
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte diario'))
     }
-  }
+  }, [date])
 
   useEffect(() => {
     bootstrapOfflineData()
     setIsLoading(true)
     void refresh().finally(() => setIsLoading(false))
-  }, [date])
+  }, [date, refresh])
+
+  useReportAutoRefresh(refresh)
 
   return {
     report,
@@ -102,7 +135,7 @@ export function useWeeklyReport() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       const data = getOfflineWeeklyReport()
@@ -111,13 +144,15 @@ export function useWeeklyReport() {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte semanal'))
     }
-  }
+  }, [])
 
   useEffect(() => {
     bootstrapOfflineData()
     setIsLoading(true)
     void refresh().finally(() => setIsLoading(false))
-  }, [])
+  }, [refresh])
+
+  useReportAutoRefresh(refresh)
 
   return {
     days,
@@ -142,25 +177,30 @@ export function useGameReport(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const parsedStartDate = options?.startDate ? startOfDay(new Date(options.startDate)) : undefined
+  const parsedEndDate = options?.endDate ? endOfDay(new Date(options.endDate)) : undefined
+
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setGames(
         getOfflineGameReport({
-          startDate: options?.startDate ? new Date(options.startDate) : undefined,
-          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+          startDate: parsedStartDate,
+          endDate: parsedEndDate,
         })
       )
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte por juego'))
     }
-  }
+  }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
     bootstrapOfflineData()
     setIsLoading(true)
     void refresh().finally(() => setIsLoading(false))
-  }, [options?.startDate, options?.endDate])
+  }, [options?.startDate, options?.endDate, refresh])
+
+  useReportAutoRefresh(refresh)
 
   return {
     games,
@@ -184,25 +224,30 @@ export function useCancellationsReport(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const parsedStartDate = options?.startDate ? startOfDay(new Date(options.startDate)) : undefined
+  const parsedEndDate = options?.endDate ? endOfDay(new Date(options.endDate)) : undefined
+
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setCancellations(
         getOfflineCancellations({
-          startDate: options?.startDate ? new Date(options.startDate) : undefined,
-          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+          startDate: parsedStartDate,
+          endDate: parsedEndDate,
         })
       )
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar cancelaciones'))
     }
-  }
+  }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
     bootstrapOfflineData()
     setIsLoading(true)
     void refresh().finally(() => setIsLoading(false))
-  }, [options?.startDate, options?.endDate])
+  }, [options?.startDate, options?.endDate, refresh])
+
+  useReportAutoRefresh(refresh)
 
   return {
     cancellations,

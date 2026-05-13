@@ -20,6 +20,7 @@ import { useGames } from '@/hooks/use-games'
 import { useTickets } from '@/hooks/use-tickets'
 import { useSettings } from '@/hooks/use-settings'
 import { useCurrentSession } from '@/hooks/use-cash'
+import { printHtmlDocument } from '@/lib/print'
 import { cn } from '@/lib/utils'
 import { 
   Plus, 
@@ -133,12 +134,9 @@ export function POSSale() {
 
   const handlePrint = () => {
     if (!lastTicket) return
-    
-    // Open print window with ticket data
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      const currency = settings.currency || 'C$'
-      printWindow.document.write(`
+
+    const currency = settings.currency || 'C$'
+    printHtmlDocument(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -186,12 +184,9 @@ export function POSSale() {
           <div class="right total">TOTAL: ${currency}${lastTicket.totalAmount.toFixed(2)}</div>
           <div class="separator"></div>
           <div class="center">${settings.ticketMessage || '¡Buena suerte!'}</div>
-          <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
         </html>
       `)
-      printWindow.document.close()
-    }
   }
 
   const currency = settings.currency || 'C$'

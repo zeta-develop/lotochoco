@@ -25,6 +25,7 @@ type LocalState = {
 }
 
 const STORAGE_KEY = 'lotochoco.offline.v1'
+export const OFFLINE_DB_UPDATED_EVENT = 'lotochoco:offline-db-updated'
 
 const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   businessName: 'Loteria La Fortuna',
@@ -172,10 +173,16 @@ function saveState(state: LocalState) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
+function notifyStateUpdated() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(OFFLINE_DB_UPDATED_EVENT))
+}
+
 function withState<T>(mutator: (state: LocalState) => T): T {
   const state = loadState()
   const result = mutator(state)
   saveState(state)
+  notifyStateUpdated()
   return result
 }
 

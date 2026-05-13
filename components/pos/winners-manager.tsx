@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 
 export function WinnersManager() {
   const { winners: allWinners, isLoading, markAsPaid, refresh } = useWinners()
-  const { winners: pendingWinners } = usePendingWinners()
+  const { winners: pendingWinners, refresh: refreshPending } = usePendingWinners()
   const { settings } = useSettings()
 
   const currency = settings.currency || 'C$'
@@ -23,8 +23,9 @@ export function WinnersManager() {
   const handleMarkAsPaid = async (winnerId: string) => {
     try {
       await markAsPaid(winnerId)
+      await refreshPending()
       toast.success('Premio marcado como pagado')
-      refresh()
+      await refresh()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al marcar como pagado')
     }

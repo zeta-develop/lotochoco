@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { useCurrentSession, useCashSummary, useCashSessions } from '@/hooks/use-cash'
 import { useSettings } from '@/hooks/use-settings'
+import { printHtmlDocument } from '@/lib/print'
 import { 
   Wallet, 
   DollarSign, 
@@ -25,7 +26,6 @@ import {
   Minus, 
   Lock,
   Unlock,
-  Printer,
   Clock,
   TrendingUp,
   TrendingDown
@@ -121,12 +121,10 @@ export function CashRegister() {
   }
 
   const handlePrintClose = (closedSession: any) => {
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      const balance = closedSession.closingAmount || summary.balance
-      const profit = closedSession.salesTotal - closedSession.prizesTotal
-      
-      printWindow.document.write(`
+    const balance = closedSession.closingAmount || summary.balance
+    const profit = closedSession.salesTotal - closedSession.prizesTotal
+
+    printHtmlDocument(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -160,12 +158,9 @@ export function CashRegister() {
           <div class="separator"></div>
           <div class="center" style="margin-top: 20px;">___________________</div>
           <div class="center">Firma</div>
-          <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
         </html>
       `)
-      printWindow.document.close()
-    }
   }
 
   return (
