@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "cap:add:android": "cap add android",
     "cap:sync:android": "cap sync android",
-    "android:build:debug": "cd android && ./gradlew assembleDebug"
+    "android:build:debug": "cd android && ./gradlew assembleDebug",
+    "android:build:release": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

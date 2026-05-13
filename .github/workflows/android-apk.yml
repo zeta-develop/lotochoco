@@ -58,11 +58,37 @@ jobs:
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      - name: Build debug APK
-        run: pnpm android:build:debug
+      - name: Configure release signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${RELEASE_KEYSTORE_BASE64:-}" ] || [ -z "${RELEASE_KEYSTORE_PASSWORD:-}" ] || [ -z "${RELEASE_KEY_ALIAS:-}" ] || [ -z "${RELEASE_KEY_PASSWORD:-}" ]; then
+            echo "Missing release signing secrets. Configure RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD."
+            exit 1
+          fi
+
+          mkdir -p android/app
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+
+          printf '%s\n' \
+            'RELEASE_STORE_FILE=app/release-keystore.jks' \
+            "RELEASE_STORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD" \
+            "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS" \
+            "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD" \
+            >> android/gradle.properties
+
+            python3 scripts/inject_android_release_signing.py
+
+      - name: Build release APK
+        run: pnpm android:build:release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lotochoco-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: lotochoco-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
