@@ -1,61 +1,134 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect, useState } from 'react'
 import type { PyramidResult } from '@/lib/types'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+import {
+  analyzeOfflineNumber,
+  bootstrapOfflineData,
+  generateOfflinePyramid,
+  generateOfflineReversePyramid,
+  getOfflineNumberFrequency,
+} from '@/lib/local-db'
 
 export function usePyramid(date?: string) {
-  const params = new URLSearchParams({ type: 'pyramid' })
-  if (date) params.set('date', date)
-  
-  const { data, error, isLoading, mutate } = useSWR<{
-    pyramid: PyramidResult
+  const [data, setData] = useState<{
+    pyramid: (PyramidResult & { rows: number[][] }) | null
     luckyNumbers: {
       single: string[]
       double: string[]
       triple: string[]
     }
-    reversePyramid: PyramidResult
-  }>(`/api/pyramid?${params.toString()}`, fetcher)
+    reversePyramid: (PyramidResult & { rows: number[][] }) | null
+    hotNumbers?: { number: string; count: number }[]
+    coldNumbers?: { number: string; count: number }[]
+    totalResults?: number
+    totalWinners?: number
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      const selectedDate = date ? new Date(date) : new Date()
+      const pyramid = generateOfflinePyramid(selectedDate)
+      const reversePyramid = generateOfflineReversePyramid(selectedDate)
+      const luckyNumbers = {
+        single: pyramid.rows.flat().slice(0, 10).map(String),
+        double: pyramid.rows.flat().slice(10, 20).map(String),
+        triple: pyramid.rows.flat().slice(20, 30).map(String),
+      }
+
+      setData({
+        pyramid,
+        luckyNumbers,
+        reversePyramid,
+        hotNumbers: getOfflineNumberFrequency({ limit: 10 }).map((item) => ({ number: item.number, count: item.frequency })),
+        coldNumbers: getOfflineNumberFrequency({ limit: 10 }).slice().reverse().map((item) => ({ number: item.number, count: item.frequency })),
+        totalResults: 0,
+        totalWinners: 0,
+      })
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al calcular pirámide'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [date])
 
   return {
+    data,
     pyramid: data?.pyramid || null,
     luckyNumbers: data?.luckyNumbers || { single: [], double: [], triple: [] },
     reversePyramid: data?.reversePyramid || null,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
+    mutate: refresh,
   }
 }
 
 export function useHotColdNumbers(gameId: string) {
-  const { data, error, isLoading, mutate } = useSWR<{
+  const [data, setData] = useState<{
     hot: { number: string; frequency: number }[]
     cold: { number: string; frequency: number }[]
-  }>(gameId ? `/api/pyramid?type=hot-cold&gameId=${gameId}` : null, fetcher)
+  }>({ hot: [], cold: [] })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      const frequency = getOfflineNumberFrequency({ gameId, limit: 20 })
+      setData({
+        hot: frequency.slice(0, 10),
+        cold: frequency.slice(-10).reverse(),
+      })
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar números'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    if (!gameId) return
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [gameId])
 
   return {
-    hot: data?.hot || [],
-    cold: data?.cold || [],
+    hot: data.hot,
+    cold: data.cold,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
   }
 }
 
 export function useNumberAnalysis(number: string, date?: string) {
-  const params = new URLSearchParams({ type: 'analyze', number })
-  if (date) params.set('date', date)
-  
-  const { data, error, isLoading } = useSWR<{
+  const [data, setData] = useState<{
     compatibility: number
     message: string
-  }>(number ? `/api/pyramid?${params.toString()}` : null, fetcher)
+  }>({ compatibility: 0, message: '' })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    if (!number) return
+    setIsLoading(true)
+    const selectedDate = date ? new Date(date) : new Date()
+    const pyramid = generateOfflinePyramid(selectedDate)
+    setData(analyzeOfflineNumber(number, pyramid))
+    setIsLoading(false)
+  }, [number, date])
 
   return {
-    compatibility: data?.compatibility || 0,
-    message: data?.message || '',
+    compatibility: data.compatibility,
+    message: data.message,
     isLoading,
     error
   }

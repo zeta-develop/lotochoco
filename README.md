@@ -2,11 +2,11 @@
 
 ## APK con Capacitor + Next.js
 
-Este proyecto se puede empaquetar como APK Android usando Capacitor sin cambiar la app principal. La app web sigue usando sus rutas API de Next.js y Prisma; por eso, el APK debe abrir una URL desplegada del sitio en lugar de intentar ejecutar todo de forma local dentro del dispositivo.
+Este proyecto se empaqueta como APK Android completamente local. La UI se exporta como archivos estáticos y la lógica de datos corre dentro del dispositivo con almacenamiento local; no depende de una URL externa ni de internet en tiempo de ejecución.
 
 ### Requisitos
 
-Necesitas definir `CAPACITOR_SERVER_URL` con la URL pública donde esté desplegada la app, por ejemplo `https://tu-dominio.com`. Esa URL es la que abrirá el APK y la misma que consumen las llamadas relativas a `/api/...`.
+No necesitas definir ninguna URL remota. El build genera `out/` y Capacitor lo usa como origen local.
 
 ### Build local
 
@@ -20,4 +20,4 @@ pnpm android:build:debug
 
 ### Build en GitHub Actions
 
-El workflow [android-apk.yml](.github/workflows/android-apk.yml) genera un APK debug y lo sube como artefacto. Puedes dispararlo manualmente con `workflow_dispatch` y pasar `server_url`, o definir la secret `CAPACITOR_SERVER_URL` en el repositorio.
+El workflow [android-apk.yml](.github/workflows/android-apk.yml) genera un APK debug y lo sube como artefacto usando únicamente archivos locales del proyecto.

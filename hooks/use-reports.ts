@@ -1,81 +1,130 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect, useState } from 'react'
 import type { SalesReport } from '@/lib/types'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+import {
+  bootstrapOfflineData,
+  getOfflineCancellations,
+  getOfflineDailyReport,
+  getOfflineGameReport,
+  getOfflineSalesReport,
+  getOfflineWeeklyReport,
+} from '@/lib/local-db'
 
 export function useSalesReport(options?: {
   startDate?: string
   endDate?: string
 }) {
-  const params = new URLSearchParams({ type: 'sales' })
-  if (options?.startDate) params.set('startDate', options.startDate)
-  if (options?.endDate) params.set('endDate', options.endDate)
-  
-  const { data, error, isLoading, mutate } = useSWR<SalesReport>(
-    `/api/reports?${params.toString()}`,
-    fetcher
-  )
+  const [report, setReport] = useState<SalesReport>({
+    totalSales: 0,
+    totalTickets: 0,
+    totalPrizes: 0,
+    totalPaid: 0,
+    pendingPrizes: 0,
+    netProfit: 0,
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setReport(
+        getOfflineSalesReport({
+          startDate: options?.startDate ? new Date(options.startDate) : undefined,
+          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+        })
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar reporte'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [options?.startDate, options?.endDate])
 
   return {
-    report: data || {
-      totalSales: 0,
-      totalTickets: 0,
-      totalPrizes: 0,
-      totalPaid: 0,
-      pendingPrizes: 0,
-      netProfit: 0
-    },
+    report,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
   }
 }
 
 export function useDailyReport(date?: string) {
-  const params = new URLSearchParams({ type: 'daily' })
-  if (date) params.set('date', date)
-  
-  const { data, error, isLoading, mutate } = useSWR<SalesReport>(
-    `/api/reports?${params.toString()}`,
-    fetcher
-  )
+  const [report, setReport] = useState<SalesReport>({
+    totalSales: 0,
+    totalTickets: 0,
+    totalPrizes: 0,
+    totalPaid: 0,
+    pendingPrizes: 0,
+    netProfit: 0,
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setReport(getOfflineDailyReport(date ? new Date(date) : new Date()))
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar reporte diario'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [date])
 
   return {
-    report: data || {
-      totalSales: 0,
-      totalTickets: 0,
-      totalPrizes: 0,
-      totalPaid: 0,
-      pendingPrizes: 0,
-      netProfit: 0
-    },
+    report,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
   }
 }
 
 export function useWeeklyReport() {
-  const { data, error, isLoading, mutate } = useSWR<{
-    days: { date: string; sales: number; prizes: number }[]
-    totals: SalesReport
-  }>('/api/reports?type=weekly', fetcher)
+  const [days, setDays] = useState<{ date: string; sales: number; prizes: number }[]>([])
+  const [totals, setTotals] = useState<SalesReport>({
+    totalSales: 0,
+    totalTickets: 0,
+    totalPrizes: 0,
+    totalPaid: 0,
+    pendingPrizes: 0,
+    netProfit: 0,
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      const data = getOfflineWeeklyReport()
+      setDays(data.days)
+      setTotals(data.totals)
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar reporte semanal'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [])
 
   return {
-    days: data?.days || [],
-    totals: data?.totals || {
-      totalSales: 0,
-      totalTickets: 0,
-      totalPrizes: 0,
-      totalPaid: 0,
-      pendingPrizes: 0,
-      netProfit: 0
-    },
+    days,
+    totals,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
   }
 }
 
@@ -83,23 +132,41 @@ export function useGameReport(options?: {
   startDate?: string
   endDate?: string
 }) {
-  const params = new URLSearchParams({ type: 'games' })
-  if (options?.startDate) params.set('startDate', options.startDate)
-  if (options?.endDate) params.set('endDate', options.endDate)
-  
-  const { data, error, isLoading, mutate } = useSWR<{
+  const [games, setGames] = useState<{
     gameId: string
     gameName: string
     ticketCount: number
     totalAmount: number
     prizesAmount: number
-  }[]>(`/api/reports?${params.toString()}`, fetcher)
+  }[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setGames(
+        getOfflineGameReport({
+          startDate: options?.startDate ? new Date(options.startDate) : undefined,
+          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+        })
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar reporte por juego'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [options?.startDate, options?.endDate])
 
   return {
-    games: data || [],
+    games,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
   }
 }
 
@@ -107,22 +174,40 @@ export function useCancellationsReport(options?: {
   startDate?: string
   endDate?: string
 }) {
-  const params = new URLSearchParams({ type: 'cancellations' })
-  if (options?.startDate) params.set('startDate', options.startDate)
-  if (options?.endDate) params.set('endDate', options.endDate)
-  
-  const { data, error, isLoading, mutate } = useSWR<{
+  const [cancellations, setCancellations] = useState<{
     id: string
     ticketNumber: string
     totalAmount: number
     reason: string
     createdAt: string
-  }[]>(`/api/reports?${params.toString()}`, fetcher)
+  }[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setCancellations(
+        getOfflineCancellations({
+          startDate: options?.startDate ? new Date(options.startDate) : undefined,
+          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+        })
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar cancelaciones'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [options?.startDate, options?.endDate])
 
   return {
-    cancellations: data || [],
+    cancellations,
     isLoading,
     error,
-    refresh: mutate
+    refresh,
   }
 }

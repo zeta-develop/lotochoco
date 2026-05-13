@@ -1,44 +1,43 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect, useState } from 'react'
 import { usePOSStore } from '@/store/pos-store'
-import { useEffect } from 'react'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+import {
+  bootstrapOfflineData,
+  getOfflineSettings,
+  updateOfflineSettings,
+} from '@/lib/local-db'
 
 export function useSettings() {
   const { settings: localSettings, setSettings: setLocalSettings, updateSetting: updateLocalSetting } = usePOSStore()
-  
-  const { data, error, isLoading, mutate } = useSWR<Record<string, string>>(
-    '/api/settings',
-    fetcher
-  )
+  const [data, setData] = useState<Record<string, string> | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      const settings = getOfflineSettings()
+      setData(settings)
+      setLocalSettings(settings)
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar configuración'))
+    }
+  }
 
   // Sync with Zustand store
   useEffect(() => {
-    if (data) {
-      setLocalSettings(data)
-    }
-  }, [data, setLocalSettings])
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [setLocalSettings])
 
   const updateSettings = async (updates: Record<string, string>) => {
     // Optimistic update
     setLocalSettings({ ...localSettings, ...updates })
-    
-    const response = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
-    })
-    
-    if (!response.ok) {
-      // Revert on error
-      mutate()
-      const error = await response.json()
-      throw new Error(error.error || 'Error al actualizar configuración')
-    }
-    
-    const settings = await response.json()
+
+    const settings = updateOfflineSettings(updates)
+    setData(settings)
     setLocalSettings(settings)
     return settings
   }
@@ -53,6 +52,6 @@ export function useSettings() {
     error,
     updateSettings,
     updateSetting,
-    refresh: mutate
+    refresh,
   }
 }

@@ -1,9 +1,15 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect, useState } from 'react'
 import type { Ticket, CartItem } from '@/lib/types'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+import {
+  bootstrapOfflineData,
+  cancelOfflineTicket,
+  createOfflineTicket,
+  getOfflineTicketById,
+  getOfflineTickets,
+  getOfflineTodayTickets,
+} from '@/lib/local-db'
 
 export function useTickets(options?: {
   today?: boolean
@@ -11,58 +17,50 @@ export function useTickets(options?: {
   startDate?: string
   endDate?: string
 }) {
-  const params = new URLSearchParams()
-  
-  if (options?.today) params.set('today', 'true')
-  if (options?.status) params.set('status', options.status)
-  if (options?.startDate) params.set('startDate', options.startDate)
-  if (options?.endDate) params.set('endDate', options.endDate)
-  
-  const url = `/api/tickets${params.toString() ? `?${params.toString()}` : ''}`
-  
-  const { data, error, isLoading, mutate } = useSWR(url, fetcher)
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      if (options?.today) {
+        setData(getOfflineTodayTickets())
+        return
+      }
+
+      setData(
+        getOfflineTickets({
+          status: options?.status,
+          startDate: options?.startDate ? new Date(options.startDate) : undefined,
+          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+        })
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar tickets'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [options?.today, options?.status, options?.startDate, options?.endDate])
 
   const createTicket = async (items: CartItem[]) => {
-    const response = await fetch('/api/tickets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items })
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al crear ticket')
-    }
-    
-    const ticket = await response.json()
-    mutate()
+    const ticket = createOfflineTicket(items)
+    await refresh()
     return ticket
   }
 
   const cancelTicket = async (id: string, reason: string) => {
-    const response = await fetch(`/api/tickets/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason })
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al cancelar ticket')
-    }
-    
-    mutate()
-    return await response.json()
+    const result = cancelOfflineTicket(id, reason)
+    await refresh()
+    return result
   }
 
   const getTicket = async (idOrNumber: string): Promise<Ticket | null> => {
-    const response = await fetch(`/api/tickets/${idOrNumber}`)
-    
-    if (!response.ok) {
-      return null
-    }
-    
-    return await response.json()
+    return getOfflineTicketById(idOrNumber) || getOfflineTicketByNumber(idOrNumber) || null
   }
 
   // Handle both today's tickets (array) and paginated results
@@ -77,7 +75,7 @@ export function useTickets(options?: {
     createTicket,
     cancelTicket,
     getTicket,
-    refresh: mutate
+    refresh,
   }
 }
 

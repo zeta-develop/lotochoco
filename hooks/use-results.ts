@@ -1,9 +1,16 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect, useState } from 'react'
 import type { Result, Winner } from '@/lib/types'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+import {
+  bootstrapOfflineData,
+  createOfflineResult,
+  getOfflineResults,
+  getOfflineTodayResults,
+  getOfflineWinners,
+  markOfflineWinnerAsPaid,
+  processOfflineResult,
+} from '@/lib/local-db'
 
 export function useResults(options?: {
   today?: boolean
@@ -11,16 +18,32 @@ export function useResults(options?: {
   startDate?: string
   endDate?: string
 }) {
-  const params = new URLSearchParams()
-  
-  if (options?.today) params.set('today', 'true')
-  if (options?.gameId) params.set('gameId', options.gameId)
-  if (options?.startDate) params.set('startDate', options.startDate)
-  if (options?.endDate) params.set('endDate', options.endDate)
-  
-  const url = `/api/results${params.toString() ? `?${params.toString()}` : ''}`
-  
-  const { data, error, isLoading, mutate } = useSWR<Result[]>(url, fetcher)
+  const [results, setResults] = useState<Result[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setResults(
+        options?.today
+          ? getOfflineTodayResults()
+          : getOfflineResults({
+              gameId: options?.gameId,
+              startDate: options?.startDate ? new Date(options.startDate) : undefined,
+              endDate: options?.endDate ? new Date(options.endDate) : undefined,
+            })
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar resultados'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [options?.today, options?.gameId, options?.startDate, options?.endDate])
 
   const createResult = async (resultData: {
     gameId: string
@@ -29,28 +52,20 @@ export function useResults(options?: {
     drawDate?: Date
     autoProcess?: boolean
   }) => {
-    const response = await fetch('/api/results', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(resultData)
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al registrar resultado')
+    const result = createOfflineResult(resultData)
+    if (resultData.autoProcess) {
+      processOfflineResult(result.id)
     }
-    
-    const result = await response.json()
-    mutate()
+    await refresh()
     return result
   }
 
   return {
-    results: data || [],
+    results,
     isLoading,
     error,
     createResult,
-    refresh: mutate
+    refresh,
   }
 }
 
@@ -63,39 +78,43 @@ export function useWinners(options?: {
   startDate?: string
   endDate?: string
 }) {
-  const params = new URLSearchParams()
-  
-  if (options?.isPaid !== undefined) params.set('isPaid', String(options.isPaid))
-  if (options?.startDate) params.set('startDate', options.startDate)
-  if (options?.endDate) params.set('endDate', options.endDate)
-  
-  const url = `/api/winners${params.toString() ? `?${params.toString()}` : ''}`
-  
-  const { data, error, isLoading, mutate } = useSWR<Winner[]>(url, fetcher)
+  const [winners, setWinners] = useState<Winner[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setWinners(
+        getOfflineWinners({
+          isPaid: options?.isPaid,
+          startDate: options?.startDate ? new Date(options.startDate) : undefined,
+          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+        })
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar ganadores'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [options?.isPaid, options?.startDate, options?.endDate])
 
   const markAsPaid = async (winnerId: string) => {
-    const response = await fetch('/api/winners', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ winnerId })
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al marcar como pagado')
-    }
-    
-    const winner = await response.json()
-    mutate()
+    const winner = markOfflineWinnerAsPaid(winnerId)
+    await refresh()
     return winner
   }
 
   return {
-    winners: data || [],
+    winners,
     isLoading,
     error,
     markAsPaid,
-    refresh: mutate
+    refresh,
   }
 }
 

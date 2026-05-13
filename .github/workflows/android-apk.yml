@@ -2,11 +2,6 @@ name: Android APK
 
 on:
   workflow_dispatch:
-    inputs:
-      server_url:
-        description: URL del sitio Next.js que abrirá el APK
-        required: false
-        type: string
   push:
     branches:
       - main
@@ -29,6 +24,11 @@ jobs:
         with:
           version: 10
 
+      - name: Enable Corepack & prepare pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10 --activate
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -43,21 +43,6 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Set Capacitor server URL
-        run: |
-          if [ -n "${{ github.event.inputs.server_url }}" ]; then
-            echo "CAPACITOR_SERVER_URL=${{ github.event.inputs.server_url }}" >> "$GITHUB_ENV"
-          elif [ -n "${{ secrets.CAPACITOR_SERVER_URL }}" ]; then
-            echo "CAPACITOR_SERVER_URL=${{ secrets.CAPACITOR_SERVER_URL }}" >> "$GITHUB_ENV"
-          fi
-
-      - name: Validate Capacitor server URL
-        run: |
-          if [ -z "${CAPACITOR_SERVER_URL:-}" ]; then
-            echo "CAPACITOR_SERVER_URL is required. Set the repository secret or pass workflow_dispatch.server_url."
-            exit 1
-          fi
 
       - name: Generate Android project
         run: pnpm cap:add:android

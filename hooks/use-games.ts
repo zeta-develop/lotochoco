@@ -1,15 +1,34 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect, useState } from 'react'
 import type { Game } from '@/lib/types'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+import {
+  bootstrapOfflineData,
+  createOfflineGame,
+  deleteOfflineGame,
+  getOfflineGames,
+  updateOfflineGame,
+} from '@/lib/local-db'
 
 export function useGames(activeOnly = true) {
-  const { data, error, isLoading, mutate } = useSWR<Game[]>(
-    `/api/games${activeOnly ? '?active=true' : ''}`,
-    fetcher
-  )
+  const [games, setGames] = useState<Game[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const refresh = async () => {
+    try {
+      setError(null)
+      setGames(getOfflineGames(activeOnly))
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al cargar juegos'))
+    }
+  }
+
+  useEffect(() => {
+    bootstrapOfflineData()
+    setIsLoading(true)
+    void refresh().finally(() => setIsLoading(false))
+  }, [activeOnly])
 
   const createGame = async (gameData: {
     name: string
@@ -17,59 +36,29 @@ export function useGames(activeOnly = true) {
     multiplier: number
     schedules?: { name: string; time: string }[]
   }) => {
-    const response = await fetch('/api/games', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gameData)
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al crear juego')
-    }
-    
-    const game = await response.json()
-    mutate()
+    const game = createOfflineGame(gameData)
+    await refresh()
     return game
   }
 
   const updateGame = async (id: string, updates: Partial<Game>) => {
-    const response = await fetch(`/api/games/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al actualizar juego')
-    }
-    
-    const game = await response.json()
-    mutate()
+    const game = updateOfflineGame(id, updates)
+    await refresh()
     return game
   }
 
   const deleteGame = async (id: string) => {
-    const response = await fetch(`/api/games/${id}`, {
-      method: 'DELETE'
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Error al eliminar juego')
-    }
-    
-    mutate()
+    deleteOfflineGame(id)
+    await refresh()
   }
 
   return {
-    games: data || [],
+    games,
     isLoading,
     error,
     createGame,
     updateGame,
     deleteGame,
-    refresh: mutate
+    refresh,
   }
 }
