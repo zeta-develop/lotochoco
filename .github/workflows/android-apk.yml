@@ -89,7 +89,7 @@ jobs:
           fi
 
           printf '%s\n' \
-            'RELEASE_STORE_FILE=app/release-keystore.jks' \
+            'RELEASE_STORE_FILE=release-keystore.jks' \
             "RELEASE_STORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD" \
             "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS" \
             "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD" \
