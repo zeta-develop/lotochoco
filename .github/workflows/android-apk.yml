@@ -67,13 +67,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -z "${RELEASE_KEYSTORE_BASE64:-}" ] || [ -z "${RELEASE_KEYSTORE_PASSWORD:-}" ] || [ -z "${RELEASE_KEY_ALIAS:-}" ] || [ -z "${RELEASE_KEY_PASSWORD:-}" ]; then
-            echo "Missing release signing secrets. Configure RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD."
-            exit 1
-          fi
-
           mkdir -p android/app
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+
+          if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ] && [ -n "${RELEASE_KEYSTORE_PASSWORD:-}" ] && [ -n "${RELEASE_KEY_ALIAS:-}" ] && [ -n "${RELEASE_KEY_PASSWORD:-}" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+          else
+            echo "Release signing secrets not found; generating a temporary release keystore for this build."
+            keytool -genkeypair \
+              -keystore android/app/release-keystore.jks \
+              -storetype JKS \
+              -storepass android \
+              -keypass android \
+              -alias release \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 36500 \
+              -dname "CN=Lotochoco, OU=Release, O=Lotochoco, L=Local, S=NA, C=NI"
+            RELEASE_KEYSTORE_PASSWORD=android
+            RELEASE_KEY_ALIAS=release
+            RELEASE_KEY_PASSWORD=android
+          fi
 
           printf '%s\n' \
             'RELEASE_STORE_FILE=app/release-keystore.jks' \
