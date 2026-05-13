@@ -271,6 +271,16 @@ function getOpenSession(state: LocalState) {
 export function bootstrapOfflineData() {
   if (typeof window === 'undefined') return
   loadState()
+  // Attempt async migration to SQLite on native devices for durability.
+  // Fire-and-forget: failures will not break the app and localStorage remains the fallback.
+  ;(async () => {
+    try {
+      const adapter = await import('./sqlite-adapter')
+      await adapter.migrateLocalStorageToSQLite()
+    } catch {
+      // ignore
+    }
+  })()
 }
 
 export function getOfflineGames(activeOnly = true): Game[] {

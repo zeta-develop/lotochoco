@@ -29,6 +29,14 @@ jobs:
           corepack enable
           corepack prepare pnpm@10 --activate
 
+      - name: Ensure pnpm available
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found — installing global pnpm@10"
+            npm install -g pnpm@10
+          fi
+          pnpm -v
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
