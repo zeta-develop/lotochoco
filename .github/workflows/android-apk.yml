@@ -1,0 +1,75 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: URL del sitio Next.js que abrirá el APK
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Next.js
+        run: pnpm build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set Capacitor server URL
+        run: |
+          if [ -n "${{ github.event.inputs.server_url }}" ]; then
+            echo "CAPACITOR_SERVER_URL=${{ github.event.inputs.server_url }}" >> "$GITHUB_ENV"
+          elif [ -n "${{ secrets.CAPACITOR_SERVER_URL }}" ]; then
+            echo "CAPACITOR_SERVER_URL=${{ secrets.CAPACITOR_SERVER_URL }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Validate Capacitor server URL
+        run: |
+          if [ -z "${CAPACITOR_SERVER_URL:-}" ]; then
+            echo "CAPACITOR_SERVER_URL is required. Set the repository secret or pass workflow_dispatch.server_url."
+            exit 1
+          fi
+
+      - name: Generate Android project
+        run: pnpm cap:add:android
+
+      - name: Sync Capacitor
+        run: pnpm cap:sync:android
+
+      - name: Build debug APK
+        run: pnpm android:build:debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lotochoco-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
