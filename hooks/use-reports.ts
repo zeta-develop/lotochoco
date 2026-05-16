@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { SalesReport } from '@/lib/types'
 import {
@@ -52,8 +52,14 @@ export function useSalesReport(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const parsedStartDate = options?.startDate ? startOfDay(new Date(options.startDate)) : undefined
-  const parsedEndDate = options?.endDate ? endOfDay(new Date(options.endDate)) : undefined
+  const parsedStartDate = useMemo(
+    () => (options?.startDate ? startOfDay(new Date(options.startDate)) : undefined),
+    [options?.startDate]
+  )
+  const parsedEndDate = useMemo(
+    () => (options?.endDate ? endOfDay(new Date(options.endDate)) : undefined),
+    [options?.endDate]
+  )
 
   const refresh = useCallback(async () => {
     try {
@@ -70,10 +76,23 @@ export function useSalesReport(options?: {
   }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [options?.startDate, options?.endDate, refresh])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [refresh])
 
   useReportAutoRefresh(refresh)
 
@@ -107,9 +126,22 @@ export function useDailyReport(date?: string) {
   }, [date])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
   }, [date, refresh])
 
   useReportAutoRefresh(refresh)
@@ -147,9 +179,22 @@ export function useWeeklyReport() {
   }, [])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
   }, [refresh])
 
   useReportAutoRefresh(refresh)
@@ -177,8 +222,14 @@ export function useGameReport(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const parsedStartDate = options?.startDate ? startOfDay(new Date(options.startDate)) : undefined
-  const parsedEndDate = options?.endDate ? endOfDay(new Date(options.endDate)) : undefined
+  const parsedStartDate = useMemo(
+    () => (options?.startDate ? startOfDay(new Date(options.startDate)) : undefined),
+    [options?.startDate]
+  )
+  const parsedEndDate = useMemo(
+    () => (options?.endDate ? endOfDay(new Date(options.endDate)) : undefined),
+    [options?.endDate]
+  )
 
   const refresh = useCallback(async () => {
     try {
@@ -195,10 +246,23 @@ export function useGameReport(options?: {
   }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [options?.startDate, options?.endDate, refresh])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [refresh])
 
   useReportAutoRefresh(refresh)
 
@@ -224,8 +288,14 @@ export function useCancellationsReport(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const parsedStartDate = options?.startDate ? startOfDay(new Date(options.startDate)) : undefined
-  const parsedEndDate = options?.endDate ? endOfDay(new Date(options.endDate)) : undefined
+  const parsedStartDate = useMemo(
+    () => (options?.startDate ? startOfDay(new Date(options.startDate)) : undefined),
+    [options?.startDate]
+  )
+  const parsedEndDate = useMemo(
+    () => (options?.endDate ? endOfDay(new Date(options.endDate)) : undefined),
+    [options?.endDate]
+  )
 
   const refresh = useCallback(async () => {
     try {
@@ -242,10 +312,23 @@ export function useCancellationsReport(options?: {
   }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [options?.startDate, options?.endDate, refresh])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [refresh])
 
   useReportAutoRefresh(refresh)
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { PyramidResult } from '@/lib/types'
 import {
   analyzeOfflineNumber,
@@ -27,7 +27,7 @@ export function usePyramid(date?: string) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       const selectedDate = date ? new Date(date) : new Date()
@@ -51,13 +51,26 @@ export function usePyramid(date?: string) {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al calcular pirámide'))
     }
-  }
+  }, [date])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [date])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [date, refresh])
 
   return {
     data,
@@ -79,7 +92,7 @@ export function useHotColdNumbers(gameId: string) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       const frequency = getOfflineNumberFrequency({ gameId, limit: 20 })
@@ -90,14 +103,26 @@ export function useHotColdNumbers(gameId: string) {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar números'))
     }
-  }
+  }, [gameId])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    if (!gameId) return
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [gameId])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled || !gameId) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [gameId, refresh])
 
   return {
     hot: data.hot,
@@ -117,13 +142,23 @@ export function useNumberAnalysis(number: string, date?: string) {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    bootstrapOfflineData()
-    if (!number) return
-    setIsLoading(true)
-    const selectedDate = date ? new Date(date) : new Date()
-    const pyramid = generateOfflinePyramid(selectedDate)
-    setData(analyzeOfflineNumber(number, pyramid))
-    setIsLoading(false)
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled || !number) return
+      setIsLoading(true)
+      const selectedDate = date ? new Date(date) : new Date()
+      const pyramid = generateOfflinePyramid(selectedDate)
+      setData(analyzeOfflineNumber(number, pyramid))
+      if (!cancelled) setIsLoading(false)
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
   }, [number, date])
 
   return {

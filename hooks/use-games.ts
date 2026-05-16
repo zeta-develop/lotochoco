@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Game } from '@/lib/types'
 import {
   bootstrapOfflineData,
@@ -15,20 +15,33 @@ export function useGames(activeOnly = true) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setGames(getOfflineGames(activeOnly))
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar juegos'))
     }
-  }
+  }, [activeOnly])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [activeOnly])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeOnly, refresh])
 
   const createGame = async (gameData: {
     name: string

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Result, Winner } from '@/lib/types'
 import {
   bootstrapOfflineData,
@@ -22,7 +22,7 @@ export function useResults(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setResults(
@@ -37,13 +37,26 @@ export function useResults(options?: {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar resultados'))
     }
-  }
+  }, [options?.endDate, options?.gameId, options?.startDate, options?.today])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [options?.today, options?.gameId, options?.startDate, options?.endDate])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [options?.today, options?.gameId, options?.startDate, options?.endDate, refresh])
 
   const createResult = async (resultData: {
     gameId: string
@@ -82,7 +95,7 @@ export function useWinners(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       setWinners(
@@ -95,13 +108,26 @@ export function useWinners(options?: {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar ganadores'))
     }
-  }
+  }, [options?.endDate, options?.isPaid, options?.startDate])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [options?.isPaid, options?.startDate, options?.endDate])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [options?.isPaid, options?.startDate, options?.endDate, refresh])
 
   const markAsPaid = async (winnerId: string) => {
     const winner = markOfflineWinnerAsPaid(winnerId)

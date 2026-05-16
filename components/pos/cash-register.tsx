@@ -19,6 +19,7 @@ import {
 import { useCurrentSession, useCashSummary, useCashSessions } from '@/hooks/use-cash'
 import { useSettings } from '@/hooks/use-settings'
 import { printHtmlDocument } from '@/lib/print'
+import { printerService } from '@/services/printer'
 import { 
   Wallet, 
   DollarSign, 
@@ -85,7 +86,14 @@ export function CashRegister() {
       setCloseNotes('')
       
       // Print close report
-      handlePrintClose(closedSession)
+      try {
+        const result = await printerService.printClose(closedSession, settings)
+        if (!result.success) {
+          toast.error(result.message || 'Error al imprimir cierre')
+        }
+      } catch (err) {
+        // ignore
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al cerrar caja')
     } finally {
@@ -120,47 +128,8 @@ export function CashRegister() {
     }
   }
 
-  const handlePrintClose = (closedSession: any) => {
-    const balance = closedSession.closingAmount || summary.balance
-    const profit = closedSession.salesTotal - closedSession.prizesTotal
-
-    printHtmlDocument(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Cierre de Caja</title>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            body { font-family: 'Courier New', monospace; font-size: 12px; width: 80mm; margin: 0; padding: 5mm; }
-            .center { text-align: center; }
-            .right { text-align: right; }
-            .bold { font-weight: bold; }
-            .large { font-size: 16px; }
-            .separator { border-top: 1px dashed #000; margin: 8px 0; }
-            .row { display: flex; justify-content: space-between; padding: 3px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="center large bold">CIERRE DE CAJA</div>
-          <div class="center">${settings.businessName || 'LOTERIA'}</div>
-          <div class="separator"></div>
-          <div class="row"><span>Apertura:</span><span>${format(new Date(closedSession.openedAt), "dd/MM/yyyy HH:mm")}</span></div>
-          <div class="row"><span>Cierre:</span><span>${format(new Date(closedSession.closedAt), "dd/MM/yyyy HH:mm")}</span></div>
-          <div class="separator"></div>
-          <div class="row"><span>Monto Inicial:</span><span>${currency}${closedSession.openingAmount}</span></div>
-          <div class="row"><span>Ventas:</span><span class="bold">+${currency}${closedSession.salesTotal}</span></div>
-          <div class="row"><span>Premios:</span><span>-${currency}${closedSession.prizesTotal}</span></div>
-          <div class="separator"></div>
-          <div class="row bold large"><span>Balance:</span><span>${currency}${balance}</span></div>
-          <div class="row"><span>Ganancia:</span><span>${currency}${profit}</span></div>
-          ${closedSession.notes ? `<div class="separator"></div><div>Notas: ${closedSession.notes}</div>` : ''}
-          <div class="separator"></div>
-          <div class="center" style="margin-top: 20px;">___________________</div>
-          <div class="center">Firma</div>
-        </body>
-        </html>
-      `)
+  const handlePrintClose = (_closedSession: any) => {
+    // left for legacy use if needed
   }
 
   return (

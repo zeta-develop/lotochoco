@@ -337,6 +337,75 @@ export function generatePrintableHTML(
   `
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
+}
+
+export function generateTicketImageUrl(
+  ticket: Ticket & { items: (TicketItem & { game?: { name: string } })[] },
+  settings: Record<string, string>
+): string {
+  const width = 420
+  const baseHeight = 260
+  const itemHeight = 42
+  const height = baseHeight + ticket.items.length * itemHeight
+  const currency = settings.currency || 'C$'
+  const businessName = escapeXml(settings.businessName || 'LOTERÍA')
+  const ticketMessage = escapeXml(settings.ticketMessage || '¡Buena suerte!')
+  const createdAt = escapeXml(format(new Date(ticket.createdAt), 'dd/MM/yyyy HH:mm', { locale: es }))
+
+  const itemRows = ticket.items
+    .map((item, index) => {
+      const y = 190 + index * itemHeight
+      const gameName = escapeXml((item.game?.name || 'Juego').slice(0, 18))
+      const number = escapeXml(item.number)
+      const schedule = escapeXml(item.schedule.slice(0, 8))
+      const amount = escapeXml(`${currency}${item.amount.toFixed(2)}`)
+
+      return `
+        <g>
+          <text x="28" y="${y}" font-size="15" font-weight="700" fill="#111827">${gameName}</text>
+          <text x="190" y="${y}" font-size="15" font-weight="700" fill="#111827">${number}</text>
+          <text x="250" y="${y}" font-size="13" fill="#4b5563">${schedule}</text>
+          <text x="380" y="${y}" font-size="15" font-weight="700" fill="#111827" text-anchor="end">${amount}</text>
+          <line x1="24" y1="${y + 12}" x2="396" y2="${y + 12}" stroke="#e5e7eb" stroke-width="1" />
+        </g>
+      `
+    })
+    .join('')
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#ffffff" />
+      <rect x="12" y="12" width="396" height="${height - 24}" rx="18" fill="#ffffff" stroke="#111827" stroke-width="1.5" />
+      <text x="210" y="52" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#111827">${businessName}</text>
+      <text x="210" y="76" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6b7280">Ticket de Loteria</text>
+      <line x1="28" y1="95" x2="392" y2="95" stroke="#111827" stroke-dasharray="6 5" stroke-width="1" />
+      <text x="28" y="122" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#374151">Ticket:</text>
+      <text x="390" y="122" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111827">${escapeXml(ticket.ticketNumber)}</text>
+      <text x="28" y="146" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#374151">Fecha:</text>
+      <text x="390" y="146" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#111827">${createdAt}</text>
+      <line x1="28" y1="160" x2="392" y2="160" stroke="#111827" stroke-dasharray="6 5" stroke-width="1" />
+      <text x="28" y="184" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">JUEGO</text>
+      <text x="190" y="184" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">NUM</text>
+      <text x="250" y="184" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">HOR</text>
+      <text x="380" y="184" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">MONTO</text>
+      ${itemRows}
+      <line x1="28" y1="${height - 78}" x2="392" y2="${height - 78}" stroke="#111827" stroke-dasharray="6 5" stroke-width="1.2" />
+      <text x="28" y="${height - 48}" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111827">TOTAL:</text>
+      <text x="390" y="${height - 48}" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#111827">${escapeXml(`${currency}${ticket.totalAmount.toFixed(2)}`)}</text>
+      <text x="210" y="${height - 22}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#6b7280">${ticketMessage}</text>
+    </svg>
+  `
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 function generateTestPage(): string {
   return `${COMMANDS.INIT}${COMMANDS.ALIGN_CENTER}PRUEBA DE IMPRESION${COMMANDS.FEED_LINE}${COMMANDS.FEED_LINE}${COMMANDS.CUT_PAPER}`
 }
@@ -346,5 +415,68 @@ export const printerService = {
   generateCashCloseCommands: generateCashCloseReceipt,
   generateTestPage,
   generatePrintableHTML,
-  printToNetwork
+  printToNetwork,
+  async printTicket(ticket: Ticket & { items: (TicketItem & { game?: { name: string } })[] }, settings: Record<string,string>) {
+    try {
+      const type = settings.printerType || 'browser'
+
+      // Native print dialog (cordova-plugin-printer)
+      if (type === 'native' && typeof window !== 'undefined' && (window as any).cordova?.plugins?.printer) {
+        const html = generatePrintableHTML(ticket, settings)
+        return new Promise<{success:boolean;message:string}>((resolve) => {
+          ;(window as any).cordova.plugins.printer.print(html, { name: `Ticket ${ticket.ticketNumber}` }, () => resolve({ success: true, message: 'Impresión nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
+        })
+      }
+
+      // Thermal / raw plugin (if available)
+      if ((type === 'thermal' || type === 'raw') && typeof window !== 'undefined' && (window as any).thermalprinter) {
+        const commands = generateTicketReceipt(ticket, settings)
+        try {
+          await (window as any).thermalprinter.send(commands)
+          return { success: true, message: 'Enviado a impresora térmica' }
+        } catch (err) {
+          return { success: false, message: String(err) }
+        }
+      }
+
+      // Network printer
+      if (type === 'network') {
+        const commands = generateTicketReceipt(ticket, settings)
+        return await printToNetwork(settings.printerAddress || '', commands)
+      }
+
+      // Fallback: browser printing
+      const html = generatePrintableHTML(ticket, settings)
+      // dynamically import to avoid cycles
+      const { printHtmlDocument } = await import('@/lib/print')
+      printHtmlDocument(html)
+      return { success: true, message: 'Impresión por navegador iniciada' }
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  },
+  async printClose(session: CashSession, settings: Record<string,string>) {
+    try {
+      const type = settings.printerType || 'browser'
+      // Thermal/raw not typical for close; prefer network/native/browser
+      if (type === 'native' && typeof window !== 'undefined' && (window as any).cordova?.plugins?.printer) {
+        const html = generatePrintableHTML(session as any, settings)
+        return new Promise<{success:boolean;message:string}>((resolve) => {
+          ;(window as any).cordova.plugins.printer.print(html, { name: `Cierre de Caja ${session.id || ''}` }, () => resolve({ success: true, message: 'Impresión nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
+        })
+      }
+
+      if (type === 'network') {
+        const commands = generateCashCloseReceipt(session, settings)
+        return await printToNetwork(settings.printerAddress || '', commands)
+      }
+
+      const html = generatePrintableHTML(session as any, settings)
+      const { printHtmlDocument } = await import('@/lib/print')
+      printHtmlDocument(html)
+      return { success: true, message: 'Impresión por navegador iniciada' }
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  }
 }

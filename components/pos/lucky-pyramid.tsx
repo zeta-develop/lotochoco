@@ -76,15 +76,15 @@ export function LuckyPyramid() {
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-              ) : data?.pyramid ? (
-                <div className="flex flex-col items-center space-y-3 py-6">
+                ) : data?.pyramid ? (
+                <div className="flex flex-col items-center space-y-3 py-6 px-2">
                   {data.pyramid.rows.map((row: number[], rowIndex: number) => (
-                    <div key={rowIndex} className="flex gap-2">
+                    <div key={rowIndex} className="flex gap-1 sm:gap-2 justify-center flex-nowrap">
                       {row.map((num: number, colIndex: number) => (
                         <div
                           key={colIndex}
                           className={`
-                            w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg
+                            w-8 h-8 sm:w-10 md:w-12 sm:h-10 md:h-12 flex items-center justify-center rounded-lg font-bold text-sm sm:text-base md:text-lg
                             transition-all duration-300 hover:scale-110
                             ${rowIndex === data.pyramid.rows.length - 1
                               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-2 ring-primary/50"
@@ -102,7 +102,7 @@ export function LuckyPyramid() {
                   
                   <div className="mt-6 text-center space-y-2">
                     <p className="text-sm text-muted-foreground">Numero de la Suerte</p>
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-3xl font-bold shadow-xl">
+                    <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-2xl sm:text-3xl font-bold shadow-xl">
                       {data.pyramid.luckyNumber}
                     </div>
                   </div>

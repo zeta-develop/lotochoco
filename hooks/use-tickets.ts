@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Ticket, CartItem } from '@/lib/types'
 import {
   bootstrapOfflineData,
   cancelOfflineTicket,
   createOfflineTicket,
   getOfflineTicketById,
+  getOfflineTicketByNumber,
   getOfflineTickets,
   getOfflineTodayTickets,
 } from '@/lib/local-db'
@@ -21,7 +22,7 @@ export function useTickets(options?: {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       if (options?.today) {
@@ -39,13 +40,26 @@ export function useTickets(options?: {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar tickets'))
     }
-  }
+  }, [options?.endDate, options?.startDate, options?.status, options?.today])
 
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [options?.today, options?.status, options?.startDate, options?.endDate])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [options?.today, options?.status, options?.startDate, options?.endDate, refresh])
 
   const createTicket = async (items: CartItem[]) => {
     const ticket = createOfflineTicket(items)
@@ -60,7 +74,12 @@ export function useTickets(options?: {
   }
 
   const getTicket = async (idOrNumber: string): Promise<Ticket | null> => {
-    return getOfflineTicketById(idOrNumber) || getOfflineTicketByNumber(idOrNumber) || null
+    try {
+      return getOfflineTicketById(idOrNumber) || getOfflineTicketByNumber(idOrNumber) || null
+    } catch (error) {
+      setError(error instanceof Error ? error : new Error('Error al buscar ticket'))
+      return null
+    }
   }
 
   // Handle both today's tickets (array) and paginated results

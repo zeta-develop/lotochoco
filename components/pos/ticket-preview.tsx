@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Printer, X } from "lucide-react"
@@ -22,6 +23,19 @@ export function TicketPreview({
   onPrint,
   onClose 
 }: TicketPreviewProps) {
+  useEffect(() => {
+    if (!onClose) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   const formatDate = (date: Date | string) => {
     const d = new Date(date)
     return d.toLocaleDateString("es-NI", {
@@ -34,8 +48,13 @@ export function TicketPreview({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-sm bg-white text-black">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={() => onClose?.()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <Card className="w-full max-w-sm bg-white text-black" onClick={(event) => event.stopPropagation()}>
         <CardContent className="p-0">
           {/* Ticket Content - Simula papel termico */}
           <div className="p-4 font-mono text-sm space-y-3">

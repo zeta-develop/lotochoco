@@ -27,6 +27,9 @@ type LocalState = {
 const STORAGE_KEY = 'lotochoco.offline.v1'
 export const OFFLINE_DB_UPDATED_EVENT = 'lotochoco:offline-db-updated'
 
+let currentState: LocalState | null = null
+let hydrationPromise: Promise<LocalState> | null = null
+
 const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   businessName: 'Loteria La Fortuna',
   currency: 'C$',
@@ -94,11 +97,88 @@ const DEFAULT_GAMES: Array<{
 ]
 
 function now() {
-  return new Date().toISOString()
+  return new Date()
 }
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `id_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function toDate(value: unknown): Date {
+  if (value instanceof Date) return value
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value)
+  return now()
+}
+
+function safeParseState(raw: string | null | undefined): LocalState | null {
+  if (!raw) return null
+
+  try {
+    return reviveState(JSON.parse(raw) as Partial<LocalState>)
+  } catch {
+    return null
+  }
+}
+
+function reviveState(parsed?: Partial<LocalState> | null): LocalState {
+  const fallback = createInitialState()
+  if (!parsed) return fallback
+
+  return {
+    games: (parsed.games || fallback.games).map((game) => ({
+      ...game,
+      createdAt: toDate(game.createdAt),
+      updatedAt: toDate(game.updatedAt),
+      schedules: (game.schedules || []).map((schedule) => ({
+        ...schedule,
+        createdAt: toDate(schedule.createdAt),
+        updatedAt: toDate(schedule.updatedAt),
+      })),
+    })),
+    tickets: (parsed.tickets || []).map((ticket) => ({
+      ...ticket,
+      createdAt: toDate(ticket.createdAt),
+      updatedAt: toDate(ticket.updatedAt),
+      cancelledAt: ticket.cancelledAt ? toDate(ticket.cancelledAt) : null,
+      items: (ticket.items || []).map((item) => ({
+        ...item,
+        createdAt: toDate(item.createdAt),
+      })),
+      winners: (ticket.winners || []).map((winner) => ({
+        ...winner,
+        createdAt: toDate(winner.createdAt),
+        updatedAt: toDate(winner.updatedAt),
+      })),
+    })),
+    results: (parsed.results || []).map((result) => ({
+      ...result,
+      drawDate: toDate(result.drawDate),
+      createdAt: toDate(result.createdAt),
+      updatedAt: toDate(result.updatedAt),
+    })),
+    winners: (parsed.winners || []).map((winner) => ({
+      ...winner,
+      paidAt: winner.paidAt ? toDate(winner.paidAt) : null,
+      createdAt: toDate(winner.createdAt),
+      updatedAt: toDate(winner.updatedAt),
+    })),
+    cashSessions: (parsed.cashSessions || []).map((session) => ({
+      ...session,
+      openedAt: toDate(session.openedAt),
+      closedAt: session.closedAt ? toDate(session.closedAt) : null,
+      createdAt: toDate(session.createdAt),
+      updatedAt: toDate(session.updatedAt),
+      movements: (session.movements || []).map((movement) => ({
+        ...movement,
+        createdAt: toDate(movement.createdAt),
+      })),
+    })),
+    cancellations: (parsed.cancellations || []).map((cancelation) => ({
+      ...cancelation,
+      createdAt: toDate(cancelation.createdAt),
+    })),
+    settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
+  }
 }
 
 function createInitialState(): LocalState {
@@ -138,44 +218,134 @@ function createInitialState(): LocalState {
   }
 }
 
-function loadState(): LocalState {
-  if (typeof window === 'undefined') {
-    return createInitialState()
-  }
-
-  const raw = window.localStorage.getItem(STORAGE_KEY)
-  if (!raw) {
-    const initialState = createInitialState()
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initialState))
-    return initialState
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<LocalState>
-    return {
-      games: parsed.games || [],
-      tickets: parsed.tickets || [],
-      results: parsed.results || [],
-      winners: parsed.winners || [],
-      cashSessions: parsed.cashSessions || [],
-      cancellations: parsed.cancellations || [],
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
-    }
-  } catch {
-    const initialState = createInitialState()
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initialState))
-    return initialState
-  }
+function notifyStateUpdated() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(OFFLINE_DB_UPDATED_EVENT))
 }
 
-function saveState(state: LocalState) {
+function persistToLocalStorage(state: LocalState) {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
-function notifyStateUpdated() {
+async function persistToSQLite(state: LocalState) {
+  try {
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>
+    const { writeStateToSQLite } = await dynamicImport('./sqlite-adapter')
+    await writeStateToSQLite(JSON.stringify(state))
+  } catch {
+    // SQLite plugin is optional in web builds.
+  }
+}
+
+async function loadFromSQLite(): Promise<LocalState | null> {
+  try {
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>
+    const { readStateFromSQLite } = await dynamicImport('./sqlite-adapter')
+    const raw = await readStateFromSQLite()
+    if (!raw) return null
+    return reviveState(JSON.parse(raw) as Partial<LocalState>)
+  } catch {
+    return null
+  }
+}
+
+async function hydrateState(): Promise<LocalState> {
+  if (typeof window === 'undefined') return createInitialState()
+  if (currentState) return currentState
+  if (hydrationPromise) return hydrationPromise
+  hydrationPromise = (async () => {
+    const sqliteState = await loadFromSQLite()
+    if (sqliteState) {
+      currentState = sqliteState
+      persistToLocalStorage(sqliteState)
+      return sqliteState
+    }
+
+    const localRaw = window.localStorage.getItem(STORAGE_KEY)
+    const localState = safeParseState(localRaw)
+    if (localState) {
+      currentState = localState
+      persistToLocalStorage(localState)
+      void persistToSQLite(localState)
+      return localState
+    }
+
+    if (localRaw) {
+      window.localStorage.removeItem(STORAGE_KEY)
+    }
+
+    const initialState = createInitialState()
+    currentState = initialState
+    persistToLocalStorage(initialState)
+    void persistToSQLite(initialState)
+    return initialState
+  })()
+
+  // Wait for hydration, but avoid hanging the UI forever: if hydration
+  // doesn't finish within `timeoutMs`, fall back to localStorage sync
+  // so client components can continue rendering. The full SQLite
+  // hydration will still complete in background and notify updates.
+  const timeoutMs = 5000
+  try {
+    const result = await Promise.race([
+      hydrationPromise,
+      new Promise<LocalState | null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ])
+
+    if (result) {
+      return result
+    }
+
+    // fallback: try to read synchronously from localStorage
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY)
+      const parsed = safeParseState(raw)
+      if (parsed) {
+        currentState = parsed
+        return parsed
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // last resort: initial state
+    currentState = createInitialState()
+    persistToLocalStorage(currentState)
+    void persistToSQLite(currentState)
+    return currentState
+  } finally {
+    hydrationPromise = null
+    notifyStateUpdated()
+  }
+}
+
+function loadState(): LocalState {
+  if (typeof window === 'undefined') return createInitialState()
+  if (currentState) return currentState
+
+  const raw = window.localStorage.getItem(STORAGE_KEY)
+  const storedState = safeParseState(raw)
+  if (storedState) {
+    currentState = storedState
+    return currentState
+  }
+
+  if (raw) {
+    window.localStorage.removeItem(STORAGE_KEY)
+  }
+
+  currentState = createInitialState()
+  persistToLocalStorage(currentState)
+  void persistToSQLite(currentState)
+  return currentState
+}
+
+function saveState(state: LocalState) {
   if (typeof window === 'undefined') return
-  window.dispatchEvent(new CustomEvent(OFFLINE_DB_UPDATED_EVENT))
+  currentState = state
+  persistToLocalStorage(state)
+  void persistToSQLite(state)
 }
 
 function withState<T>(mutator: (state: LocalState) => T): T {
@@ -249,22 +419,12 @@ function hydrateWinner(winner: Winner, state: LocalState): Winner {
   const result = state.results.find((item) => item.id === winner.resultId)
   return {
     ...winner,
-    ticket: ticket
-      ? {
-          ...hydrateTicket(ticket, state),
-          winners: [],
-        }
-      : undefined,
-    result: result
-      ? {
-          ...hydrateResult(result, state),
-          winners: [],
-        }
-      : undefined,
+    ticket: ticket ? { ...hydrateTicket(ticket, state), winners: [] } : undefined,
+    result: result ? { ...hydrateResult(result, state), winners: [] } : undefined,
   }
 }
 
-function hydrateSession(session: CashSession, state: LocalState): CashSession {
+function hydrateSession(session: CashSession): CashSession {
   return {
     ...session,
     movements: session.movements || [],
@@ -275,19 +435,9 @@ function getOpenSession(state: LocalState) {
   return state.cashSessions.find((session) => session.status === 'open') || null
 }
 
-export function bootstrapOfflineData() {
-  if (typeof window === 'undefined') return
-  loadState()
-  // Attempt async migration to SQLite on native devices for durability.
-  // Fire-and-forget: failures will not break the app and localStorage remains the fallback.
-  ;(async () => {
-    try {
-      const adapter = await import('./sqlite-adapter')
-      await adapter.migrateLocalStorageToSQLite()
-    } catch {
-      // ignore
-    }
-  })()
+export function bootstrapOfflineData(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  return hydrateState().then(() => undefined)
 }
 
 export function getOfflineGames(activeOnly = true): Game[] {
@@ -297,7 +447,9 @@ export function getOfflineGames(activeOnly = true): Game[] {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((game) => ({
       ...game,
-      schedules: [...(game.schedules || [])].filter((schedule) => schedule.isActive).sort((a, b) => a.time.localeCompare(b.time)),
+      schedules: [...(game.schedules || [])]
+        .filter((schedule) => schedule.isActive)
+        .sort((a, b) => a.time.localeCompare(b.time)),
     }))
 }
 
@@ -349,9 +501,7 @@ export function createOfflineGame(data: {
 export function updateOfflineGame(id: string, data: Partial<{ name: string; digitCount: number; multiplier: number; isActive: boolean }>): Game {
   return withState((state) => {
     const game = state.games.find((item) => item.id === id)
-    if (!game) {
-      throw new Error('Juego no encontrado')
-    }
+    if (!game) throw new Error('Juego no encontrado')
 
     Object.assign(game, data, { updatedAt: now() })
     return game
@@ -373,9 +523,7 @@ export function deleteOfflineGame(id: string): void {
 export function createOfflineSchedule(gameId: string, schedule: { name: string; time: string }): DrawSchedule {
   return withState((state) => {
     const game = state.games.find((item) => item.id === gameId)
-    if (!game) {
-      throw new Error('Juego no encontrado')
-    }
+    if (!game) throw new Error('Juego no encontrado')
 
     const newSchedule: DrawSchedule = {
       id: createId(),
@@ -417,16 +565,12 @@ export function deleteOfflineSchedule(id: string): void {
 }
 
 export function getOfflineSettings(): Record<string, string> {
-  const state = loadState()
-  return { ...state.settings }
+  return { ...loadState().settings }
 }
 
 export function updateOfflineSettings(settings: Partial<Record<SettingKey, string>>): Record<string, string> {
   return withState((state) => {
-    state.settings = {
-      ...state.settings,
-      ...settings,
-    }
+    state.settings = { ...state.settings, ...settings }
     return { ...state.settings }
   })
 }
@@ -456,9 +600,7 @@ export function openOfflineCashSession(openingAmount: number): CashSession {
 export function closeOfflineCashSession(sessionId: string, notes?: string): CashSession {
   return withState((state) => {
     const session = state.cashSessions.find((item) => item.id === sessionId)
-    if (!session) {
-      throw new Error('Sesión de caja no encontrada')
-    }
+    if (!session) throw new Error('Sesión de caja no encontrada')
 
     session.status = 'closed'
     session.closedAt = now()
@@ -472,9 +614,7 @@ export function closeOfflineCashSession(sessionId: string, notes?: string): Cash
 export function addOfflineCashMovement(data: { cashSessionId: string; type: 'income' | 'expense' | 'sale' | 'prize_payment'; amount: number; description: string }): CashMovement {
   return withState((state) => {
     const session = state.cashSessions.find((item) => item.id === data.cashSessionId)
-    if (!session) {
-      throw new Error('Sesión de caja no encontrada')
-    }
+    if (!session) throw new Error('Sesión de caja no encontrada')
 
     const movement: CashMovement = {
       id: createId(),
@@ -502,9 +642,8 @@ function getExpenseTotal(session: CashSession) {
 }
 
 export function getOfflineCurrentSession(): CashSession | null {
-  const state = loadState()
-  const session = getOpenSession(state)
-  return session ? hydrateSession(session, state) : null
+  const session = getOpenSession(loadState())
+  return session ? hydrateSession(session) : null
 }
 
 export function getOfflineCashSummary(sessionId?: string): {
@@ -543,7 +682,10 @@ export function getOfflineCashSessions(options?: { startDate?: Date; endDate?: D
     return true
   })
 
-  return sessions.sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime()).slice(0, options?.limit || sessions.length).map((session) => hydrateSession(session, state))
+  return sessions
+    .sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime())
+    .slice(0, options?.limit || sessions.length)
+    .map((session) => hydrateSession(session))
 }
 
 export function createOfflineTicket(items: CartItem[]): Ticket {
@@ -580,14 +722,17 @@ export function createOfflineTicket(items: CartItem[]): Ticket {
     const openSession = getOpenSession(state)
     if (openSession) {
       openSession.salesTotal += totalAmount
-      openSession.movements = [...(openSession.movements || []), {
-        id: createId(),
-        cashSessionId: openSession.id,
-        type: 'sale',
-        amount: totalAmount,
-        description: `Venta ticket ${ticketNumber}`,
-        createdAt: now(),
-      }]
+      openSession.movements = [
+        ...(openSession.movements || []),
+        {
+          id: createId(),
+          cashSessionId: openSession.id,
+          type: 'sale',
+          amount: totalAmount,
+          description: `Venta ticket ${ticketNumber}`,
+          createdAt: now(),
+        },
+      ]
       openSession.updatedAt = now()
     }
 
@@ -617,14 +762,20 @@ export function getOfflineTickets(options?: { status?: string; startDate?: Date;
   })
 
   const total = filtered.length
-  const paged = filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(options?.offset || 0, (options?.offset || 0) + (options?.limit || 50))
+  const paged = filtered
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(options?.offset || 0, (options?.offset || 0) + (options?.limit || 50))
+
   return { tickets: paged.map((ticket) => hydrateTicket(ticket, state)), total }
 }
 
 export function getOfflineTodayTickets(): Ticket[] {
   const state = loadState()
   const today = new Date().toISOString().slice(0, 10)
-  return state.tickets.filter((ticket) => sameDay(ticket.createdAt, today)).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((ticket) => hydrateTicket(ticket, state))
+  return state.tickets
+    .filter((ticket) => sameDay(ticket.createdAt, today))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((ticket) => hydrateTicket(ticket, state))
 }
 
 export function cancelOfflineTicket(ticketId: string, reason: string): { success: boolean; message: string } {
@@ -654,14 +805,17 @@ export function cancelOfflineTicket(ticketId: string, reason: string): { success
     const openSession = getOpenSession(state)
     if (openSession) {
       openSession.salesTotal -= ticket.totalAmount
-      openSession.movements = [...(openSession.movements || []), {
-        id: createId(),
-        cashSessionId: openSession.id,
-        type: 'expense',
-        amount: ticket.totalAmount,
-        description: `Cancelación ticket ${ticket.ticketNumber}: ${reason}`,
-        createdAt: now(),
-      }]
+      openSession.movements = [
+        ...(openSession.movements || []),
+        {
+          id: createId(),
+          cashSessionId: openSession.id,
+          type: 'expense',
+          amount: ticket.totalAmount,
+          description: `Cancelación ticket ${ticket.ticketNumber}: ${reason}`,
+          createdAt: now(),
+        },
+      ]
       openSession.updatedAt = now()
     }
 
@@ -685,7 +839,7 @@ export function createOfflineResult(data: { gameId: string; scheduleId: string; 
       gameId: data.gameId,
       scheduleId: data.scheduleId,
       winningNumber: data.winningNumber,
-      drawDate: (data.drawDate || new Date()).toISOString(),
+      drawDate: data.drawDate || new Date(),
       isProcessed: false,
       createdAt: now(),
       updatedAt: now(),
@@ -703,14 +857,24 @@ export function processOfflineResult(resultId: string): { winnersCount: number; 
     if (result.isProcessed) throw new Error('Este resultado ya fue procesado')
 
     const resultDate = new Date(result.drawDate)
-    const matchingItems = state.tickets.flatMap((ticket) => (ticket.items || []).map((item) => ({ ticket, item }))).filter(({ ticket, item }) => {
-      return ticket.status === 'active' && item.gameId === result.gameId && item.schedule === (getScheduleMap(state).get(result.scheduleId)?.time || '') && item.number === result.winningNumber && sameDay(ticket.createdAt, resultDate)
-    })
+    const scheduleTime = getScheduleMap(state).get(result.scheduleId)?.time || ''
+    const matchingItems = state.tickets
+      .flatMap((ticket) => (ticket.items || []).map((item) => ({ ticket, item })))
+      .filter(({ ticket, item }) => {
+        return (
+          ticket.status === 'active' &&
+          item.gameId === result.gameId &&
+          item.schedule === scheduleTime &&
+          item.number === result.winningNumber &&
+          sameDay(ticket.createdAt, resultDate)
+        )
+      })
 
     let totalPrizes = 0
     for (const match of matchingItems) {
       const prizeAmount = match.item.amount * (state.games.find((game) => game.id === result.gameId)?.multiplier || 0)
       totalPrizes += prizeAmount
+
       const winner: Winner = {
         id: createId(),
         ticketId: match.ticket.id,
@@ -726,14 +890,17 @@ export function processOfflineResult(resultId: string): { winnersCount: number; 
       const openSession = getOpenSession(state)
       if (openSession) {
         openSession.prizesTotal += prizeAmount
-        openSession.movements = [...(openSession.movements || []), {
-          id: createId(),
-          cashSessionId: openSession.id,
-          type: 'prize_payment',
-          amount: prizeAmount,
-          description: `Premio ticket ${match.ticket.ticketNumber}`,
-          createdAt: now(),
-        }]
+        openSession.movements = [
+          ...(openSession.movements || []),
+          {
+            id: createId(),
+            cashSessionId: openSession.id,
+            type: 'prize_payment',
+            amount: prizeAmount,
+            description: `Premio ticket ${match.ticket.ticketNumber}`,
+            createdAt: now(),
+          },
+        ]
         openSession.updatedAt = now()
       }
     }
@@ -753,7 +920,10 @@ export function getOfflineResults(options?: { gameId?: string; startDate?: Date;
     return true
   })
 
-  return filtered.sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime()).slice(0, options?.limit || 50).map((result) => hydrateResult(result, state))
+  return filtered
+    .sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime())
+    .slice(0, options?.limit || 50)
+    .map((result) => hydrateResult(result, state))
 }
 
 export function getOfflineTodayResults(): Result[] {
@@ -763,20 +933,26 @@ export function getOfflineTodayResults(): Result[] {
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
-  return state.results.filter((result) => {
-    const drawDate = new Date(result.drawDate)
-    return drawDate >= today && drawDate < tomorrow
-  }).sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime()).map((result) => hydrateResult(result, state))
+  return state.results
+    .filter((result) => {
+      const drawDate = new Date(result.drawDate)
+      return drawDate >= today && drawDate < tomorrow
+    })
+    .sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime())
+    .map((result) => hydrateResult(result, state))
 }
 
 export function getOfflineWinners(options?: { isPaid?: boolean; startDate?: Date; endDate?: Date }): Winner[] {
   const state = loadState()
-  return state.winners.filter((winner) => {
-    if (options?.isPaid !== undefined && winner.isPaid !== options.isPaid) return false
-    if (options?.startDate && new Date(winner.createdAt) < options.startDate) return false
-    if (options?.endDate && new Date(winner.createdAt) > options.endDate) return false
-    return true
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((winner) => hydrateWinner(winner, state))
+  return state.winners
+    .filter((winner) => {
+      if (options?.isPaid !== undefined && winner.isPaid !== options.isPaid) return false
+      if (options?.startDate && new Date(winner.createdAt) < options.startDate) return false
+      if (options?.endDate && new Date(winner.createdAt) > options.endDate) return false
+      return true
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((winner) => hydrateWinner(winner, state))
 }
 
 export function markOfflineWinnerAsPaid(winnerId: string): Winner {
@@ -790,14 +966,17 @@ export function markOfflineWinnerAsPaid(winnerId: string): Winner {
     const openSession = getOpenSession(state)
     if (openSession) {
       openSession.prizesTotal += winner.prizeAmount
-      openSession.movements = [...(openSession.movements || []), {
-        id: createId(),
-        cashSessionId: openSession.id,
-        type: 'prize_payment',
-        amount: winner.prizeAmount,
-        description: `Pago premio ticket ${winner.ticket?.ticketNumber || ''}`,
-        createdAt: now(),
-      }]
+      openSession.movements = [
+        ...(openSession.movements || []),
+        {
+          id: createId(),
+          cashSessionId: openSession.id,
+          type: 'prize_payment',
+          amount: winner.prizeAmount,
+          description: `Pago premio ticket ${winner.ticket?.ticketNumber || ''}`,
+          createdAt: now(),
+        },
+      ]
       openSession.updatedAt = now()
     }
 
@@ -856,7 +1035,7 @@ export function getOfflineWeeklyReport(): { days: { date: string; sales: number;
 
 export function getOfflineGameReport(options?: { startDate?: Date; endDate?: Date }): { gameId: string; gameName: string; ticketCount: number; totalAmount: number; prizesAmount: number }[] {
   const state = loadState()
-  const results = state.games.map((game) => {
+  return state.games.map((game) => {
     const tickets = state.tickets.filter((ticket) => {
       const usesGame = (ticket.items || []).some((item) => item.gameId === game.id)
       if (!usesGame) return false
@@ -866,10 +1045,12 @@ export function getOfflineGameReport(options?: { startDate?: Date; endDate?: Dat
     })
 
     const ticketItems = tickets.flatMap((ticket) => (ticket.items || []).filter((item) => item.gameId === game.id))
-    const prizesAmount = state.winners.filter((winner) => {
-      const result = state.results.find((item) => item.id === winner.resultId)
-      return result?.gameId === game.id && (!options?.startDate || new Date(winner.createdAt) >= options.startDate) && (!options?.endDate || new Date(winner.createdAt) <= options.endDate)
-    }).reduce((sum, winner) => sum + winner.prizeAmount, 0)
+    const prizesAmount = state.winners
+      .filter((winner) => {
+        const result = state.results.find((item) => item.id === winner.resultId)
+        return result?.gameId === game.id && (!options?.startDate || new Date(winner.createdAt) >= options.startDate) && (!options?.endDate || new Date(winner.createdAt) <= options.endDate)
+      })
+      .reduce((sum, winner) => sum + winner.prizeAmount, 0)
 
     return {
       gameId: game.id,
@@ -879,24 +1060,32 @@ export function getOfflineGameReport(options?: { startDate?: Date; endDate?: Dat
       prizesAmount,
     }
   })
-
-  return results
 }
 
 export function getOfflineNumberFrequency(options?: { gameId?: string; limit?: number }): { number: string; frequency: number }[] {
   const state = loadState()
-  const numbers = state.tickets.flatMap((ticket) => (ticket.items || []).filter((item) => !options?.gameId || item.gameId === options.gameId).map((item) => item.number))
+  const numbers = state.tickets.flatMap((ticket) =>
+    (ticket.items || [])
+      .filter((item) => !options?.gameId || item.gameId === options.gameId)
+      .map((item) => item.number),
+  )
   const counts = new Map<string, number>()
   for (const number of numbers) {
     counts.set(number, (counts.get(number) || 0) + 1)
   }
 
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, options?.limit || 20).map(([number, frequency]) => ({ number, frequency }))
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, options?.limit || 20)
+    .map(([number, frequency]) => ({ number, frequency }))
 }
 
 function buildDigits(date: Date) {
+  // Use only the date portion (YYYY-MM-DD) to avoid including time zeros
+  // (which produce long runs of unnecessary zeros in the pyramid).
   return date
     .toISOString()
+    .slice(0, 10) // YYYY-MM-DD
     .replace(/\D/g, '')
     .split('')
     .map((digit) => Number(digit))
@@ -922,6 +1111,7 @@ export function generateOfflinePyramid(date: Date): PyramidResult & { rows: numb
   }
 
   return {
+    layers: rows.map((row) => row.map(String)),
     rows,
     luckyNumber: String(rows[rows.length - 1]?.[0] ?? 0),
     date: date.toISOString().slice(0, 10),
@@ -951,4 +1141,11 @@ export function analyzeOfflineNumber(number: string, pyramid: { rows: number[][]
     compatibility,
     message: compatibility > 75 ? 'Alta compatibilidad con la piramide local' : 'Compatibilidad media o baja con la piramide local',
   }
+}
+
+export async function flushOfflineState(): Promise<void> {
+  if (typeof window === 'undefined') return
+  if (!currentState) return
+  persistToLocalStorage(currentState)
+  await persistToSQLite(currentState)
 }

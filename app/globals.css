@@ -131,3 +131,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media (max-width: 768px) {
+  [data-sonner-toaster] {
+    width: calc(100vw - 1rem) !important;
+    max-width: calc(100vw - 1rem) !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+  }
+
+  [data-sonner-toast][data-styled='true'] {
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+  }
+
+  [data-sonner-toast] :where([data-title]) {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  [data-sonner-toast] :where([data-description]) {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+}

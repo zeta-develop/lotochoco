@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   useSalesReport, 
@@ -24,12 +32,20 @@ import {
   Search,
   Calendar,
   FileText,
+  Printer,
   X,
   Gamepad2
 } from 'lucide-react'
 import { format, startOfDay, endOfDay, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { generateTicketImageUrl, printerService } from '@/services/printer'
+import type { Ticket, TicketItem } from '@/lib/types'
+import { toast } from 'sonner'
+
+type TicketWithDetails = Ticket & {
+  items?: (TicketItem & { game?: { name?: string } })[]
+}
 
 export function Reports() {
   const { settings } = useSettings()
@@ -58,10 +74,18 @@ export function Reports() {
     startDate: dateRange.start,
     endDate: dateRange.end
   })
+  const { tickets: reportTickets } = useTickets({ startDate: dateRange.start, endDate: dateRange.end })
   
   const { getTicket } = useTickets()
-  const [foundTicket, setFoundTicket] = useState<any>(null)
+  const [foundTicket, setFoundTicket] = useState<TicketWithDetails | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<TicketWithDetails | null>(null)
+  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false)
   const [ticketNotFound, setTicketNotFound] = useState(false)
+  const printerType = settings.printerType || 'browser'
+  const printerAddress = settings.printerAddress || ''
+  const hasPhysicalPrinterConfigured = (printerType === 'network' || printerType === 'thermal')
+    ? Boolean(printerAddress.trim())
+    : false
 
   const handleSearchTicket = async () => {
     if (!searchTicket.trim()) return
@@ -70,11 +94,45 @@ export function Reports() {
     const ticket = await getTicket(searchTicket.trim())
     
     if (ticket) {
-      setFoundTicket(ticket)
+      setFoundTicket(ticket as TicketWithDetails)
     } else {
       setFoundTicket(null)
       setTicketNotFound(true)
     }
+  }
+
+  const openTicketDetails = (ticket: TicketWithDetails) => {
+    setSelectedTicket(ticket)
+    setIsTicketDialogOpen(true)
+  }
+
+  const handleReprintTicket = async (ticket: TicketWithDetails) => {
+    if (!hasPhysicalPrinterConfigured) {
+      toast.error('No tienes una impresora configurada. Se abrirá el ticket como imagen.')
+      handleSendTicketImage(ticket)
+      return
+    }
+
+    const result = await printerService.printTicket(ticket as any, settings as any)
+
+    if (!result.success) {
+      toast.error(result.message || 'Error al imprimir')
+      return
+    }
+
+    toast.success(result.message || 'Impresión iniciada')
+  }
+
+  const handleSendTicketImage = (ticket: TicketWithDetails) => {
+    const imageUrl = generateTicketImageUrl(ticket as any, settings as any)
+    const imageWindow = window.open(imageUrl, '_blank', 'noopener,noreferrer')
+
+    if (!imageWindow) {
+      toast.error('No se pudo abrir la imagen del ticket')
+      return
+    }
+
+    toast.success('Ticket abierto como imagen')
   }
 
   return (
@@ -153,6 +211,10 @@ export function Reports() {
           <TabsTrigger value="tickets">
             <Search className="h-4 w-4 mr-2" />
             Buscar Ticket
+          </TabsTrigger>
+          <TabsTrigger value="list">
+            <Ticket className="h-4 w-4 mr-2" />
+            Tickets
           </TabsTrigger>
           <TabsTrigger value="games">
             <Gamepad2 className="h-4 w-4 mr-2" />
@@ -349,7 +411,83 @@ export function Reports() {
                       <span>Total:</span>
                       <span>{currency}{foundTicket.totalAmount}</span>
                     </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => openTicketDetails(foundTicket)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Ver información
+                      </Button>
+                      <Button onClick={() => handleReprintTicket(foundTicket)}>
+                        <Printer className="h-4 w-4 mr-2" />
+                        Reimprimir
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleSendTicketImage(foundTicket)}
+                      >
+                        Enviar imagen
+                      </Button>
+                    </div>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tickets List Tab */}
+        <TabsContent value="list" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tickets en el período</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(!reportTickets || reportTickets.length === 0) ? (
+                <div className="text-center py-8 text-muted-foreground">Sin tickets en el período seleccionado</div>
+              ) : (
+                <div className="space-y-3">
+                  {reportTickets.map((ticket: Ticket) => (
+                    <div key={ticket.id} className="flex items-center justify-between rounded-lg border p-4">
+                      <div>
+                        <div className="font-mono font-semibold">{ticket.ticketNumber}</div>
+                        <div className="text-sm text-muted-foreground">{format(new Date(ticket.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}</div>
+                        <div className="text-xs text-muted-foreground">{ticket.items?.length || 0} ítem(s)</div>
+                      </div>
+                      <div className="text-right space-y-2">
+                        <div className="font-semibold">{currency}{ticket.totalAmount}</div>
+                        <Badge variant={ticket.status === 'active' ? 'default' : ticket.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                          {ticket.status === 'active' ? 'Activo' : ticket.status === 'cancelled' ? 'Cancelado' : 'Pagado'}
+                        </Badge>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openTicketDetails(ticket as TicketWithDetails)}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Ver
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleReprintTicket(ticket as TicketWithDetails)}
+                          >
+                            <Printer className="h-4 w-4 mr-2" />
+                            Reimprimir
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleSendTicketImage(ticket as TicketWithDetails)}
+                          >
+                            Enviar imagen
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -432,6 +570,108 @@ export function Reports() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between gap-3">
+              <span>Ticket {selectedTicket?.ticketNumber}</span>
+              {selectedTicket && (
+                <Badge variant={selectedTicket.status === 'active' ? 'default' : selectedTicket.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                  {selectedTicket.status === 'active' ? 'Activo' : selectedTicket.status === 'cancelled' ? 'Cancelado' : 'Pagado'}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Revisa la información completa del ticket y vuelve a imprimirlo si es necesario.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTicket && (
+            <div className="space-y-4">
+              {!hasPhysicalPrinterConfigured && (
+                <Card className="border-amber-500/30 bg-amber-500/5">
+                  <CardContent className="p-4 text-sm text-amber-700">
+                    No tienes una impresora configurada. Usa <span className="font-semibold">Reimprimir</span> para abrir el ticket como imagen.
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Card>
+                  <CardContent className="p-4 space-y-1">
+                    <div className="text-xs text-muted-foreground">Número</div>
+                    <div className="font-mono font-semibold">{selectedTicket.ticketNumber}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 space-y-1">
+                    <div className="text-xs text-muted-foreground">Fecha</div>
+                    <div className="font-semibold">{format(new Date(selectedTicket.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {selectedTicket.cancelReason && (
+                <Card className="border-red-500/30 bg-red-500/5">
+                  <CardContent className="p-4 space-y-1">
+                    <div className="text-xs text-red-600">Motivo de cancelación</div>
+                    <div className="text-sm">{selectedTicket.cancelReason}</div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between text-sm font-semibold">
+                    <span>Juego</span>
+                    <span>Detalle</span>
+                  </div>
+                  <div className="space-y-2">
+                    {(selectedTicket.items || []).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between rounded-lg bg-muted p-3 text-sm">
+                        <div>
+                          <div className="font-medium">{item.game?.name || 'Juego'}</div>
+                          <div className="text-muted-foreground">{item.schedule}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-semibold">{item.number}</div>
+                          <div>{currency}{item.amount.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between border-t pt-3 text-lg font-bold">
+                    <span>Total</span>
+                    <span>{currency}{selectedTicket.totalAmount.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsTicketDialogOpen(false)}
+            >
+              Cerrar
+            </Button>
+            {selectedTicket && (
+              <>
+                <Button variant="secondary" onClick={() => handleSendTicketImage(selectedTicket)}>
+                  Enviar imagen
+                </Button>
+                <Button onClick={() => handleReprintTicket(selectedTicket)}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Reimprimir
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

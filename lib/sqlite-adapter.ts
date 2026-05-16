@@ -5,7 +5,8 @@ const STORAGE_KEY = 'lotochoco.offline.v1'
 async function tryImportSqlite() {
   try {
     // dynamic import so Node/SSR builds won't fail
-    const mod = await import('@capacitor-community/sqlite')
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>
+    const mod = await dynamicImport('@capacitor-community/sqlite')
     return mod
   } catch (e) {
     return null
@@ -83,6 +84,8 @@ export async function readStateFromSQLite(): Promise<string | null> {
   } catch {
     return null
   }
+
+  return null
 }
 
 export async function writeStateToSQLite(json: string): Promise<void> {

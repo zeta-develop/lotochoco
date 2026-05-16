@@ -248,14 +248,17 @@ export function ResultsManager() {
                 <Label>Número Ganador</Label>
                 <Input
                   value={winningNumber}
-                  readOnly
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '')
+                    if (value.length <= (selectedGame?.digitCount || 2)) {
+                      setWinningNumber(value)
+                    }
+                  }}
                   placeholder={`Ingresa ${selectedGame?.digitCount || 2} dígitos`}
                   className="text-center text-3xl font-bold h-16 font-mono"
-                />
-                <NumPad
-                  value={winningNumber}
-                  onChange={setWinningNumber}
                   maxLength={selectedGame?.digitCount || 2}
+                  type="tel"
+                  inputMode="numeric"
                 />
               </div>
             )}

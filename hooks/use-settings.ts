@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePOSStore } from '@/store/pos-store'
 import {
   bootstrapOfflineData,
@@ -14,7 +14,7 @@ export function useSettings() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       setError(null)
       const settings = getOfflineSettings()
@@ -23,14 +23,27 @@ export function useSettings() {
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar configuración'))
     }
-  }
+  }, [setLocalSettings])
 
   // Sync with Zustand store
   useEffect(() => {
-    bootstrapOfflineData()
-    setIsLoading(true)
-    void refresh().finally(() => setIsLoading(false))
-  }, [setLocalSettings])
+    let cancelled = false
+
+    const initialize = async () => {
+      await bootstrapOfflineData()
+      if (cancelled) return
+      setIsLoading(true)
+      void refresh().finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    }
+
+    void initialize()
+
+    return () => {
+      cancelled = true
+    }
+  }, [refresh])
 
   const updateSettings = async (updates: Record<string, string>) => {
     // Optimistic update
