@@ -85,6 +85,7 @@ export function useCash() {
 
   return {
     currentSession,
+    isOpen: !!currentSession,
     summary,
     isLoading,
     openSession,
@@ -95,8 +96,8 @@ export function useCash() {
 }
 
 export const useCurrentSession = () => {
-  const { currentSession, isLoading, refresh } = useCash()
-  return { session: currentSession, isLoading, refresh }
+  const { currentSession, isOpen, isLoading, refresh, openSession, closeSession, addMovement } = useCash()
+  return { session: currentSession, isOpen, isLoading, refresh, openSession, closeSession, addMovement }
 }
 
 export const useCashSummary = () => {
