@@ -3,6 +3,9 @@ name: Build and Release Android APK
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   workflow_dispatch:
   push:
@@ -36,7 +39,7 @@ jobs:
           corepack enable
           corepack prepare pnpm@10 --activate
 
-      # 5️⃣ Install dependencies (Corregido para evitar el error de Lockfile en CI)
+      # 5️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
@@ -47,7 +50,7 @@ jobs:
             pnpm cap:add:android
           fi
 
-      # 7️⃣ Set app version and inject into Android project
+      # 7️⃣ Set app version and inject into Android App Gradle
       - name: Set app version and inject into Gradle
         run: |
           VERSION_NAME=$(jq -r '.version' package.json)
@@ -55,9 +58,9 @@ jobs:
           
           echo "APP_VERSION=$VERSION_NAME" >> "$GITHUB_ENV"
           
-          # Modifica el build.gradle de Android para actualizar las versiones de la app
-          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
-          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
+          # Actualiza dinámicamente las líneas del versionCode y versionName
+          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" ./android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" ./android/app/build.gradle
           
           echo "Inyectado en Android -> versionCode: $VERSION_CODE, versionName: $VERSION_NAME"
 
@@ -93,7 +96,7 @@ jobs:
           # Decode keystore
           echo "$ANDROID_KEYSTORE" | base64 --decode > android/app/release.keystore
           
-          # Configura gradle.properties para que Gradle firme el APK automáticamente en el orden correcto
+          # Configura gradle.properties con tus secrets de GitHub
           printf '%s\n' \
             'RELEASE_STORE_FILE=release.keystore' \
             "RELEASE_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" \
@@ -110,13 +113,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lotochoco-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/*.apk
 
       # 1️⃣5️⃣ Create GitHub Release and upload APK
       - name: Create GitHub Release and upload APK
         uses: ncipollo/release-action@v1
         with:
-          artifacts: android/app/build/outputs/apk/release/app-release.apk
+          artifacts: android/app/build/outputs/apk/release/*.apk
           tag: "v${{ env.APP_VERSION }}-${{ github.run_number }}"
           name: "LotoChoco v${{ env.APP_VERSION }}"
           draft: false
