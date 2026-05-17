@@ -1,7 +1,7 @@
 name: Build and Release Android APK
 
 permissions:
-  contents: write
+  contents: write  # necesario para crear releases
 
 on:
   workflow_dispatch:
@@ -14,9 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node.js y pnpm
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -33,17 +35,21 @@ jobs:
           corepack prepare pnpm@10 --activate
           pnpm -v
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # 4️⃣ Set app version
       - name: Set app version
         run: |
           echo "APP_VERSION=$(jq -r '.version' package.json)" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
+      # 5️⃣ Build Next.js
       - name: Build Next.js
         run: pnpm build
 
+      # 6️⃣ Setup Java y Android SDK
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -53,9 +59,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # 7️⃣ Sync Capacitor Android
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
+      # 8️⃣ Configure signing
       - name: Configure release signing
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
@@ -63,6 +71,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           mkdir -p android/app
           echo "$ANDROID_KEYSTORE" | base64 --decode > android/app/release.keystore
           printf '%s\n' \
@@ -72,23 +81,26 @@ jobs:
             "RELEASE_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" \
             >> android/gradle.properties
 
-      - name: Build release APK
+      # 9️⃣ Build signed release APK
+      - name: Build signed release APK
         run: |
           cd android
-          chmod +x gradlew
+          chmod +x ./gradlew
           ./gradlew assembleRelease
 
+      # 🔟 Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: lotochoco-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
 
+      # 1️⃣1️⃣ Create GitHub Release and upload APK
       - name: Create GitHub Release and upload APK
         uses: ncipollo/release-action@v1
         with:
-          artifacts: android/app/build/outputs/apk/release/*.apk
+          artifacts: android/app/build/outputs/apk/release/app-release.apk
           tag: "v${{ env.APP_VERSION }}-${{ github.run_number }}"
-          name: "LotoChoco v${{ env.APP_VERSION }} build #${{ github.run_number }}"
+          name: "LotoChoco v${{ env.APP_VERSION }}"
           draft: false
           prerelease: false
