@@ -9,16 +9,19 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+
     steps:
+      # 1️⃣ Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ Node.js setup
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          # remove cache here to avoid setup-node trying to run pnpm before it's available
 
+      # 3️⃣ Setup pnpm
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -32,37 +35,46 @@ jobs:
       - name: Ensure pnpm available
         run: |
           if ! command -v pnpm >/dev/null 2>&1; then
-            echo "pnpm not found — installing global pnpm@10"
             npm install -g pnpm@10
           fi
           pnpm -v
 
+      # 4️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # 5️⃣ Set app version
       - name: Set app version
         run: |
-          echo "APP_VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
-          echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          APP_VERSION=$(node -p 'require("./package.json").version')
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          APP_VERSION_CODE=$GITHUB_RUN_NUMBER
+          echo "APP_VERSION_CODE=$APP_VERSION_CODE" >> "$GITHUB_ENV"
 
+      # 6️⃣ Build Next.js
       - name: Build Next.js
         run: pnpm build
 
+      # 7️⃣ Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
+      # 8️⃣ Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # 9️⃣ Generate Android project if needed
       - name: Generate Android project
         run: pnpm cap:add:android
 
+      # 🔟 Sync Capacitor
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
+      # 1️⃣1️⃣ Configure release signing
       - name: Configure release signing
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -74,25 +86,10 @@ jobs:
 
           mkdir -p android/app
 
-          if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ] && [ -n "${RELEASE_KEYSTORE_PASSWORD:-}" ] && [ -n "${RELEASE_KEY_ALIAS:-}" ] && [ -n "${RELEASE_KEY_PASSWORD:-}" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
-          else
-            echo "Release signing secrets not found; generating a temporary release keystore for this build."
-            keytool -genkeypair \
-              -keystore android/app/release-keystore.jks \
-              -storetype JKS \
-              -storepass android \
-              -keypass android \
-              -alias release \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 36500 \
-              -dname "CN=Lotochoco, OU=Release, O=Lotochoco, L=Local, S=NA, C=NI"
-            RELEASE_KEYSTORE_PASSWORD=android
-            RELEASE_KEY_ALIAS=release
-            RELEASE_KEY_PASSWORD=android
-          fi
+          # Restaurar keystore desde GitHub Secrets
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
 
+          # Escribir gradle.properties para firma
           printf '%s\n' \
             'RELEASE_STORE_FILE=release-keystore.jks' \
             "RELEASE_STORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD" \
@@ -100,11 +97,16 @@ jobs:
             "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD" \
             >> android/gradle.properties
 
+          # Ejecutar script si lo necesitas (opcional)
+          if [ -f scripts/inject_android_release_signing.py ]; then
             python3 scripts/inject_android_release_signing.py
+          fi
 
+      # 1️⃣2️⃣ Build release APK
       - name: Build release APK
         run: pnpm android:build:release
 
+      # 1️⃣3️⃣ Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

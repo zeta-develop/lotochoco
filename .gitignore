@@ -16,3 +16,7 @@ node_modules
 out/
 .DS_Store
 ignore
+release.keystore
+release.keystore.*
+*.log
+*.pem
