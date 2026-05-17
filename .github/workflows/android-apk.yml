@@ -1,7 +1,7 @@
 name: Build and Release Android APK
 
 permissions:
-  contents: write  # necesario para crear releases
+  contents: write
 
 on:
   workflow_dispatch:
@@ -14,56 +14,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js y pnpm
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
 
+      # 3️⃣ Setup pnpm
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
+      # 4️⃣ Enable Corepack & ensure pnpm
       - name: Enable Corepack & ensure pnpm
         run: |
           corepack enable
           corepack prepare pnpm@10 --activate
+          if ! command -v pnpm >/dev/null 2>&1; then
+            npm install -g pnpm@10
+          fi
           pnpm -v
 
-      # 3️⃣ Install dependencies
+      # 5️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      # 4️⃣ Set app version
+      # 6️⃣ Set app version and code
       - name: Set app version
         run: |
           echo "APP_VERSION=$(jq -r '.version' package.json)" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
-      # 5️⃣ Build Next.js
+      # 7️⃣ Build Next.js
       - name: Build Next.js
         run: pnpm build
 
-      # 6️⃣ Setup Java y Android SDK
+      # 8️⃣ Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
+      # 9️⃣ Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 7️⃣ Sync Capacitor Android
+      # 🔟 Generate Android project if not exists
+      - name: Generate Android project
+        run: |
+          if [ ! -d android ]; then
+            pnpm cap:add:android
+          fi
+
+      # 1️⃣1️⃣ Sync Capacitor
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      # 8️⃣ Configure signing
+      # 1️⃣2️⃣ Configure release signing
       - name: Configure release signing
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
@@ -73,7 +86,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p android/app
+          # Decode keystore
           echo "$ANDROID_KEYSTORE" | base64 --decode > android/app/release.keystore
+          # Add signing info to gradle.properties
           printf '%s\n' \
             'RELEASE_STORE_FILE=release.keystore' \
             "RELEASE_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" \
@@ -81,21 +96,38 @@ jobs:
             "RELEASE_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" \
             >> android/gradle.properties
 
-      # 9️⃣ Build signed release APK
-      - name: Build signed release APK
-        run: |
-          cd android
-          chmod +x ./gradlew
-          ./gradlew assembleRelease
+      # 1️⃣3️⃣ Build release APK (unsigned)
+      - name: Build release APK
+        run: pnpm android:build:release
 
-      # 🔟 Upload APK artifact
+      # 1️⃣4️⃣ Sign the APK
+      - name: Sign APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
+            -keystore android/app/release.keystore \
+            -storepass $ANDROID_KEYSTORE_PASSWORD \
+            -keypass $ANDROID_KEY_PASSWORD \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            $ANDROID_KEY_ALIAS
+
+      # 1️⃣5️⃣ Align APK to generate final installable APK
+      - name: Align APK
+        run: |
+          zipalign -v 4 android/app/build/outputs/apk/release/app-release-unsigned.apk \
+                    android/app/build/outputs/apk/release/app-release.apk
+
+      # 1️⃣6️⃣ Upload APK as artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: lotochoco-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      # 1️⃣1️⃣ Create GitHub Release and upload APK
+      # 1️⃣7️⃣ Create GitHub Release and upload APK
       - name: Create GitHub Release and upload APK
         uses: ncipollo/release-action@v1
         with:
