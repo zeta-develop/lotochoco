@@ -134,7 +134,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
         <div className="border-t p-3">
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             <div className="font-medium">Sistema POS Loteria</div>
-            <div>v1.0.0 - Offline</div>
+            {/* Version Info */} <VersionInfo />
           </div>
         </div>
       </aside>
@@ -174,4 +174,22 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
       </div>
     </div>
   )
+}
+
+function VersionInfo() {
+  const { currentVersion, latestVersion, isUpdateAvailable } = require('@/hooks/use-updater').useUpdater();
+
+  return (
+    <div className="flex flex-col gap-1 mt-1">
+      <div className="flex items-center gap-2">
+        <span>v{currentVersion}</span>
+        <span className="text-[10px] bg-green-500/20 text-green-600 px-1.5 rounded-full">Offline</span>
+      </div>
+      {isUpdateAvailable && (
+        <div className="text-[10px] text-primary font-medium animate-pulse">
+          v{latestVersion} disponible!
+        </div>
+      )}
+    </div>
+  );
 }
