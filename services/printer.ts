@@ -4,6 +4,8 @@
 import type { Ticket, TicketItem, CashSession } from '@/lib/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Capacitor } from '@capacitor/core'
+import { BleClient } from '@capacitor-community/bluetooth-le'
 
 // ESC/POS Commands
 const ESC = '\x1B'
@@ -301,8 +303,23 @@ let bluetoothDevice: BluetoothDevice | null = null
 let bluetoothCharacteristic: BluetoothRemoteGATTCharacteristic | null = null
 
 export async function scanBluetoothPrinter(): Promise<{ name: string; id: string } | null> {
+  // Caso nativo (Android/iOS)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await BleClient.initialize();
+      const device = await BleClient.requestDevice({
+        services: [PRINTER_SERVICE_UUID],
+      });
+
+      return { name: device.name || 'Impresora Térmica', id: device.deviceId };
+    } catch (error) {
+      console.error('Error scanning native bluetooth:', error);
+      return null;
+    }
+  }
+
   if (typeof navigator === 'undefined' || !navigator.bluetooth) {
-    throw new Error('Web Bluetooth no es compatible con este navegador')
+    throw new Error('Web Bluetooth no es compatible con este navegador. Si estás en Android, asegúrate de estar usando el APK.')
   }
 
   try {
@@ -322,6 +339,18 @@ export async function scanBluetoothPrinter(): Promise<{ name: string; id: string
 }
 
 export async function connectBluetoothPrinter(deviceId: string): Promise<boolean> {
+  // Caso nativo
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await BleClient.initialize();
+      await BleClient.connect(deviceId);
+      return true;
+    } catch (error) {
+      console.error('Error connecting native bluetooth:', error);
+      return false;
+    }
+  }
+
   if (typeof navigator === 'undefined' || !navigator.bluetooth) {
     return false
   }
@@ -358,6 +387,13 @@ export async function connectBluetoothPrinter(deviceId: string): Promise<boolean
 }
 
 export async function printViaBluetooth(data: string): Promise<{ success: boolean; message: string }> {
+  // En nativo, printerService.printTicket ya redirige a printDirect
+  // pero esta función podría usarse para cierres de caja.
+  if (Capacitor.isNativePlatform()) {
+    // Si no tenemos un deviceId aquí, es difícil. Pero usualmente se pasa por printerService.
+    return { success: false, message: 'Usa printDirect en plataformas nativas' }
+  }
+
   if (!bluetoothCharacteristic) {
     return { success: false, message: 'Impresora Bluetooth no conectada' }
   }
@@ -709,8 +745,13 @@ export const printerService = {
       }
 
       // Web Bluetooth printing
-      if (type === 'bluetooth' && typeof window !== 'undefined' && navigator.bluetooth) {
+      if (type === 'bluetooth' && typeof window !== 'undefined' && (navigator.bluetooth || Capacitor.isNativePlatform())) {
         const commands = generateCashCloseReceipt(session, settings)
+        
+        if (Capacitor.isNativePlatform() && settings.bluetoothDeviceId) {
+           return await printDirect(settings.bluetoothDeviceId, commands)
+        }
+        
         return await printViaBluetooth(commands)
       }
 
