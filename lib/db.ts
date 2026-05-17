@@ -13,49 +13,72 @@ class DatabaseManager {
     return this.sqlite
   }
 
+  /**
+   * Obtiene la conexión a la base de datos de forma segura (Singleton)
+   */
   async getDb(): Promise<SQLiteDBConnection> {
-    if (this.db) return this.db
-    if (this.initPromise) return this.initPromise
+    // 1. Si ya tenemos una conexión abierta y lista, la devolvemos
+    if (this.db) {
+      try {
+        const isOpen = await this.db.isDBOpen()
+        if (isOpen.result) return this.db
+      } catch (e) {
+        // Si hay error al verificar, limpiamos y reintentamos
+        this.db = null
+      }
+    }
 
+    // 2. Si hay una inicialización en curso, esperamos a esa misma promesa
+    if (this.initPromise) {
+      return this.initPromise
+    }
+
+    // 3. Si no hay nada, iniciamos el proceso y guardamos la promesa
     this.initPromise = this.initialize()
     return this.initPromise
   }
 
   private async initialize(): Promise<SQLiteDBConnection> {
+    const dbName = 'lotochoco_db'
+    console.log(`[DB] Iniciando proceso de conexión para: ${dbName}`)
+
     try {
       const sqlite = this.getSqlite()
-      console.log('Iniciando conexión SQLite nativa...')
-      
-      const dbName = 'lotochoco_db'
       let db: SQLiteDBConnection
-      
-      // Comprobar si la conexión ya existe en el pool del plugin
-      const isConn = await sqlite.isConnection(dbName, false)
 
-      if (isConn.result) {
-        // Si existe, la recuperamos
+      // En Capacitor SQLite, la forma más robusta de evitar el error "connection exist"
+      // es intentar recuperarla primero del pool interno del plugin.
+      try {
+        const isConn = await sqlite.isConnection(dbName, false)
+        if (isConn.result) {
+          console.log('[DB] Recuperando conexión existente del pool...')
+          db = await sqlite.retrieveConnection(dbName, false)
+        } else {
+          console.log('[DB] Creando nueva conexión...')
+          db = await sqlite.createConnection(dbName, false, 'no-encryption', 1, false)
+        }
+      } catch (poolError) {
+        console.warn('[DB] Fallo en gestión de pool, reintentando recuperación directa...', poolError)
+        // Último recurso: intentar recuperar aunque isConnection fallara
         db = await sqlite.retrieveConnection(dbName, false)
-      } else {
-        // Si no existe, la creamos
-        db = await sqlite.createConnection(dbName, false, 'no-encryption', 1, false)
       }
-      
-      // Asegurarnos de que esté abierta
+
+      // Asegurarnos de abrirla si está cerrada
       const isOpen = await db.isDBOpen()
       if (!isOpen.result) {
         await db.open()
+        console.log('[DB] Base de datos abierta correctamente.')
       }
-      
-      console.log('Conexión SQLite lista y abierta.')
-      
-      // Inicializar esquema si no existe
+
+      // Sincronizar esquema
       await this.ensureSchema(db)
-      
+
       this.db = db
+      this.initPromise = null // Limpiamos para futuros chequeos si se desea
       return db
     } catch (error) {
-      this.initPromise = null // Permitir reintento si falló
-      console.error('Error crítico inicializando base de datos:', error)
+      this.initPromise = null // Permitir reintentos en caso de fallo real
+      console.error('[DB] ERROR CRÍTICO:', error)
       throw error
     }
   }
@@ -64,7 +87,7 @@ class DatabaseManager {
     try {
       const tableCheck = await db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='Game';")
       if (!tableCheck.values || tableCheck.values.length === 0) {
-        console.log('Configurando esquema inicial (Database First Run)...')
+        console.log('[DB] Configurando tablas iniciales...')
         const statements = [
           `CREATE TABLE IF NOT EXISTS "Game" ("id" TEXT PRIMARY KEY, "name" TEXT UNIQUE, "isActive" INTEGER DEFAULT 1, "digitCount" INTEGER DEFAULT 2, "multiplier" REAL DEFAULT 70, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
           `CREATE TABLE IF NOT EXISTS "DrawSchedule" ("id" TEXT PRIMARY KEY, "gameId" TEXT, "name" TEXT, "time" TEXT, "isActive" INTEGER DEFAULT 1, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("gameId") REFERENCES "Game" ("id") ON DELETE CASCADE);`,
@@ -78,10 +101,10 @@ class DatabaseManager {
           `CREATE TABLE IF NOT EXISTS "CancellationLog" ("id" TEXT PRIMARY KEY, "ticketId" TEXT, "ticketNumber" TEXT, "totalAmount" REAL, "reason" TEXT, "itemsJson" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`
         ]
         await db.executeSet(statements.map(s => ({ statement: s, values: [] })))
-        console.log('Esquema creado exitosamente.')
+        console.log('[DB] Esquema sincronizado con éxito.')
       }
     } catch (e) {
-      console.error('Error al asegurar esquema:', e)
+      console.error('[DB] Error en ensureSchema:', e)
       throw e
     }
   }
@@ -92,7 +115,7 @@ class DatabaseManager {
       const result = await db.query(sql, params)
       return (result.values || []) as T[]
     } catch (e) {
-      console.error('Error en consulta SQL:', sql, e)
+      console.error(`[DB] Error en Query: ${sql}`, e)
       throw e
     }
   }
@@ -102,7 +125,7 @@ class DatabaseManager {
       const db = await this.getDb()
       return await db.run(sql, params)
     } catch (e) {
-      console.error('Error en ejecución SQL:', sql, e)
+      console.error(`[DB] Error en Execute: ${sql}`, e)
       throw e
     }
   }
