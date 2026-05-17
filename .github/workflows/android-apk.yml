@@ -83,7 +83,7 @@ jobs:
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      # 1️⃣2️⃣ Configure release signing
+# 1️⃣2️⃣ Configure release signing
       - name: Configure release signing
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
@@ -93,10 +93,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p android/app
-          # Decode keystore
+          
+          # FORCE DELETE: Nos aseguramos de eliminar cualquier rastro del keystore viejo
+          rm -f android/app/release.keystore
+          
+          # Decode keystore moderno
           echo "$ANDROID_KEYSTORE" | base64 --decode > android/app/release.keystore
           
-          # Configura gradle.properties con tus secrets de GitHub
+          # Limpiamos el gradle.properties viejo si existiera y creamos uno nuevo limpio
+          rm -f android/gradle.properties
           printf '%s\n' \
             'RELEASE_STORE_FILE=release.keystore' \
             "RELEASE_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" \
