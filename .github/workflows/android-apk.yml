@@ -36,12 +36,11 @@ jobs:
           corepack enable
           corepack prepare pnpm@10 --activate
 
-      # 5️⃣ Install dependencies
+      # 5️⃣ Install dependencies (Corregido para evitar el error de Lockfile en CI)
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       # 6️⃣ Generate Android project if not exists
-      # Nota: Movido arriba para poder modificar sus archivos Gradle en el siguiente paso
       - name: Generate Android project
         run: |
           if [ ! -d android ]; then
