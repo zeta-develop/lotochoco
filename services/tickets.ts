@@ -13,12 +13,14 @@ function generateTicketNumber(): string {
 export async function createTicket(items: CartItem[]): Promise<Ticket> {
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
   const ticketNumber = generateTicketNumber()
+  const client = items[0]?.client || null
 
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber,
       totalAmount,
       status: 'active',
+      client,
       items: {
         create: items.map((item) => ({
           gameId: item.gameId,

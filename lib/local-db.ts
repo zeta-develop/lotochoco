@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   printerType: 'network',
   printerAddress: '',
   darkMode: 'false',
+  bluetoothDeviceId: '',
+  bluetoothDeviceName: '',
 }
 
 const DEFAULT_GAMES: Array<{
@@ -695,9 +697,11 @@ export function createOfflineTicket(items: CartItem[]): Ticket {
   return withState((state) => {
     const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
     const ticketNumber = `TKT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    const client = items[0]?.client || null
     const ticket: Ticket = {
       id: createId(),
       ticketNumber,
+      client,
       totalAmount,
       status: 'active',
       cancelReason: null,

@@ -22,6 +22,7 @@ import {
   CheckCircle,
   AlertCircle
 } from "lucide-react";
+import { toast } from "sonner";
 
 export function Settings() {
   const { settings, isLoading, updateSettings } = useSettings();
@@ -31,6 +32,8 @@ export function Settings() {
     ticketMessage: "Gracias por su compra!",
     printerType: "network",
     printerAddress: "",
+    bluetoothDeviceId: "",
+    bluetoothDeviceName: "",
     darkMode: false,
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -44,6 +47,8 @@ export function Settings() {
         ticketMessage: settings.ticketMessage || "Gracias por su compra!",
         printerType: settings.printerType || "network",
         printerAddress: settings.printerAddress || "",
+        bluetoothDeviceId: settings.bluetoothDeviceId || "",
+        bluetoothDeviceName: settings.bluetoothDeviceName || "",
         darkMode: settings.darkMode === "true",
       });
     }
@@ -280,17 +285,25 @@ export function Settings() {
               {formData.printerType === "rawbt" && (
                 <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p className="text-sm text-blue-600 dark:text-blue-400">
-                    La conexión RawBT es la opción más estable para impresoras PT210 y similares en Android.
-                    Requiere que instales la aplicación gratuita <strong>RawBT</strong> desde la Play Store y la vincules con tu impresora.
+                    La conexion RawBT es la opcion mas estable para impresoras PT210 y similares en Android.
+                    Requiere que instales la aplicacion gratuita <strong>RawBT</strong> desde la Play Store y la vincules con tu impresora.
                   </p>
                 </div>
               )}
               {formData.printerType === "bluetooth" && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
-                    La conexion Bluetooth requiere un wrapper nativo o WebBluetooth API.
-                    Asegurate de que tu navegador soporte esta caracteristica.
-                  </p>
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      Impresion directa por Bluetooth sin necesidad de app externa. Compatible con PT-210 y otras impresoras termicas ESC/POS.
+                    </p>
+                  </div>
+                  
+                  {formData.bluetoothDeviceName && (
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <Bluetooth className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium">Impresora: {formData.bluetoothDeviceName}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -310,20 +323,24 @@ export function Settings() {
                     variant="outline"
                     onClick={async () => {
                       try {
-                        const device = await (navigator as any).bluetooth.requestDevice({
-                          acceptAllDevices: true,
-                          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Common receipt printer service
-                        });
-                        console.log('Device selected:', device.name);
-                        alert(`Dispositivo ${device.name || 'desconocido'} seleccionado. Asegurate de emparejarlo.`);
+                        const { printerService } = await import('@/services/printer')
+                        const device = await printerService.scanBluetoothPrinter()
+                        if (device) {
+                          setFormData({ 
+                            ...formData, 
+                            bluetoothDeviceId: device.id,
+                            bluetoothDeviceName: device.name 
+                          })
+                          toast.success(`Impresora "${device.name}" seleccionada`)
+                        }
                       } catch (err) {
-                        console.error('Error WebBluetooth:', err);
-                        alert('No se pudo encontrar dispositivo Bluetooth o se canceló.');
+                        console.error('Error WebBluetooth:', err)
+                        toast.error(err instanceof Error ? err.message : 'No se pudo encontrar dispositivo Bluetooth')
                       }
                     }}
                   >
                     <Bluetooth className="h-4 w-4 mr-2" />
-                    Buscar Impresora WebBT
+                    Buscar Impresora Bluetooth
                   </Button>
                 )}
                 
@@ -432,7 +449,7 @@ export function Settings() {
             <CardContent className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Version</span>
-                <span className="font-mono">1.0.0</span>
+                <span className="font-mono">1.2.0</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Base de Datos</span>

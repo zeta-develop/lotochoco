@@ -2,12 +2,14 @@ import prisma from '@/lib/db'
 import type { Setting, SettingKey } from '@/lib/types'
 
 const DEFAULT_SETTINGS: Record<SettingKey, string> = {
-  businessName: 'Lotería La Fortuna',
+  businessName: 'Loteria La Fortuna',
   currency: 'C$',
-  ticketMessage: '¡Buena suerte! Gracias por su compra.',
+  ticketMessage: 'Buena suerte! Gracias por su compra.',
   printerType: 'network',
-  printerAddress: '192.168.1.100',
-  darkMode: 'false'
+  printerAddress: '',
+  darkMode: 'false',
+  bluetoothDeviceId: '',
+  bluetoothDeviceName: ''
 }
 
 export async function getSetting(key: SettingKey): Promise<string> {
@@ -88,7 +90,9 @@ export const settingsService = {
         key === 'currency' ||
         key === 'ticketMessage' ||
         key === 'printerType' ||
-        key === 'printerAddress'
+        key === 'printerAddress' ||
+        key === 'bluetoothDeviceId' ||
+        key === 'bluetoothDeviceName'
       ) {
         normalized[key] = String(value)
       }

@@ -48,6 +48,7 @@ model DrawSchedule {
 model Ticket {
   id           String    @id @default(cuid())
   ticketNumber String    @unique // Número legible: TKT-20240101-0001
+  client       String?   // Nombre del cliente
   totalAmount  Float
   status       String    @default("active") // active, cancelled, paid
   cancelReason String?
