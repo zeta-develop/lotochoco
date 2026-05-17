@@ -3,12 +3,12 @@ import type { Game, DrawSchedule } from '@/lib/types'
 import { generateId } from '@/lib/utils'
 
 export async function getGames(): Promise<Game[]> {
-  const games = await query<Game>('SELECT * FROM Game ORDER BY name ASC')
+  const games = await query<Game>('SELECT * FROM "Game" ORDER BY "name" ASC')
   
   for (const game of games) {
     game.isActive = Boolean(game.isActive)
     game.schedules = await query<DrawSchedule>(
-      'SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1 ORDER BY time ASC',
+      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 ORDER BY "time" ASC',
       [game.id]
     )
     for (const s of game.schedules) s.isActive = Boolean(s.isActive)
@@ -18,12 +18,12 @@ export async function getGames(): Promise<Game[]> {
 }
 
 export async function getActiveGames(): Promise<Game[]> {
-  const games = await query<Game>('SELECT * FROM Game WHERE isActive = 1 ORDER BY name ASC')
+  const games = await query<Game>('SELECT * FROM "Game" WHERE "isActive" = 1 ORDER BY "name" ASC')
   
   for (const game of games) {
     game.isActive = true
     game.schedules = await query<DrawSchedule>(
-      'SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1 ORDER BY time ASC',
+      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 ORDER BY "time" ASC',
       [game.id]
     )
     for (const s of game.schedules) s.isActive = true

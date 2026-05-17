@@ -88,7 +88,7 @@ export async function getTodayResults(): Promise<Result[]> {
     console.log(`Buscando resultados entre ${startOfDay} y ${endOfDay}`)
 
     const results = await query<Result>(
-      'SELECT * FROM "Result" WHERE drawDate >= ? AND drawDate <= ? ORDER BY drawDate DESC',
+      'SELECT * FROM "Result" WHERE "drawDate" >= ? AND "drawDate" <= ? ORDER BY "drawDate" DESC',
       [startOfDay, endOfDay]
     )
 
@@ -96,9 +96,9 @@ export async function getTodayResults(): Promise<Result[]> {
 
     for (const r of results) {
       r.isProcessed = Boolean(r.isProcessed)
-      const games = await query<Game>('SELECT * FROM "Game" WHERE id = ?', [r.gameId])
+      const games = await query<Game>('SELECT * FROM "Game" WHERE "id" = ?', [r.gameId])
       r.game = games[0]
-      const schedules = await query<DrawSchedule>('SELECT * FROM "DrawSchedule" WHERE id = ?', [r.scheduleId])
+      const schedules = await query<DrawSchedule>('SELECT * FROM "DrawSchedule" WHERE "id" = ?', [r.scheduleId])
       r.schedule = schedules[0]
     }
 
