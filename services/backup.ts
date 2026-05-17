@@ -1,8 +1,7 @@
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { Capacitor } from '@capacitor/core'
-import { SQLiteConnection, CapacitorSQLite } from '@capacitor-community/sqlite'
-import { getDb } from '@/lib/db'
+import { getDb, getSqliteConnection } from '@/lib/db'
 
 export async function exportBackup(): Promise<{ success: boolean; message: string }> {
   if (!Capacitor.isNativePlatform()) {
@@ -10,18 +9,6 @@ export async function exportBackup(): Promise<{ success: boolean; message: strin
   }
 
   try {
-    const sqlite = new SQLiteConnection(CapacitorSQLite)
-    
-    // 1. Cerrar conexión actual para asegurar integridad
-    // (Opcional, pero recomendado por Capacitor SQLite para exportar el archivo físico)
-    
-    // 2. Exportar la base de datos a JSON o copiar el archivo .db
-    // Usaremos la función nativa de Capacitor SQLite para exportar a un archivo
-    // Pero como estamos usando archivos planos, copiaremos el archivo .db directamente
-    
-    // Nombre del archivo en Android: databases/lotochoco_db.db
-    // Vamos a usar copyPhoto o similar? No, mejor usar la API de export de SQLite.
-    
     const db = await getDb()
     
     // Exportamos a un archivo JSON (formato interno de Capacitor SQLite)
@@ -59,7 +46,7 @@ export async function importBackup(jsonData: string): Promise<{ success: boolean
   }
 
   try {
-    const sqlite = new SQLiteConnection(CapacitorSQLite)
+    const sqlite = await getSqliteConnection()
     
     // 1. Validar el JSON
     const parsedData = JSON.parse(jsonData)
