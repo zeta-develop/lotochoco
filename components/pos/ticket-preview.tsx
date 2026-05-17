@@ -93,8 +93,8 @@ export function TicketPreview({
                   {ticket.items.map((item, index) => (
                     <tr key={index} className="align-top">
                       <td className="py-1">
-                        <div className="truncate pr-1">{item.game.name}</div>
-                        <div className="text-[11px] text-gray-600">{item.drawTime}</div>
+                        <div className="truncate pr-1">{item.game?.name}</div>
+                        <div className="text-[11px] text-gray-600">{item.schedule}</div>
                       </td>
                       <td className="py-1 text-center font-bold text-base">
                         {item.number}
@@ -113,7 +113,7 @@ export function TicketPreview({
               {/* Total */}
               <div className="flex justify-between text-lg font-bold my-3">
                 <span>TOTAL:</span>
-                <span>{currency}{ticket.total.toFixed(2)}</span>
+                <span>{currency}{ticket.totalAmount.toFixed(2)}</span>
               </div>
 
               {/* Separator */}

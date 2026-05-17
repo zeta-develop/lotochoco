@@ -235,9 +235,9 @@ export function generateCashCloseReceipt(
   return receipt
 }
 
+
 // Network printer interface (for browser use, this would need a backend proxy)
-export async function printToNetwork(
-  printerAddress: string,
+export async function printToNetwork(  printerAddress: string,
   data: string
 ): Promise<{ success: boolean; message: string }> {
   try {
@@ -346,8 +346,8 @@ export function generatePrintableHTML(
           ${ticket.items.map(item => `
             <tr>
               <td>
-                <div class="game-name">${item.game?.name || item.gameName || 'Juego'}</div>
-                <div class="schedule">${item.schedule || item.scheduleTime || ''}</div>
+                <div class="game-name">${item.game?.name || (item as any).gameName || 'Juego'}</div>
+                <div class="schedule">${item.schedule || (item as any).scheduleTime || ''}</div>
               </td>
               <td class="number">${item.number}</td>
               <td class="right">${currency}${(item.amount || 0).toFixed(2)}</td>
@@ -360,7 +360,7 @@ export function generatePrintableHTML(
 
       <div class="total-row">
         <span>TOTAL:</span>
-        <span>${currency}${(ticket.totalAmount || ticket.total || 0).toFixed(2)}</span>
+        <span>${currency}${(ticket.totalAmount || ticket.totalAmount || 0).toFixed(2)}</span>
       </div>
 
       <div class="double-separator"></div>
@@ -390,12 +390,23 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;')
 }
 
+
+// Helper to convert Uint8Array (ESC/POS commands) to base64
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 export function generateTicketImageUrl(
   ticket: Ticket & { items: (TicketItem & { game?: { name: string }; gameName?: string; scheduleTime?: string })[] },
   settings: Record<string, string>
 ): string {
-  // Aumentar el width para que los textos en Courier encajen bien sin cortarse.
-  const width = 450
+  // 384px es el estandar para impresoras termicas de 58mm (48mm efectivos)
+  const width = 384
   const baseHeight = 310
   const itemHeight = 40
   const height = baseHeight + ticket.items.length * itemHeight
@@ -407,16 +418,16 @@ export function generateTicketImageUrl(
   const itemRows = ticket.items
     .map((item, index) => {
       const y = 180 + index * itemHeight
-      const gameName = escapeXml((item.game?.name || item.gameName || 'Juego').slice(0, 16))
+      const gameName = escapeXml((item.game?.name || (item as any).gameName || 'Juego').slice(0, 16))
       const number = escapeXml(item.number)
-      const schedule = escapeXml((item.schedule || item.scheduleTime || '').slice(0, 8))
+      const schedule = escapeXml((item.schedule || (item as any).scheduleTime || '').slice(0, 8))
       const amount = escapeXml(`${currency}${(item.amount || 0).toFixed(2)}`)
 
       return `
         <g font-family="'Courier New', Courier, monospace">
           <text x="20" y="${y}" font-size="15" font-weight="700" fill="#000">${gameName}</text>
           <text x="20" y="${y + 14}" font-size="11" fill="#333">${schedule}</text>
-          <text x="250" y="${y}" font-size="16" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
+          <text x="200" y="${y}" font-size="16" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
           <text x="${width - 20}" y="${y}" font-size="15" font-weight="700" fill="#000" text-anchor="end">${amount}</text>
         </g>
       `
@@ -459,18 +470,18 @@ export function generateTicketImageUrl(
         <text x="250" y="160" font-size="15" font-weight="900" text-anchor="middle">NUM</text>
         <text x="${width-20}" y="160" font-size="15" font-weight="900" text-anchor="end">MONTO</text>
 
-        <line x1="15" y1="168" x2="${width-15}" y2="168" stroke="#000" stroke-width="1.5" />
+        <line x1="5" y1="168" x2="${width-5}" y2="168" stroke="#000" stroke-width="1.5" />
 
         <!-- Items -->
         ${itemRows}
 
-        <line x1="15" y1="${height - 155}" x2="${width-15}" y2="${height - 155}" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
+        <line x1="5" y1="${height - 155}" x2="${width-5}" y2="${height - 155}" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
 
         <!-- Total -->
         <text x="20" y="${height - 125}" font-size="18" font-weight="900">TOTAL:</text>
-        <text x="${width-20}" y="${height - 125}" text-anchor="end" font-size="20" font-weight="900">${escapeXml(`${currency}${(ticket.totalAmount || ticket.total || 0).toFixed(2)}`)}</text>
+        <text x="${width-20}" y="${height - 125}" text-anchor="end" font-size="20" font-weight="900">${escapeXml(`${currency}${(ticket.totalAmount || ticket.totalAmount || 0).toFixed(2)}`)}</text>
 
-        <line x1="15" y1="${height - 110}" x2="${width-15}" y2="${height - 110}" stroke="#000" stroke-width="2" />
+        <line x1="5" y1="${height - 110}" x2="${width-5}" y2="${height - 110}" stroke="#000" stroke-width="2" />
 
         <!-- Barcode and Footer -->
         ${barcodeSvg}
@@ -518,7 +529,22 @@ export const printerService = {
         }
       }
 
+      // RawBT intent printing (Android specific for Bluetooth printers like PT210)
+      if (type === 'rawbt' && typeof window !== 'undefined') {
+        const commands = generateTicketReceipt(ticket, settings)
+        // Convert to base64 correctly supporting special characters
+        const encoded = btoa(unescape(encodeURIComponent(commands)));
+        const intentUrl = `intent:${encoded}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`
+
+        // Try opening RawBT intent
+        window.location.href = intentUrl;
+        return { success: true, message: 'Abriendo app RawBT para imprimir' }
+      }
+
       // Network printer
+
+
+
       if (type === 'network') {
         const commands = generateTicketReceipt(ticket, settings)
         return await printToNetwork(settings.printerAddress || '', commands)
@@ -543,6 +569,17 @@ export const printerService = {
         return new Promise<{success:boolean;message:string}>((resolve) => {
           ;(window as any).cordova.plugins.printer.print(html, { name: `Cierre de Caja ${session.id || ''}` }, () => resolve({ success: true, message: 'Impresión nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
         })
+      }
+
+
+      // RawBT intent printing
+      if (type === 'rawbt' && typeof window !== 'undefined') {
+        const commands = generateCashCloseReceipt(session, settings)
+        const encoded = btoa(unescape(encodeURIComponent(commands)));
+        const intentUrl = `intent:${encoded}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`
+
+        window.location.href = intentUrl;
+        return { success: true, message: 'Abriendo app RawBT para imprimir' }
       }
 
       if (type === 'network') {

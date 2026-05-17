@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.zetadevelop.lotochoco',
   appName: 'Lotochoco',
   webDir: 'out',
-  bundledWebRuntime: false,
   android: {
     path: 'android'
   }

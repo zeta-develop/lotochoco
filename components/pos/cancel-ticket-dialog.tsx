@@ -91,7 +91,7 @@ export function CancelTicketDialog({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total:</span>
-              <span className="font-bold">C${ticket.total.toFixed(2)}</span>
+              <span className="font-bold">C${(ticket.totalAmount || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Jugadas:</span>
