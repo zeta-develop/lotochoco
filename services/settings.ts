@@ -17,12 +17,12 @@ const DEFAULT_SETTINGS: Record<SettingKey, string> = {
 }
 
 export async function getSetting(key: SettingKey): Promise<string> {
-  const results = await query<Setting>('SELECT value FROM Setting WHERE key = ?', [key])
+  const results = await query<Setting>('SELECT "value" FROM "Setting" WHERE "key" = ?', [key])
   return results[0]?.value ?? DEFAULT_SETTINGS[key]
 }
 
 export async function getAllSettings(): Promise<Record<string, string>> {
-  const settings = await query<Setting>('SELECT key, value FROM Setting')
+  const settings = await query<Setting>('SELECT "key", "value" FROM "Setting"')
   
   const result: Record<string, string> = { ...DEFAULT_SETTINGS }
   
@@ -36,9 +36,9 @@ export async function getAllSettings(): Promise<Record<string, string>> {
 export async function updateSetting(key: SettingKey, value: string): Promise<void> {
   const id = generateId()
   await execute(
-    `INSERT OR REPLACE INTO Setting (id, key, value, updatedAt) 
+    `INSERT OR REPLACE INTO "Setting" ("id", "key", "value", "updatedAt") 
      VALUES (
-       COALESCE((SELECT id FROM Setting WHERE key = ?), ?),
+       COALESCE((SELECT "id" FROM "Setting" WHERE "key" = ?), ?),
        ?, ?, CURRENT_TIMESTAMP
      )`,
     [key, id, key, value]
