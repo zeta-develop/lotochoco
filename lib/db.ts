@@ -26,7 +26,7 @@ class DatabaseManager {
       if (isConn.result) {
         db = await this.sqlite.retrieveConnection('lotochoco_db', false)
       } else {
-        db = await sqlite.createConnection('lotochoco_db', false, 'no-encryption', 1, false)
+        db = await this.sqlite.createConnection('lotochoco_db', false, 'no-encryption', 1, false)
       }
       await db.open()
       
@@ -74,6 +74,13 @@ class DatabaseManager {
     const db = await this.getDb()
     return await db.run(sql, params)
   }
+
+  async getSqliteConnection(): Promise<SQLiteConnection> {
+    if (!this.sqlite) {
+      this.sqlite = new SQLiteConnection(CapacitorSQLite)
+    }
+    return this.sqlite
+  }
 }
 
 const dbManager = new DatabaseManager()
@@ -82,3 +89,4 @@ export default dbManager
 export const query = dbManager.query.bind(dbManager)
 export const execute = dbManager.execute.bind(dbManager)
 export const getDb = dbManager.getDb.bind(dbManager)
+export const getSqliteConnection = dbManager.getSqliteConnection.bind(dbManager)
