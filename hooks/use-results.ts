@@ -17,7 +17,7 @@ export function useResults() {
       setResults(data)
     } catch (error) {
       console.error('Error al cargar resultados:', error)
-      toast.error('Error al cargar resultados')
+      toast.error(error instanceof Error ? `Error: ${error.message}` : 'Error al cargar resultados')
     } finally {
       setIsLoading(false)
     }

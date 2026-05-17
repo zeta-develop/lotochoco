@@ -1,12 +1,13 @@
 import { query, execute } from '@/lib/db'
 import type { CashSession, CashMovement } from '@/lib/types'
+import { generateId } from '@/lib/utils'
 
 export async function openCashSession(openingAmount: number): Promise<CashSession> {
   // Check if there's already an open session
   const existing = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
   if (existing.length > 0) throw new Error('Ya existe una sesión de caja abierta')
 
-  const id = crypto.randomUUID()
+  const id = generateId()
   const now = new Date().toISOString()
   
   await execute(
@@ -52,7 +53,7 @@ export async function addCashMovement(data: {
   amount: number
   description: string
 }): Promise<CashMovement> {
-  const id = crypto.randomUUID()
+  const id = generateId()
   const now = new Date().toISOString()
   
   await execute(

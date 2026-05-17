@@ -1,6 +1,7 @@
 import { query, execute } from '@/lib/db'
 import type { Ticket, TicketItem, CartItem, Game } from '@/lib/types'
 import { format } from 'date-fns'
+import { generateId } from '@/lib/utils'
 
 // Generate unique ticket number
 function generateTicketNumber(): string {
@@ -14,7 +15,7 @@ export async function createTicket(items: CartItem[]): Promise<Ticket> {
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
   const ticketNumber = generateTicketNumber()
   const client = items[0]?.client || null
-  const ticketId = crypto.randomUUID()
+  const ticketId = generateId()
   const now = new Date().toISOString()
 
   // 1. Crear el Ticket
@@ -27,7 +28,7 @@ export async function createTicket(items: CartItem[]): Promise<Ticket> {
   for (const item of items) {
     await execute(
       'INSERT INTO TicketItem (id, ticketId, gameId, number, amount, schedule, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [crypto.randomUUID(), ticketId, item.gameId, item.number, item.amount, item.schedule, now]
+      [generateId(), ticketId, item.gameId, item.number, item.amount, item.schedule, now]
     )
   }
 
@@ -38,7 +39,7 @@ export async function createTicket(items: CartItem[]): Promise<Ticket> {
     await execute('UPDATE CashSession SET salesTotal = salesTotal + ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [totalAmount, sessionId])
     await execute(
       'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "sale", ?, ?, ?)',
-      [crypto.randomUUID(), sessionId, totalAmount, `Venta ticket ${ticketNumber}`, now]
+      [generateId(), sessionId, totalAmount, `Venta ticket ${ticketNumber}`, now]
     )
   }
 
@@ -148,7 +149,7 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<{ 
 
   await execute(
     'INSERT INTO CancellationLog (id, ticketId, ticketNumber, totalAmount, reason, itemsJson, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [crypto.randomUUID(), ticket.id, ticket.ticketNumber, ticket.totalAmount, reason, JSON.stringify(ticket.items), now]
+    [generateId(), ticket.id, ticket.ticketNumber, ticket.totalAmount, reason, JSON.stringify(ticket.items), now]
   )
 
   const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
@@ -157,7 +158,7 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<{ 
     await execute('UPDATE CashSession SET salesTotal = salesTotal - ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ticket.totalAmount, sessionId])
     await execute(
       'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "expense", ?, ?, ?)',
-      [crypto.randomUUID(), sessionId, -ticket.totalAmount, `Cancelación ticket ${ticket.ticketNumber}`, now]
+      [generateId(), sessionId, -ticket.totalAmount, `Cancelación ticket ${ticket.ticketNumber}`, now]
     )
   }
 

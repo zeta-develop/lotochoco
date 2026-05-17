@@ -20,9 +20,14 @@ import {
   Wifi,
   Bluetooth,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Shield,
+  Download,
+  Upload,
+  Database
 } from "lucide-react";
 import { toast } from "sonner";
+import { exportBackup, importBackup } from "@/services/backup";
 
 export function Settings() {
   const { settings, isLoading, updateSettings } = useSettings();
@@ -104,7 +109,7 @@ export function Settings() {
       </div>
 
       <Tabs defaultValue="business" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="business" className="gap-2">
             <Store className="h-4 w-4" />
             Negocio
@@ -116,6 +121,10 @@ export function Settings() {
           <TabsTrigger value="appearance" className="gap-2">
             <Palette className="h-4 w-4" />
             Apariencia
+          </TabsTrigger>
+          <TabsTrigger value="maintenance" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Seguridad
           </TabsTrigger>
         </TabsList>
 
@@ -449,7 +458,7 @@ export function Settings() {
             <CardContent className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Version</span>
-                <span className="font-mono">1.2.0</span>
+                <span className="font-mono">1.4.0</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Base de Datos</span>
@@ -458,6 +467,76 @@ export function Settings() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Modo</span>
                 <span className="font-mono">Offline</span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="maintenance" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Copias de Seguridad
+              </CardTitle>
+              <CardDescription>
+                Respalda tus datos localmente o restaura una copia anterior
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Exportar Datos</p>
+                    <p className="text-xs text-muted-foreground">Crea un archivo con toda tu informacion actual</p>
+                  </div>
+                  <Button variant="outline" onClick={async () => {
+                    const res = await exportBackup();
+                    if (res.success) toast.success(res.message);
+                    else toast.error(res.message);
+                  }}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Importar Datos</p>
+                    <p className="text-xs text-muted-foreground">Restaura una copia de seguridad (sobreescribe actual)</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      id="backup-input"
+                      className="hidden"
+                      accept=".json"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                          const content = event.target?.result as string;
+                          const res = await importBackup(content);
+                          if (res.success) toast.success(res.message);
+                          else toast.error(res.message);
+                        };
+                        reader.readAsText(file);
+                      }}
+                    />
+                    <Button variant="outline" onClick={() => document.getElementById('backup-input')?.click()}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Importar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  <strong>Aviso:</strong> Al importar un respaldo, se borrara toda la informacion actual y se reemplazara por la del archivo. Es recomendable reiniciar la aplicacion despues de importar.
+                </p>
               </div>
             </CardContent>
           </Card>
