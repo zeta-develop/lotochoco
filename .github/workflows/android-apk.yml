@@ -31,9 +31,6 @@ jobs:
         run: |
           corepack enable
           corepack prepare pnpm@10 --activate
-          if ! command -v pnpm >/dev/null 2>&1; then
-            npm install -g pnpm@10
-          fi
           pnpm -v
 
       - name: Install dependencies
@@ -66,7 +63,6 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          set -euo pipefail
           mkdir -p android/app
           echo "$ANDROID_KEYSTORE" | base64 --decode > android/app/release.keystore
           printf '%s\n' \
@@ -86,13 +82,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lotochoco-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/*.apk
 
       - name: Create GitHub Release and upload APK
         uses: ncipollo/release-action@v1
         with:
-          artifacts: android/app/build/outputs/apk/release/app-release.apk
-          tag: "v${{ env.APP_VERSION }}"
-          name: "LotoChoco v${{ env.APP_VERSION }}"
+          artifacts: android/app/build/outputs/apk/release/*.apk
+          tag: "v${{ env.APP_VERSION }}-${{ github.run_number }}"
+          name: "LotoChoco v${{ env.APP_VERSION }} build #${{ github.run_number }}"
           draft: false
           prerelease: false
