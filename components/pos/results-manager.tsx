@@ -73,8 +73,8 @@ export function ResultsManager() {
         autoProcess: true
       })
 
-      const winnersCount = response.processed?.winnersCount || 0
-      const totalPrizes = response.processed?.totalPrizes || 0
+      const winnersCount = response.isProcessed?.winnersCount || 0
+      const totalPrizes = response.isProcessed?.totalPrizes || 0
 
       toast.success(
         winnersCount > 0 

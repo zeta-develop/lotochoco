@@ -141,17 +141,19 @@ export function Reports() {
       })
 
       const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
+      const scale = 3
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('No se pudo crear el contexto del canvas')
+      ctx.scale(scale, scale)
       ctx.drawImage(img, 0, 0)
 
-      const pngData = canvas.toDataURL('image/png')
+      const pngData = canvas.toDataURL('image/png', 1.0)
 
       const { jsPDF } = await import('jspdf')
-      const pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] })
-      pdf.addImage(pngData, 'PNG', 0, 0, canvas.width, canvas.height)
+      const pdf = new jsPDF({ unit: 'px', format: [img.width, img.height] })
+      pdf.addImage(pngData, 'PNG', 0, 0, img.width, img.height)
 
       if (Capacitor.isNativePlatform()) {
         const pdfBase64 = pdf.output('datauristring').split(',')[1];

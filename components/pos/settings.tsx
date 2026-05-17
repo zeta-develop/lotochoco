@@ -44,7 +44,7 @@ export function Settings() {
         ticketMessage: settings.ticketMessage || "Gracias por su compra!",
         printerType: settings.printerType || "network",
         printerAddress: settings.printerAddress || "",
-        darkMode: settings.darkMode || false,
+        darkMode: settings.darkMode === "true",
       });
     }
   }, [settings]);
@@ -52,7 +52,7 @@ export function Settings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await updateSettings(formData);
+      await updateSettings({...formData, darkMode: formData.darkMode.toString()});
     } finally {
       setIsSaving(false);
     }
@@ -228,7 +228,7 @@ export function Settings() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Tipo de Conexion</Label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Button
                     type="button"
                     variant={formData.printerType === "network" ? "default" : "outline"}
@@ -240,12 +240,21 @@ export function Settings() {
                   </Button>
                   <Button
                     type="button"
+                    variant={formData.printerType === "rawbt" ? "default" : "outline"}
+                    className="h-20 flex-col gap-2"
+                    onClick={() => setFormData({ ...formData, printerType: "rawbt" })}
+                  >
+                    <Bluetooth className="h-6 w-6" />
+                    <span>RawBT (Android)</span>
+                  </Button>
+                  <Button
+                    type="button"
                     variant={formData.printerType === "bluetooth" ? "default" : "outline"}
                     className="h-20 flex-col gap-2"
                     onClick={() => setFormData({ ...formData, printerType: "bluetooth" })}
                   >
                     <Bluetooth className="h-6 w-6" />
-                    <span>Bluetooth</span>
+                    <span>Web Bluetooth</span>
                   </Button>
                 </div>
               </div>
@@ -267,6 +276,15 @@ export function Settings() {
                 </div>
               )}
 
+
+              {formData.printerType === "rawbt" && (
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    La conexión RawBT es la opción más estable para impresoras PT210 y similares en Android.
+                    Requiere que instales la aplicación gratuita <strong>RawBT</strong> desde la Play Store y la vincules con tu impresora.
+                  </p>
+                </div>
+              )}
               {formData.printerType === "bluetooth" && (
                 <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                   <p className="text-sm text-amber-600 dark:text-amber-400">
@@ -286,6 +304,28 @@ export function Settings() {
                   <TestTube className="h-4 w-4 mr-2" />
                   {testStatus === "testing" ? "Probando..." : "Probar Impresora"}
                 </Button>
+                {formData.printerType === "bluetooth" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const device = await (navigator as any).bluetooth.requestDevice({
+                          acceptAllDevices: true,
+                          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Common receipt printer service
+                        });
+                        console.log('Device selected:', device.name);
+                        alert(`Dispositivo ${device.name || 'desconocido'} seleccionado. Asegurate de emparejarlo.`);
+                      } catch (err) {
+                        console.error('Error WebBluetooth:', err);
+                        alert('No se pudo encontrar dispositivo Bluetooth o se canceló.');
+                      }
+                    }}
+                  >
+                    <Bluetooth className="h-4 w-4 mr-2" />
+                    Buscar Impresora WebBT
+                  </Button>
+                )}
                 
                 {testStatus === "success" && (
                   <div className="flex items-center gap-2 text-green-500">

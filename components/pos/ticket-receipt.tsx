@@ -1,11 +1,11 @@
 "use client";
 
 import { forwardRef } from "react";
-import type { Ticket, TicketItem, Settings as SettingsType } from "@/lib/types";
+import type { Ticket, TicketItem, Setting as SettingType } from "@/lib/types";
 
 interface TicketReceiptProps {
   ticket: Ticket & { items: TicketItem[] };
-  settings?: SettingsType;
+  settings?: SettingType;
 }
 
 export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
@@ -59,9 +59,9 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
               {ticket.items.map((item, index) => (
                 <tr key={index} className="align-top">
                   <td className="py-1">
-                    <div className="truncate pr-1">{item.gameName || "Juego"}</div>
-                    {item.scheduleTime && (
-                      <div className="text-[11px] text-gray-600">{item.scheduleTime}</div>
+                    <div className="truncate pr-1">{(item.game?.name) || "Juego"}</div>
+                    {item.schedule && (
+                      <div className="text-[11px] text-gray-600">{item.schedule}</div>
                     )}
                   </td>
                   <td className="py-1 text-center font-bold text-base">
@@ -79,18 +79,18 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
         {/* Total */}
         <div className="flex justify-between font-bold text-lg mb-4">
           <span>TOTAL:</span>
-          <span>{currency}{ticket.total.toFixed(2)}</span>
+          <span>{currency}{ticket.totalAmount.toFixed(2)}</span>
         </div>
 
         {/* Prize Info */}
-        {ticket.items.some(item => item.multiplier) && (
+        {ticket.items.some(item => ((item as any).multiplier || 0)) && (
           <div className="text-sm border-t border-dashed border-gray-500 pt-2 mb-4">
             <p className="text-center font-semibold mb-1">Multiplicadores:</p>
             {ticket.items.map((item, index) => (
-              item.multiplier ? (
+              ((item as any).multiplier || 0) ? (
                 <div key={index} className="flex justify-between">
                   <span>{item.number}</span>
-                  <span>x{item.multiplier} = {currency}{(item.amount * item.multiplier).toFixed(2)}</span>
+                  <span>x{((item as any).multiplier || 0)} = {currency}{(item.amount * ((item as any).multiplier || 0)).toFixed(2)}</span>
                 </div>
               ) : null
             ))}
