@@ -28,6 +28,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportBackup, importBackup } from "@/services/backup";
+import { sendErrorReport } from "@/services/report-service";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export function Settings() {
   const { settings, isLoading, updateSettings } = useSettings();
@@ -43,6 +52,10 @@ export function Settings() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -531,6 +544,17 @@ export function Settings() {
                     </Button>
                   </div>
                 </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium">Reportar Error</p>
+                    <p className="text-xs text-muted-foreground">Envía un problema directamente al desarrollador</p>
+                  </div>
+                  <Button variant="outline" onClick={() => setShowReportDialog(true)}>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Reportar
+                  </Button>
+                </div>
               </div>
 
               <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
@@ -542,6 +566,58 @@ export function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reportar Problema</DialogTitle>
+            <DialogDescription>
+              Describe el error para que podamos solucionarlo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Resumen corto</Label>
+              <Input 
+                value={reportTitle} 
+                onChange={(e) => setReportTitle(e.target.value)} 
+                placeholder="Ej: No conecta la impresora"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Detalles</Label>
+              <Textarea 
+                value={reportDetails} 
+                onChange={(e) => setReportDetails(e.target.value)} 
+                placeholder="Describe qué estabas haciendo cuando ocurrió el error..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancelar</Button>
+            <Button 
+              onClick={async () => {
+                if (!reportTitle || !reportDetails) return toast.error("Completa los campos");
+                setIsReporting(true);
+                const res = await sendErrorReport(reportTitle, reportDetails);
+                setIsReporting(false);
+                if (res.success) {
+                  toast.success("¡Reporte enviado! Gracias por tu ayuda.");
+                  setShowReportDialog(false);
+                  setReportTitle("");
+                  setReportDetails("");
+                } else {
+                  toast.error(res.message);
+                }
+              }}
+              disabled={isReporting}
+            >
+              {isReporting ? "Enviando..." : "Enviar Reporte"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
