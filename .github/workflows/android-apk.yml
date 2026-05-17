@@ -105,12 +105,13 @@ jobs:
 
           echo "=== Archivo gradle.properties generado con éxito ==="
 
-      # 1️⃣3️⃣ Build and auto-sign release APK
+      # 1️⃣3️⃣ Build and auto-sign release APK (Con limpieza de caché incremental)
       - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          # El comando 'clean' borra compilaciones previas que causan el error del IncrementalSplitter
+          ./gradlew clean assembleRelease
 
       # 1️⃣4️⃣ Upload APK as artifact
       - name: Upload APK artifact
