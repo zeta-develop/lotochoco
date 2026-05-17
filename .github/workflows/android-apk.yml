@@ -101,6 +101,8 @@ jobs:
           # Soporte para plugins heredados y dependencias biométricas/sqlite
           android.useAndroidX=true
           android.enableJetifier=true
+
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
           echo "=== Archivo gradle.properties generado con éxito ==="
