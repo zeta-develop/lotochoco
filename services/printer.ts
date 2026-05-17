@@ -527,9 +527,10 @@ export function generatePrintableHTML(
       <table>
         <thead>
           <tr>
-            <th style="width: 35%;">JUEGO</th>
-            <th class="center" style="width: 20%;">NUM</th>
-            <th class="right" style="width: 45%;">PREMIO</th>
+            <th style="width: 30%;">JUEGO</th>
+            <th class="center" style="width: 15%;">NUM</th>
+            <th class="right" style="width: 25%;">MONTO</th>
+            <th class="right" style="width: 30%;">PREMIO</th>
           </tr>
         </thead>
         <tbody>
@@ -543,6 +544,7 @@ export function generatePrintableHTML(
                 <div class="schedule">${item.schedule || ''}</div>
               </td>
               <td class="number">${item.number}</td>
+              <td class="right">${currency}${item.amount.toFixed(0)}</td>
               <td class="prize">${currency}${prize.toFixed(0)}</td>
             </tr>
             `
@@ -624,7 +626,8 @@ export function generateTicketImageUrl(
         <g font-family="'Courier New', Courier, monospace">
           <text x="15" y="${y}" font-size="14" font-weight="700" fill="#000">${gameName}</text>
           <text x="15" y="${y + 14}" font-size="10" fill="#555">${schedule}</text>
-          <text x="170" y="${y}" font-size="15" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
+          <text x="140" y="${y}" font-size="15" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
+          <text x="210" y="${y}" font-size="14" font-weight="700" fill="#000" text-anchor="middle">${amount}</text>
           <text x="${width - 15}" y="${y}" font-size="14" font-weight="700" fill="#000" text-anchor="end">${prizeStr}</text>
         </g>
       `
@@ -705,6 +708,7 @@ function generateTestPage(): string {
 }
 
 import { generatePT210Receipt, printDirect } from './pt210-printer'
+import { jsPDF } from 'jspdf'
 
 export const printerService = {
   generateTicketCommands: generateTicketReceipt,
@@ -716,6 +720,111 @@ export const printerService = {
   connectBluetoothPrinter,
   disconnectBluetoothPrinter,
   printViaBluetooth,
+
+  async shareTicketPDF(ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }, settings: Record<string, string>) {
+    try {
+      const doc = new jsPDF({
+        unit: 'mm',
+        format: [58, 150] // Estándar de 58mm
+      });
+
+      const currency = settings.currency || 'C$';
+      const businessName = (settings.businessName || 'LOTERIA').toUpperCase();
+      
+      // Estilos básicos
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(14);
+      doc.text(businessName, 29, 10, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setFont('courier', 'normal');
+      doc.text('Ticket de Loteria', 29, 15, { align: 'center' });
+      
+      doc.setLineDashPattern([1, 1], 0);
+      doc.line(5, 18, 53, 18);
+      
+      doc.setFontSize(9);
+      doc.text(`TICKET: #${ticket.ticketNumber}`, 5, 23);
+      doc.text(`FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}`, 5, 27);
+      doc.text(`HORA:   ${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}`, 5, 31);
+      
+      if (ticket.client) {
+        doc.text(`CLIENTE: ${ticket.client.toUpperCase()}`, 5, 35);
+      }
+
+      doc.line(5, 38, 53, 38);
+      
+      // Encabezado de tabla
+      doc.setFont('courier', 'bold');
+      doc.text('JUEGO', 5, 43);
+      doc.text('NUM', 22, 43, { align: 'center' });
+      doc.text('VALOR', 35, 43, { align: 'center' });
+      doc.text('PREMIO', 53, 43, { align: 'right' });
+      doc.setFont('courier', 'normal');
+      
+      doc.line(5, 45, 53, 45);
+      
+      let y = 50;
+      for (const item of ticket.items) {
+        const gameName = (item.game?.name || 'NICA').substring(0, 10);
+        const multiplier = item.game?.multiplier || 70;
+        const prize = item.amount * multiplier;
+
+        doc.text(gameName, 5, y);
+        doc.setFont('courier', 'bold');
+        doc.text(item.number, 22, y, { align: 'center' });
+        doc.setFont('courier', 'normal');
+        doc.text(`${currency}${item.amount.toFixed(0)}`, 35, y, { align: 'center' });
+        doc.text(`${currency}${prize.toFixed(0)}`, 53, y, { align: 'right' });
+        
+        y += 4;
+        doc.setFontSize(7);
+        doc.text(`Sorteo: ${item.schedule}`, 5, y);
+        doc.setFontSize(9);
+        y += 6;
+
+        if (y > 140) doc.addPage([58, 150]);
+      }
+
+      doc.line(5, y - 2, 53, y - 2);
+      
+      doc.setFontSize(12);
+      doc.setFont('courier', 'bold');
+      doc.text(`TOTAL: ${currency}${ticket.totalAmount.toFixed(2)}`, 53, y + 5, { align: 'right' });
+      
+      doc.setFontSize(8);
+      doc.setFont('courier', 'normal');
+      doc.text(settings.ticketMessage || '¡Gracias por su compra!', 29, y + 12, { align: 'center' });
+      doc.text('*** CONSERVE SU TICKET ***', 29, y + 16, { align: 'center' });
+
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const fileName = `ticket_${ticket.ticketNumber}.pdf`;
+
+      if (Capacitor.isNativePlatform()) {
+        const savedFile = await Filesystem.writeFile({
+          path: fileName,
+          data: pdfBase64,
+          directory: Directory.Cache,
+        });
+
+        await Share.share({
+          title: 'Compartir Ticket',
+          text: `Ticket #${ticket.ticketNumber} - Lotochoco`,
+          url: savedFile.uri,
+          dialogTitle: 'Enviar ticket vía...',
+        });
+        
+        return { success: true, message: 'Listo para compartir' };
+      } else {
+        doc.save(fileName);
+        return { success: true, message: 'Descarga iniciada' };
+      }
+    } catch (error) {
+      console.error('Error al generar/compartir PDF:', error);
+      return { success: false, message: 'No se pudo generar el PDF' };
+    }
+  },
+
   async printTicket(ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }, settings: Record<string,string>) {
     try {
       const type = settings.printerType || 'browser'

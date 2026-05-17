@@ -25,6 +25,7 @@ import {
   Clock,
   Plus,
   Printer,
+  Share2,
   ShoppingCart,
   Trash2,
   X,
@@ -136,6 +137,16 @@ export function POSSale() {
     }
 
     toast.success(result.message || 'Impresión iniciada')
+  }
+
+  const handleShare = async () => {
+    if (!lastTicket) return
+    toast.info('Generando PDF...')
+    const result = await printerService.shareTicketPDF(
+      lastTicket as Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
+      settings
+    )
+    if (!result.success) toast.error(result.message)
   }
 
   const currency = settings.currency || 'C$'
@@ -379,10 +390,14 @@ export function POSSale() {
           )}
 
           <DialogFooter className="flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => setShowSuccessDialog(false)} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setShowSuccessDialog(false)} className="w-full sm:w-auto rounded-xl">
               Cerrar
             </Button>
-            <Button onClick={handlePrint} className="w-full sm:w-auto">
+            <Button variant="secondary" onClick={handleShare} className="w-full sm:w-auto rounded-xl">
+              <Share2 className="mr-2 h-4 w-4" />
+              Compartir
+            </Button>
+            <Button onClick={handlePrint} className="w-full sm:w-auto rounded-xl">
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
             </Button>

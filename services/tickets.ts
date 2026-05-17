@@ -74,7 +74,19 @@ export async function getTicketById(id: string): Promise<Ticket | null> {
 }
 
 export async function getTicketByNumber(ticketNumber: string): Promise<Ticket | null> {
-  const tickets = await query<Ticket>('SELECT * FROM Ticket WHERE ticketNumber = ?', [ticketNumber])
+  let searchNumber = ticketNumber.trim()
+  
+  // Si no empieza con #, intentamos formatearlo
+  if (!searchNumber.startsWith('#')) {
+    // Si es un número puro, lo rellenamos con ceros hasta 8 dígitos
+    if (/^\d+$/.test(searchNumber)) {
+      searchNumber = `#${searchNumber.padStart(8, '0')}`
+    } else {
+      searchNumber = `#${searchNumber}`
+    }
+  }
+
+  const tickets = await query<Ticket>('SELECT * FROM Ticket WHERE ticketNumber = ?', [searchNumber])
   if (tickets.length === 0) return null
   return await getTicketById(tickets[0].id)
 }

@@ -56,9 +56,10 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-300">
-                <th className="py-1 w-2/5 font-semibold">JUEGO</th>
-                <th className="py-1 w-1/5 text-center font-semibold">NUM</th>
-                <th className="py-1 w-2/5 text-right font-semibold">PREMIO</th>
+                <th className="py-1 w-1/4 font-semibold">JUEGO</th>
+                <th className="py-1 w-1/4 text-center font-semibold">NUM</th>
+                <th className="py-1 w-1/4 text-right font-semibold">VALOR</th>
+                <th className="py-1 w-1/4 text-right font-semibold">PREMIO</th>
               </tr>
             </thead>
             <tbody>
@@ -75,6 +76,9 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
                     </td>
                     <td className="py-1 text-center font-bold text-base">
                       {item.number}
+                    </td>
+                    <td className="py-1 text-right">
+                      {currency}{item.amount.toFixed(0)}
                     </td>
                     <td className="py-1 text-right font-semibold">
                       {currency}{prize.toFixed(0)}

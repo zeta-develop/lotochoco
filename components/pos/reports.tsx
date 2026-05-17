@@ -95,7 +95,7 @@ export function Reports() {
   })
   const { tickets: reportTickets } = useTickets({ startDate: dateRange.start, endDate: dateRange.end })
   
-  const { getTicket } = useTickets()
+  const { getTicketByNumber: getTicket } = useTickets()
   const [foundTicket, setFoundTicket] = useState<TicketWithDetails | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<TicketWithDetails | null>(null)
   const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false)
@@ -121,20 +121,9 @@ export function Reports() {
   }
 
   const handleSendTicketImage = async (ticket: TicketWithDetails) => {
-    const imageUrl = generateTicketImageUrl(ticket as any, settings as any)
-    try {
-      if (Capacitor.isNativePlatform()) {
-        const { jsPDF } = await import('jspdf')
-        const pdf = new jsPDF()
-        // Lógica simplificada para reporte
-        toast.info('Generando imagen...')
-        window.open(imageUrl, '_blank')
-      } else {
-        window.open(imageUrl, '_blank')
-      }
-    } catch (err) {
-      toast.error('Error al generar imagen')
-    }
+    toast.info('Generando PDF...')
+    const result = await printerService.shareTicketPDF(ticket as any, settings as any)
+    if (!result.success) toast.error(result.message)
   }
 
   return (
