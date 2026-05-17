@@ -1,5 +1,6 @@
 import { query, execute, getDb } from '@/lib/db'
 import type { Game, DrawSchedule } from '@/lib/types'
+import { generateId } from '@/lib/utils'
 
 export async function getGames(): Promise<Game[]> {
   const games = await query<Game>('SELECT * FROM Game ORDER BY name ASC')
@@ -52,7 +53,7 @@ export async function createGame(data: {
   multiplier: number
   schedules?: { name: string; time: string }[]
 }): Promise<Game> {
-  const gameId = crypto.randomUUID()
+  const gameId = generateId()
   
   await execute(
     'INSERT INTO Game (id, name, digitCount, multiplier, isActive) VALUES (?, ?, ?, ?, 1)',
@@ -63,7 +64,7 @@ export async function createGame(data: {
     for (const s of data.schedules) {
       await execute(
         'INSERT INTO DrawSchedule (id, gameId, name, time, isActive) VALUES (?, ?, ?, ?, 1)',
-        [crypto.randomUUID(), gameId, s.name, s.time]
+        [generateId(), gameId, s.name, s.time]
       )
     }
   }
