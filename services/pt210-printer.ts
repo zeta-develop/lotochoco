@@ -68,9 +68,9 @@ export function generatePT210Receipt(
   receipt += COMMANDS.FEED_LINE;
   
   // Tabla de Jugadas
-  // Columnas: JUEGO (10), NUM (5), PREMIO (15) -> Total 30 + espacios = 32
+  // Columnas: JUEGO (10), NUM (8), MONTO (14) -> Total 32
   receipt += COMMANDS.BOLD_ON;
-  receipt += 'JUEGO      NUM       PREMIO'.padEnd(lineWidth);
+  receipt += 'JUEGO     NUM          MONTO'.padEnd(lineWidth);
   receipt += COMMANDS.BOLD_OFF;
   receipt += COMMANDS.FEED_LINE;
   receipt += separator;
@@ -79,17 +79,16 @@ export function generatePT210Receipt(
   for (const item of ticket.items) {
     const gameName = (item.game?.name || 'NICA').substring(0, 10).padEnd(10);
     const number = item.number.padStart(5);
+    const monto = `${currency}${item.amount.toFixed(0)}`.padStart(15);
+    
+    // Fila 1: Juego, Número y MONTO (inversión)
+    receipt += `${gameName}${number}${monto}${COMMANDS.FEED_LINE}`;
+    
+    // Fila 2: Hora del sorteo y Premio potencial
     const multiplier = item.game?.multiplier || 70;
     const prize = item.amount * multiplier;
-    const prizeStr = `${currency}${prize.toFixed(0)}`.padStart(15);
-    
-    // Fila 1: Juego, Número y Premio calculado
-    receipt += `${gameName}${number}${prizeStr}${COMMANDS.FEED_LINE}`;
-    
-    // Fila 2: Hora del sorteo y MONTO (inversión)
-    const scheduleInfo = ` SORTEO: ${item.schedule}`.padEnd(17);
-    const montoInfo = `MONTO: ${currency}${item.amount.toFixed(0)}`.padStart(15);
-    receipt += `${scheduleInfo}${montoInfo}${COMMANDS.FEED_LINE}`;
+    const details = ` ${item.schedule} > Premio: ${currency}${prize.toFixed(0)}`;
+    receipt += `${details}${COMMANDS.FEED_LINE}`;
     receipt += COMMANDS.FEED_LINE; // Espacio entre items para mejor lectura
   }
   
