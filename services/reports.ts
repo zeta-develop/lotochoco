@@ -1,61 +1,44 @@
-import prisma from '@/lib/db'
+import { query } from '@/lib/db'
 import type { SalesReport } from '@/lib/types'
 
 export async function getSalesReport(options?: {
   startDate?: Date
   endDate?: Date
 }): Promise<SalesReport> {
-  const where: Record<string, unknown> = {
-    status: 'active'
+  const params = []
+  let whereStr = " WHERE status = 'active'"
+  
+  if (options?.startDate) {
+    whereStr += " AND createdAt >= ?"
+    params.push(options.startDate.toISOString())
+  }
+  if (options?.endDate) {
+    whereStr += " AND createdAt <= ?"
+    params.push(options.endDate.toISOString())
   }
 
+  // Ventas totales
+  const salesResult = await query(`SELECT SUM(totalAmount) as totalSales, COUNT(*) as totalTickets FROM Ticket ${whereStr}`, params)
+  
+  // Premios totales
+  let prizeWhereStr = ""
+  const prizeParams = []
   if (options?.startDate || options?.endDate) {
-    where.createdAt = {}
-    if (options.startDate) {
-      (where.createdAt as Record<string, Date>).gte = options.startDate
-    }
-    if (options.endDate) {
-      (where.createdAt as Record<string, Date>).lte = options.endDate
-    }
+    prizeWhereStr = " WHERE createdAt >= ? AND createdAt <= ?"
+    prizeParams.push(options?.startDate?.toISOString() || '1970-01-01T00:00:00.000Z')
+    prizeParams.push(options?.endDate?.toISOString() || new Date().toISOString())
   }
 
-  // Get total sales
-  const salesResult = await prisma.ticket.aggregate({
-    where,
-    _sum: {
-      totalAmount: true
-    },
-    _count: true
-  })
+  const prizesResult = await query(`SELECT SUM(prizeAmount) as totalPrizes FROM Winner ${prizeWhereStr}`, prizeParams)
+  
+  // Premios pagados
+  let paidWhereStr = prizeWhereStr ? prizeWhereStr + " AND isPaid = 1" : " WHERE isPaid = 1"
+  const paidResult = await query(`SELECT SUM(prizeAmount) as totalPaid FROM Winner ${paidWhereStr}`, prizeParams)
 
-  // Get total prizes
-  const prizeWhere: Record<string, unknown> = {}
-  if (options?.startDate || options?.endDate) {
-    prizeWhere.createdAt = where.createdAt
-  }
-
-  const prizesResult = await prisma.winner.aggregate({
-    where: prizeWhere,
-    _sum: {
-      prizeAmount: true
-    }
-  })
-
-  // Get paid prizes
-  const paidResult = await prisma.winner.aggregate({
-    where: {
-      ...prizeWhere,
-      isPaid: true
-    },
-    _sum: {
-      prizeAmount: true
-    }
-  })
-
-  const totalSales = salesResult._sum.totalAmount || 0
-  const totalTickets = salesResult._count
-  const totalPrizes = prizesResult._sum.prizeAmount || 0
-  const totalPaid = paidResult._sum.prizeAmount || 0
+  const totalSales = salesResult[0]?.totalSales || 0
+  const totalTickets = salesResult[0]?.totalTickets || 0
+  const totalPrizes = prizesResult[0]?.totalPrizes || 0
+  const totalPaid = paidResult[0]?.totalPaid || 0
   const pendingPrizes = totalPrizes - totalPaid
   const netProfit = totalSales - totalPrizes
 
@@ -72,10 +55,8 @@ export async function getSalesReport(options?: {
 export async function getDailyReport(date: Date): Promise<SalesReport> {
   const startDate = new Date(date)
   startDate.setHours(0, 0, 0, 0)
-  
   const endDate = new Date(date)
   endDate.setHours(23, 59, 59, 999)
-
   return getSalesReport({ startDate, endDate })
 }
 
@@ -86,125 +67,87 @@ export async function getWeeklyReport(): Promise<{
   const today = new Date()
   const weekAgo = new Date(today)
   weekAgo.setDate(weekAgo.getDate() - 7)
-
-  const days: { date: string; sales: number; prizes: number }[] = []
+  const days = []
 
   for (let i = 6; i >= 0; i--) {
     const date = new Date(today)
     date.setDate(date.getDate() - i)
-    
-    const dayReport = await getDailyReport(date)
-    
+    const report = await getDailyReport(date)
     days.push({
       date: date.toISOString().split('T')[0],
-      sales: dayReport.totalSales,
-      prizes: dayReport.totalPrizes
+      sales: report.totalSales,
+      prizes: report.totalPrizes
     })
   }
 
-  const totals = await getSalesReport({
-    startDate: weekAgo,
-    endDate: today
-  })
-
+  const totals = await getSalesReport({ startDate: weekAgo, endDate: today })
   return { days, totals }
 }
 
 export async function getGameReport(options?: {
   startDate?: Date
   endDate?: Date
-}): Promise<{
-  gameId: string
-  gameName: string
-  ticketCount: number
-  totalAmount: number
-  prizesAmount: number
-}[]> {
-  const where: Record<string, unknown> = {}
+}): Promise<any[]> {
+  const params = []
+  let whereStr = " WHERE t.status = 'active'"
   
-  if (options?.startDate || options?.endDate) {
-    where.createdAt = {}
-    if (options.startDate) {
-      (where.createdAt as Record<string, Date>).gte = options.startDate
-    }
-    if (options.endDate) {
-      (where.createdAt as Record<string, Date>).lte = options.endDate
-    }
+  if (options?.startDate) {
+    whereStr += " AND t.createdAt >= ?"
+    params.push(options.startDate.toISOString())
+  }
+  if (options?.endDate) {
+    whereStr += " AND t.createdAt <= ?"
+    params.push(options.endDate.toISOString())
   }
 
-  const items = await prisma.ticketItem.groupBy({
-    by: ['gameId'],
-    where: {
-      ticket: {
-        status: 'active',
-        ...where
-      }
-    },
-    _sum: {
-      amount: true
-    },
-    _count: true
-  })
+  const sql = `
+    SELECT 
+      g.id as gameId, 
+      g.name as gameName, 
+      COUNT(ti.id) as ticketCount, 
+      SUM(ti.amount) as totalAmount
+    FROM Game g
+    LEFT JOIN TicketItem ti ON g.id = ti.gameId
+    LEFT JOIN Ticket t ON ti.ticketId = t.id
+    ${whereStr}
+    GROUP BY g.id
+  `
+  
+  const games = await query(sql, params)
+  
+  for (const g of games) {
+    const prizes = await query(
+      "SELECT SUM(prizeAmount) as prizesAmount FROM Winner w JOIN Result r ON w.resultId = r.id WHERE r.gameId = ?",
+      [g.gameId]
+    )
+    g.prizesAmount = prizes[0]?.prizesAmount || 0
+  }
 
-  const games = await prisma.game.findMany()
-  const gameMap = new Map(games.map(g => [g.id, g.name]))
-
-  const results = await Promise.all(
-    items.map(async (item) => {
-      const prizeWhere: Record<string, unknown> = {
-        result: {
-          gameId: item.gameId
-        }
-      }
-      
-      if (options?.startDate || options?.endDate) {
-        prizeWhere.createdAt = where.createdAt
-      }
-
-      const prizes = await prisma.winner.aggregate({
-        where: prizeWhere,
-        _sum: {
-          prizeAmount: true
-        }
-      })
-
-      return {
-        gameId: item.gameId,
-        gameName: gameMap.get(item.gameId) || 'Desconocido',
-        ticketCount: item._count,
-        totalAmount: item._sum.amount || 0,
-        prizesAmount: prizes._sum.prizeAmount || 0
-      }
-    })
-  )
-
-  return results
+  return games
 }
 
 export async function getNumberFrequency(options?: {
   gameId?: string
   limit?: number
 }): Promise<{ number: string; frequency: number }[]> {
-  const where: Record<string, unknown> = {}
-  
+  let sql = "SELECT number, COUNT(*) as frequency FROM TicketItem"
+  const params = []
   if (options?.gameId) {
-    where.gameId = options.gameId
+    sql += " WHERE gameId = ?"
+    params.push(options.gameId)
   }
+  sql += " GROUP BY number ORDER BY frequency DESC"
+  if (options?.limit) {
+    sql += " LIMIT ?"
+    params.push(options.limit)
+  }
+  return await query(sql, params)
+}
 
-  const items = await prisma.ticketItem.groupBy({
-    by: ['number'],
-    where,
-    _count: true,
-    orderBy: {
-      _count: {
-        number: 'desc'
-      }
-    },
-    take: options?.limit || 20
-  })
-
-  return items.map(item => ({
-    number: item.number,
-    frequency: item._count
-  }))
+export const reportService = {
+  getSalesReport,
+  getDailyReport,
+  getWeeklyReport,
+  getGameReport,
+  getNumberFrequency
 }

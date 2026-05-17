@@ -1,4 +1,4 @@
-import prisma from '@/lib/db'
+import { query, execute } from '@/lib/db'
 import type { Setting, SettingKey } from '@/lib/types'
 
 const DEFAULT_SETTINGS: Record<SettingKey, string> = {
@@ -13,58 +13,50 @@ const DEFAULT_SETTINGS: Record<SettingKey, string> = {
 }
 
 export async function getSetting(key: SettingKey): Promise<string> {
-  const setting = await prisma.setting.findUnique({
-    where: { key }
-  })
-  
-  return setting?.value ?? DEFAULT_SETTINGS[key]
+  const results = await query<Setting>('SELECT value FROM Setting WHERE key = ?', [key])
+  return results[0]?.value ?? DEFAULT_SETTINGS[key]
 }
 
 export async function getAllSettings(): Promise<Record<string, string>> {
-  const settings = await prisma.setting.findMany()
+  const settings = await query<Setting>('SELECT key, value FROM Setting')
   
   const result: Record<string, string> = { ...DEFAULT_SETTINGS }
   
   for (const setting of settings) {
-    result[setting.key] = setting.value
+    result[setting.key as SettingKey] = setting.value
   }
   
   return result
 }
 
-export async function updateSetting(key: SettingKey, value: string): Promise<Setting> {
-  const setting = await prisma.setting.upsert({
-    where: { key },
-    update: { value },
-    create: { key, value }
-  })
-  
-  return setting as Setting
+export async function updateSetting(key: SettingKey, value: string): Promise<void> {
+  const id = crypto.randomUUID()
+  await execute(
+    `INSERT OR REPLACE INTO Setting (id, key, value, updatedAt) 
+     VALUES (
+       COALESCE((SELECT id FROM Setting WHERE key = ?), ?),
+       ?, ?, CURRENT_TIMESTAMP
+     )`,
+    [key, id, key, value]
+  )
 }
 
 export async function updateSettings(
   settings: Partial<Record<SettingKey, string>>
 ): Promise<void> {
-  const updates = Object.entries(settings).map(([key, value]) =>
-    prisma.setting.upsert({
-      where: { key },
-      update: { value: value as string },
-      create: { key, value: value as string }
-    })
-  )
-  
-  await Promise.all(updates)
+  for (const [key, value] of Object.entries(settings)) {
+    await updateSetting(key as SettingKey, value as string)
+  }
 }
 
 export async function initializeSettings(): Promise<void> {
-  const existing = await prisma.setting.count()
+  const results = await query('SELECT COUNT(*) as count FROM Setting')
+  const count = results[0]?.count || 0
   
-  if (existing === 0) {
-    const entries = Object.entries(DEFAULT_SETTINGS)
-    
-    await prisma.setting.createMany({
-      data: entries.map(([key, value]) => ({ key, value }))
-    })
+  if (count === 0) {
+    for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+      await updateSetting(key as SettingKey, value as string)
+    }
   }
 }
 
@@ -94,7 +86,7 @@ export const settingsService = {
         key === 'bluetoothDeviceId' ||
         key === 'bluetoothDeviceName'
       ) {
-        normalized[key] = String(value)
+        normalized[key as SettingKey] = String(value)
       }
     }
 
