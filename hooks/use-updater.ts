@@ -91,18 +91,21 @@ export function useUpdater() {
       if (value) {
         toast.info('Descargando actualización...');
         
-        // Descargar el archivo
+        const fileName = `lotochoco_v${latestVersion}.apk`;
+
+        // Descargar el archivo a Documentos (más fiable para el instalador)
         const downloadResult = await Filesystem.downloadFile({
           url: apkAsset.browser_download_url,
-          path: `updates/${fileName}`,
-          directory: Directory.Cache,
+          path: fileName,
+          directory: Directory.Documents,
           recursive: true
         });
 
         if (downloadResult.path) {
+          console.log('APK descargado en:', downloadResult.path);
           toast.success('Descarga completada. Iniciando instalación...');
           
-          // Abrir el instalador
+          // Abrir el instalador con la ruta absoluta
           await FileOpener.open({
             filePath: downloadResult.path,
             contentType: 'application/vnd.android.package-archive'
