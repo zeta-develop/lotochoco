@@ -17,6 +17,9 @@ out/
 .DS_Store
 ignore
 release.keystore
+release-keystore-jks.base64
+release.keystore-jks.jks
+release-keystore-jks.jks
 release.keystore.*
 *.log
 *.pem

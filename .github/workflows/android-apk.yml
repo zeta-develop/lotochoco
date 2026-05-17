@@ -1,4 +1,4 @@
-name: Android APK
+name: Build and Release Android APK
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2️⃣ Node.js setup
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,54 +27,50 @@ jobs:
         with:
           version: 10
 
-      - name: Enable Corepack & prepare pnpm
+      # 4️⃣ Enable Corepack & ensure pnpm
+      - name: Enable Corepack & ensure pnpm
         run: |
           corepack enable
           corepack prepare pnpm@10 --activate
-
-      - name: Ensure pnpm available
-        run: |
           if ! command -v pnpm >/dev/null 2>&1; then
             npm install -g pnpm@10
           fi
           pnpm -v
 
-      # 4️⃣ Install dependencies
+      # 5️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      # 5️⃣ Set app version
+      # 6️⃣ Set app version and code
       - name: Set app version
         run: |
-          APP_VERSION=$(node -p 'require("./package.json").version')
-          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
-          APP_VERSION_CODE=$GITHUB_RUN_NUMBER
-          echo "APP_VERSION_CODE=$APP_VERSION_CODE" >> "$GITHUB_ENV"
+          echo "APP_VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
-      # 6️⃣ Build Next.js
+      # 7️⃣ Build Next.js
       - name: Build Next.js
         run: pnpm build
 
-      # 7️⃣ Setup Java
+      # 8️⃣ Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      # 8️⃣ Setup Android SDK
+      # 9️⃣ Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 9️⃣ Generate Android project if needed
+      # 🔟 Generate Android project
       - name: Generate Android project
         run: pnpm cap:add:android
 
-      # 🔟 Sync Capacitor
+      # 1️⃣1️⃣ Sync Capacitor
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      # 1️⃣1️⃣ Configure release signing
+      # 1️⃣2️⃣ Configure release signing
       - name: Configure release signing
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -83,13 +79,12 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-
           mkdir -p android/app
 
-          # Restaurar keystore desde GitHub Secrets
+          # Decode the JKS keystore
           echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
 
-          # Escribir gradle.properties para firma
+          # Add signing info to gradle.properties
           printf '%s\n' \
             'RELEASE_STORE_FILE=release-keystore.jks' \
             "RELEASE_STORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD" \
@@ -97,18 +92,23 @@ jobs:
             "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD" \
             >> android/gradle.properties
 
-          # Ejecutar script si lo necesitas (opcional)
-          if [ -f scripts/inject_android_release_signing.py ]; then
-            python3 scripts/inject_android_release_signing.py
-          fi
-
-      # 1️⃣2️⃣ Build release APK
+      # 1️⃣3️⃣ Build release APK
       - name: Build release APK
         run: pnpm android:build:release
 
-      # 1️⃣3️⃣ Upload APK artifact
+      # 1️⃣4️⃣ Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: lotochoco-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+
+      # 1️⃣5️⃣ Create GitHub Release and upload APK
+      - name: Create GitHub Release and upload APK
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: android/app/build/outputs/apk/release/app-release.apk
+          tag: "v${{ env.APP_VERSION }}"
+          name: "LotoChoco v${{ env.APP_VERSION }}"
+          draft: false
+          prerelease: false
