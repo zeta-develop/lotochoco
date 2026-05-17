@@ -83,24 +83,21 @@ jobs:
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-# 1️⃣2️⃣ Configure release signing
+      # 1️⃣2️⃣ Configure release signing
       - name: Configure release signing
         env:
-          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_CRYPT_KEY: ${{ secrets.KEYSTORE_CRYPT_KEY }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          mkdir -p android/app
           
-          # FORCE DELETE: Nos aseguramos de eliminar cualquier rastro del keystore viejo
-          rm -f android/app/release.keystore
+          # Desencriptar de forma binaria exacta el keystore original
+          gpg --quiet --batch --yes --decrypt --passphrase "$KEYSTORE_CRYPT_KEY" \
+            --output android/app/release.keystore android/app/release.keystore.gpg
           
-          # Decode keystore moderno
-          echo "$ANDROID_KEYSTORE" | base64 --decode > android/app/release.keystore
-          
-          # Limpiamos el gradle.properties viejo si existiera y creamos uno nuevo limpio
+          # Limpiar y escribir el archivo gradle.properties
           rm -f android/gradle.properties
           printf '%s\n' \
             'RELEASE_STORE_FILE=release.keystore' \
