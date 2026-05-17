@@ -158,7 +158,7 @@ async function createPrismaClient() {
           CREATE INDEX IF NOT EXISTS "CashMovement_type_idx" ON "CashMovement"("type");
           CREATE UNIQUE INDEX IF NOT EXISTS "Setting_key_key" ON "Setting"("key");
           CREATE INDEX IF NOT EXISTS "CancellationLog_createdAt_idx" ON "CancellationLog"("createdAt");
-        \`;
+        `;
         
         await db.execute(schemaSql)
         console.log('Esquema de base de datos inicializado con éxito.')
