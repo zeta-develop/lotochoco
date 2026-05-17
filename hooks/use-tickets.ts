@@ -12,6 +12,15 @@ import {
   getOfflineTodayTickets,
 } from '@/lib/local-db'
 
+function parseLocalDate(value?: string) {
+  if (!value) return undefined
+
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return undefined
+
+  return new Date(year, month - 1, day)
+}
+
 export function useTickets(options?: {
   today?: boolean
   status?: string
@@ -33,8 +42,8 @@ export function useTickets(options?: {
       setData(
         getOfflineTickets({
           status: options?.status,
-          startDate: options?.startDate ? new Date(options.startDate) : undefined,
-          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+          startDate: parseLocalDate(options?.startDate),
+          endDate: parseLocalDate(options?.endDate),
         })
       )
     } catch (error) {

@@ -13,6 +13,15 @@ import {
   getOfflineWeeklyReport,
 } from '@/lib/local-db'
 
+function parseLocalDate(value?: string) {
+  if (!value) return undefined
+
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return undefined
+
+  return new Date(year, month - 1, day)
+}
+
 function useReportAutoRefresh(refresh: () => Promise<void>) {
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -53,11 +62,17 @@ export function useSalesReport(options?: {
   const [error, setError] = useState<Error | null>(null)
 
   const parsedStartDate = useMemo(
-    () => (options?.startDate ? startOfDay(new Date(options.startDate)) : undefined),
+    () => {
+      const parsedDate = parseLocalDate(options?.startDate)
+      return parsedDate ? startOfDay(parsedDate) : undefined
+    },
     [options?.startDate]
   )
   const parsedEndDate = useMemo(
-    () => (options?.endDate ? endOfDay(new Date(options.endDate)) : undefined),
+    () => {
+      const parsedDate = parseLocalDate(options?.endDate)
+      return parsedDate ? endOfDay(parsedDate) : undefined
+    },
     [options?.endDate]
   )
 
@@ -119,7 +134,7 @@ export function useDailyReport(date?: string) {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      setReport(getOfflineDailyReport(date ? new Date(date) : new Date()))
+      setReport(getOfflineDailyReport(date ? parseLocalDate(date) || new Date() : new Date()))
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte diario'))
     }
@@ -223,11 +238,17 @@ export function useGameReport(options?: {
   const [error, setError] = useState<Error | null>(null)
 
   const parsedStartDate = useMemo(
-    () => (options?.startDate ? startOfDay(new Date(options.startDate)) : undefined),
+    () => {
+      const parsedDate = parseLocalDate(options?.startDate)
+      return parsedDate ? startOfDay(parsedDate) : undefined
+    },
     [options?.startDate]
   )
   const parsedEndDate = useMemo(
-    () => (options?.endDate ? endOfDay(new Date(options.endDate)) : undefined),
+    () => {
+      const parsedDate = parseLocalDate(options?.endDate)
+      return parsedDate ? endOfDay(parsedDate) : undefined
+    },
     [options?.endDate]
   )
 

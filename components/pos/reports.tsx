@@ -125,12 +125,87 @@ export function Reports() {
 
   const handleSendTicketImage = (ticket: TicketWithDetails) => {
     const imageUrl = generateTicketImageUrl(ticket as any, settings as any)
-    const imageWindow = window.open(imageUrl, '_blank', 'noopener,noreferrer')
+    const imageWindow = window.open('', '_blank', 'noopener,noreferrer')
 
     if (!imageWindow) {
       toast.error('No se pudo abrir la imagen del ticket')
       return
     }
+
+    const ticketTitle = `Ticket ${ticket.ticketNumber}`
+    imageWindow.document.open()
+    imageWindow.document.write(`
+      <!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${ticketTitle}</title>
+          <style>
+            :root { color-scheme: light; }
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 16px;
+              padding: 16px;
+              background: #f3f4f6;
+              font-family: Arial, Helvetica, sans-serif;
+            }
+            .wrap {
+              width: min(100%, 480px);
+              background: #fff;
+              border-radius: 16px;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+              padding: 12px;
+            }
+            img {
+              display: block;
+              width: 100%;
+              height: auto;
+              border-radius: 12px;
+            }
+            .actions {
+              width: min(100%, 480px);
+              display: flex;
+              gap: 12px;
+            }
+            a {
+              flex: 1;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 48px;
+              padding: 0 16px;
+              border-radius: 12px;
+              text-decoration: none;
+              font-weight: 700;
+            }
+            .primary {
+              background: #111827;
+              color: #fff;
+            }
+            .secondary {
+              background: #e5e7eb;
+              color: #111827;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="wrap">
+            <img src="${imageUrl}" alt="${ticketTitle}" />
+          </div>
+          <div class="actions">
+            <a class="primary" href="${imageUrl}" download="${ticket.ticketNumber}.svg">Descargar</a>
+            <a class="secondary" href="${imageUrl}" target="_blank" rel="noreferrer">Abrir</a>
+          </div>
+        </body>
+      </html>
+    `)
+    imageWindow.document.close()
+    imageWindow.focus()
 
     toast.success('Ticket abierto como imagen')
   }
