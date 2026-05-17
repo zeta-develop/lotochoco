@@ -649,6 +649,8 @@ function generateTestPage(): string {
   return `${COMMANDS.INIT}${COMMANDS.ALIGN_CENTER}${COMMANDS.BOLD_ON}PRUEBA DE IMPRESION${COMMANDS.BOLD_OFF}${COMMANDS.FEED_LINE}${COMMANDS.FEED_LINE}${COMMANDS.PARTIAL_CUT}`
 }
 
+import { generatePT210Receipt, printDirect } from './pt210-printer'
+
 export const printerService = {
   generateTicketCommands: generateTicketReceipt,
   generateCashCloseCommands: generateCashCloseReceipt,
@@ -662,42 +664,21 @@ export const printerService = {
   async printTicket(ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }, settings: Record<string,string>) {
     try {
       const type = settings.printerType || 'browser'
+      const bluetoothDeviceId = settings.bluetoothDeviceId
 
-      // Native print dialog (cordova-plugin-printer)
-      if (type === 'native' && typeof window !== 'undefined' && (window as any).cordova?.plugins?.printer) {
-        const html = generatePrintableHTML(ticket, settings)
-        return new Promise<{success:boolean;message:string}>((resolve) => {
-          ;(window as any).cordova.plugins.printer.print(html, { name: `Ticket ${ticket.ticketNumber}` }, () => resolve({ success: true, message: 'Impresion nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
-        })
+      // Impresión Directa Bluetooth (PT-210 sin RawBT)
+      if (type === 'bluetooth' && bluetoothDeviceId) {
+        const commands = generatePT210Receipt(ticket, settings)
+        return await printDirect(bluetoothDeviceId, commands)
       }
 
-      // Thermal / raw plugin (if available)
-      if ((type === 'thermal' || type === 'raw') && typeof window !== 'undefined' && (window as any).thermalprinter) {
-        const commands = generateTicketReceipt(ticket, settings)
-        try {
-          await (window as any).thermalprinter.send(commands)
-          return { success: true, message: 'Enviado a impresora termica' }
-        } catch (err) {
-          return { success: false, message: String(err) }
-        }
-      }
-
-      // Web Bluetooth printing (direct, no RawBT needed)
-      if (type === 'bluetooth' && typeof window !== 'undefined' && navigator.bluetooth) {
-        const commands = generateTicketReceipt(ticket, settings)
-        return await printViaBluetooth(commands)
-      }
-
-      // RawBT intent printing (Android specific for Bluetooth printers like PT210)
+      // RawBT intent printing (Mantenemos como fallback pero el usuario no la quiere)
       if (type === 'rawbt' && typeof window !== 'undefined') {
-        const commands = generateTicketReceipt(ticket, settings)
-        // Convert to base64 correctly supporting special characters
+        const commands = generatePT210Receipt(ticket, settings)
         const encoded = btoa(unescape(encodeURIComponent(commands)));
         const intentUrl = `intent:${encoded}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`
-
-        // Try opening RawBT intent
         window.location.href = intentUrl;
-        return { success: true, message: 'Abriendo app RawBT para imprimir' }
+        return { success: true, message: 'Abriendo app RawBT' }
       }
 
       // Network printer

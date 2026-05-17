@@ -1,113 +1,81 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { endOfDay, startOfDay } from 'date-fns'
 import type { Ticket, CartItem } from '@/lib/types'
-import {
-  bootstrapOfflineData,
-  cancelOfflineTicket,
-  createOfflineTicket,
-  getOfflineTicketById,
-  getOfflineTicketByNumber,
-  getOfflineTickets,
-  getOfflineTodayTickets,
-} from '@/lib/local-db'
+import { ticketService } from '@/services/tickets'
+import { toast } from 'sonner'
 
-function parseLocalDate(value?: string) {
-  if (!value) return undefined
-
-  const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) return undefined
-
-  return new Date(year, month - 1, day)
-}
-
-export function useTickets(options?: {
-  today?: boolean
-  status?: string
-  startDate?: string
-  endDate?: string
-}) {
-  const [data, setData] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+export function useTickets() {
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const refresh = useCallback(async () => {
+    setIsLoading(true)
     try {
-      setError(null)
-      if (options?.today) {
-        setData(getOfflineTodayTickets())
-        return
-      }
-
-      setData(
-        getOfflineTickets({
-          status: options?.status,
-          startDate: options?.startDate ? startOfDay(parseLocalDate(options.startDate) || new Date()) : undefined,
-          endDate: options?.endDate ? endOfDay(parseLocalDate(options.endDate) || new Date()) : undefined,
-        })
-      )
+      const data = await ticketService.getTodayTickets()
+      setTickets(data)
     } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar tickets'))
+      console.error('Error al cargar tickets:', error)
+      toast.error('Error al cargar tickets')
+    } finally {
+      setIsLoading(false)
     }
-  }, [options?.endDate, options?.startDate, options?.status, options?.today])
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
-  }, [options?.today, options?.status, options?.startDate, options?.endDate, refresh])
+    refresh()
+  }, [refresh])
 
   const createTicket = async (items: CartItem[]) => {
-    const ticket = createOfflineTicket(items)
-    await refresh()
-    return ticket
+    setIsSubmitting(true)
+    try {
+      const ticket = await ticketService.create(items)
+      toast.success(`Ticket ${ticket.ticketNumber} creado`)
+      await refresh()
+      return ticket
+    } catch (error) {
+      console.error('Error al crear ticket:', error)
+      toast.error('Error al crear el ticket')
+      throw error
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const cancelTicket = async (id: string, reason: string) => {
-    const result = cancelOfflineTicket(id, reason)
-    await refresh()
-    return result
+    try {
+      const result = await ticketService.cancelTicket(id, reason)
+      if (result.success) {
+        toast.success(result.message)
+        await refresh()
+      } else {
+        toast.error(result.message)
+      }
+      return result
+    } catch (error) {
+      console.error('Error al cancelar ticket:', error)
+      toast.error('Error al cancelar el ticket')
+      throw error
+    }
   }
 
-  const getTicket = async (idOrNumber: string): Promise<Ticket | null> => {
+  const getTicketByNumber = async (ticketNumber: string) => {
     try {
-      return getOfflineTicketById(idOrNumber) || getOfflineTicketByNumber(idOrNumber) || null
+      return await ticketService.getByNumber(ticketNumber)
     } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al buscar ticket'))
+      console.error('Error al buscar ticket:', error)
       return null
     }
   }
 
-  // Handle both today's tickets (array) and paginated results
-  const tickets = options?.today ? data : data?.tickets
-  const total = options?.today ? data?.length : data?.total
-
   return {
-    tickets: (tickets || []) as Ticket[],
-    total: total || 0,
+    tickets,
     isLoading,
-    error,
+    isSubmitting,
     createTicket,
     cancelTicket,
-    getTicket,
-    refresh,
+    getTicketByNumber,
+    refresh
   }
-}
-
-export function useTodayTickets() {
-  return useTickets({ today: true })
 }

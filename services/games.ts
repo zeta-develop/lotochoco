@@ -1,7 +1,8 @@
-import prisma from '@/lib/db'
+import getPrisma from '@/lib/db'
 import type { Game, DrawSchedule } from '@/lib/types'
 
 export async function getGames(): Promise<Game[]> {
+  const prisma = await getPrisma()
   const games = await prisma.game.findMany({
     include: {
       schedules: {
@@ -15,6 +16,7 @@ export async function getGames(): Promise<Game[]> {
 }
 
 export async function getActiveGames(): Promise<Game[]> {
+  const prisma = await getPrisma()
   const games = await prisma.game.findMany({
     where: { isActive: true },
     include: {
@@ -29,6 +31,7 @@ export async function getActiveGames(): Promise<Game[]> {
 }
 
 export async function getGameById(id: string): Promise<Game | null> {
+  const prisma = await getPrisma()
   const game = await prisma.game.findUnique({
     where: { id },
     include: {
@@ -46,6 +49,7 @@ export async function createGame(data: {
   multiplier: number
   schedules?: { name: string; time: string }[]
 }): Promise<Game> {
+  const prisma = await getPrisma()
   const game = await prisma.game.create({
     data: {
       name: data.name,
@@ -71,6 +75,7 @@ export async function updateGame(
     isActive: boolean
   }>
 ): Promise<Game> {
+  const prisma = await getPrisma()
   const game = await prisma.game.update({
     where: { id },
     data,
@@ -82,6 +87,7 @@ export async function updateGame(
 }
 
 export async function deleteGame(id: string): Promise<void> {
+  const prisma = await getPrisma()
   await prisma.game.delete({
     where: { id }
   })
@@ -89,6 +95,7 @@ export async function deleteGame(id: string): Promise<void> {
 
 // Schedule functions
 export async function getSchedulesByGame(gameId: string): Promise<DrawSchedule[]> {
+  const prisma = await getPrisma()
   const schedules = await prisma.drawSchedule.findMany({
     where: { gameId },
     orderBy: { time: 'asc' }
@@ -101,6 +108,7 @@ export async function createSchedule(data: {
   name: string
   time: string
 }): Promise<DrawSchedule> {
+  const prisma = await getPrisma()
   const schedule = await prisma.drawSchedule.create({
     data
   })
@@ -115,6 +123,7 @@ export async function updateSchedule(
     isActive: boolean
   }>
 ): Promise<DrawSchedule> {
+  const prisma = await getPrisma()
   const schedule = await prisma.drawSchedule.update({
     where: { id },
     data
@@ -123,6 +132,7 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
+  const prisma = await getPrisma()
   await prisma.drawSchedule.delete({
     where: { id }
   })
@@ -130,6 +140,7 @@ export async function deleteSchedule(id: string): Promise<void> {
 
 // Seed default games
 export async function seedDefaultGames(): Promise<void> {
+  const prisma = await getPrisma()
   const existingGames = await prisma.game.count()
   
   if (existingGames === 0) {

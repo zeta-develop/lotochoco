@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PyramidResult } from '@/lib/types'
 import {
-  analyzeOfflineNumber,
-  bootstrapOfflineData,
-  generateOfflinePyramid,
-  generateOfflineReversePyramid,
-  getOfflineNumberFrequency,
-} from '@/lib/local-db'
+  analyzeNumber,
+  generatePyramid,
+  generateReversePyramid,
+  getLuckyNumbers
+} from '@/services/pyramid'
 
 export function usePyramid(date?: string) {
   const [data, setData] = useState<{
@@ -31,20 +30,28 @@ export function usePyramid(date?: string) {
     try {
       setError(null)
       const selectedDate = date ? new Date(date) : new Date()
-      const pyramid = generateOfflinePyramid(selectedDate)
-      const reversePyramid = generateOfflineReversePyramid(selectedDate)
-      const luckyNumbers = {
-        single: pyramid.rows.flat().slice(0, 10).map(String),
-        double: pyramid.rows.flat().slice(10, 20).map(String),
-        triple: pyramid.rows.flat().slice(20, 30).map(String),
+      const pyramid = generatePyramid(selectedDate)
+      const reversePyramid = generateReversePyramid(selectedDate)
+      
+      // Adaptar el formato esperado por el componente (rows de números)
+      const pyramidWithRows = {
+        ...pyramid,
+        rows: pyramid.layers.map(layer => layer.map(Number))
+      }
+      
+      const reversePyramidWithRows = {
+        ...reversePyramid,
+        rows: reversePyramid.layers.map(layer => layer.map(Number))
       }
 
+      const luckyNumbers = getLuckyNumbers(pyramid)
+
       setData({
-        pyramid,
+        pyramid: pyramidWithRows,
         luckyNumbers,
-        reversePyramid,
-        hotNumbers: getOfflineNumberFrequency({ limit: 10 }).map((item) => ({ number: item.number, count: item.frequency })),
-        coldNumbers: getOfflineNumberFrequency({ limit: 10 }).slice().reverse().map((item) => ({ number: item.number, count: item.frequency })),
+        reversePyramid: reversePyramidWithRows,
+        hotNumbers: [], // Se cargará dinámicamente si es necesario
+        coldNumbers: [],
         totalResults: 0,
         totalWinners: 0,
       })
@@ -54,22 +61,10 @@ export function usePyramid(date?: string) {
   }, [date])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [date, refresh])
 
   return {
@@ -95,33 +90,20 @@ export function useHotColdNumbers(gameId: string) {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const frequency = getOfflineNumberFrequency({ gameId, limit: 20 })
-      setData({
-        hot: frequency.slice(0, 10),
-        cold: frequency.slice(-10).reverse(),
-      })
+      const { getHotColdNumbers } = await import('@/services/results')
+      const frequency = await getHotColdNumbers(gameId, 10)
+      setData(frequency)
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar números'))
     }
   }, [gameId])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled || !gameId) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    if (!gameId) return
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [gameId, refresh])
 
   return {
@@ -142,23 +124,12 @@ export function useNumberAnalysis(number: string, date?: string) {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled || !number) return
-      setIsLoading(true)
-      const selectedDate = date ? new Date(date) : new Date()
-      const pyramid = generateOfflinePyramid(selectedDate)
-      setData(analyzeOfflineNumber(number, pyramid))
-      if (!cancelled) setIsLoading(false)
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    if (!number) return
+    setIsLoading(true)
+    const selectedDate = date ? new Date(date) : new Date()
+    const pyramid = generatePyramid(selectedDate)
+    setData(analyzeNumber(number, pyramid))
+    setIsLoading(false)
   }, [number, date])
 
   return {

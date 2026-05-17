@@ -1,4 +1,4 @@
-import prisma from '@/lib/db'
+import getPrisma from '@/lib/db'
 import type { Ticket, TicketItem, CartItem } from '@/lib/types'
 import { format } from 'date-fns'
 
@@ -11,6 +11,7 @@ function generateTicketNumber(): string {
 }
 
 export async function createTicket(items: CartItem[]): Promise<Ticket> {
+  const prisma = await getPrisma()
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
   const ticketNumber = generateTicketNumber()
   const client = items[0]?.client || null
@@ -68,6 +69,7 @@ export async function createTicket(items: CartItem[]): Promise<Ticket> {
 }
 
 export async function getTicketById(id: string): Promise<Ticket | null> {
+  const prisma = await getPrisma()
   const ticket = await prisma.ticket.findUnique({
     where: { id },
     include: {
@@ -87,6 +89,7 @@ export async function getTicketById(id: string): Promise<Ticket | null> {
 }
 
 export async function getTicketByNumber(ticketNumber: string): Promise<Ticket | null> {
+  const prisma = await getPrisma()
   const ticket = await prisma.ticket.findUnique({
     where: { ticketNumber },
     include: {
@@ -112,6 +115,7 @@ export async function getTickets(options?: {
   limit?: number
   offset?: number
 }): Promise<{ tickets: Ticket[]; total: number }> {
+  const prisma = await getPrisma()
   const where: Record<string, unknown> = {}
   
   if (options?.status) {
@@ -149,6 +153,7 @@ export async function getTickets(options?: {
 }
 
 export async function getTodayTickets(): Promise<Ticket[]> {
+  const prisma = await getPrisma()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   
@@ -179,6 +184,7 @@ export async function cancelTicket(
   ticketId: string,
   reason: string
 ): Promise<{ success: boolean; message: string }> {
+  const prisma = await getPrisma()
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
     include: { items: true }
@@ -254,6 +260,7 @@ export async function getCancellations(options?: {
   startDate?: Date
   endDate?: Date
 }): Promise<{ id: string; ticketNumber: string; totalAmount: number; reason: string; createdAt: Date }[]> {
+  const prisma = await getPrisma()
   const where: Record<string, unknown> = {}
 
   if (options?.startDate || options?.endDate) {

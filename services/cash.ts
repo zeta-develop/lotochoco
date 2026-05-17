@@ -1,7 +1,8 @@
-import prisma from '@/lib/db'
+import getPrisma from '@/lib/db'
 import type { CashSession, CashMovement } from '@/lib/types'
 
 export async function openCashSession(openingAmount: number): Promise<CashSession> {
+  const prisma = await getPrisma()
   // Check if there's already an open session
   const existingSession = await prisma.cashSession.findFirst({
     where: { status: 'open' }
@@ -25,6 +26,7 @@ export async function openCashSession(openingAmount: number): Promise<CashSessio
 }
 
 export async function getCurrentSession(): Promise<CashSession | null> {
+  const prisma = await getPrisma()
   const session = await prisma.cashSession.findFirst({
     where: { status: 'open' },
     include: {
@@ -41,6 +43,7 @@ export async function closeCashSession(
   sessionId: string,
   notes?: string
 ): Promise<CashSession> {
+  const prisma = await getPrisma()
   const session = await prisma.cashSession.findUnique({
     where: { id: sessionId },
     include: { movements: true }
@@ -89,6 +92,7 @@ export async function addCashMovement(data: {
   amount: number
   description: string
 }): Promise<CashMovement> {
+  const prisma = await getPrisma()
   const movement = await prisma.cashMovement.create({
     data
   })
@@ -101,6 +105,7 @@ export async function getCashSessions(options?: {
   endDate?: Date
   limit?: number
 }): Promise<CashSession[]> {
+  const prisma = await getPrisma()
   const where: Record<string, unknown> = {}
 
   if (options?.startDate || options?.endDate) {
@@ -128,6 +133,7 @@ export async function getCashSessions(options?: {
 }
 
 export async function getCashSessionById(id: string): Promise<CashSession | null> {
+  const prisma = await getPrisma()
   const session = await prisma.cashSession.findUnique({
     where: { id },
     include: {
