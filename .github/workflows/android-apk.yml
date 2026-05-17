@@ -58,7 +58,7 @@ jobs:
           
           echo "APP_VERSION=$VERSION_NAME" >> "$GITHUB_ENV"
           
-          # Actualiza dinámicamente las líneas del versionCode y versionName
+          # Actualiza dinámicamente el versionCode y versionName en el Gradle del módulo app
           sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" ./android/app/build.gradle
           sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" ./android/app/build.gradle
           
@@ -83,21 +83,16 @@ jobs:
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      # 1️⃣2️⃣ Configure release signing
+      # 1️⃣2️⃣ Configure release signing (Vincula el Keystore del repositorio con tus secretos)
       - name: Configure release signing
         env:
-          KEYSTORE_CRYPT_KEY: ${{ secrets.KEYSTORE_CRYPT_KEY }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           
-          # Desencriptar de forma binaria exacta el keystore original
-          gpg --quiet --batch --yes --decrypt --passphrase "$KEYSTORE_CRYPT_KEY" \
-            --output android/app/release.keystore android/app/release.keystore.gpg
-          
-          # Limpiar y escribir el archivo gradle.properties
+          # Limpiar y escribir el archivo gradle.properties apuntando al archivo release.keystore del repo
           rm -f android/gradle.properties
           printf '%s\n' \
             'RELEASE_STORE_FILE=release.keystore' \
