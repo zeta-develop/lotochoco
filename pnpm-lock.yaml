@@ -8,15 +8,27 @@ importers:
 
   .:
     dependencies:
+      '@capacitor-community/file-opener':
+        specifier: ^8.0.0
+        version: 8.0.0(@capacitor/core@7.6.5)
+      '@capacitor-community/http':
+        specifier: ^1.4.1
+        version: 1.4.1
       '@capacitor-community/sqlite':
         specifier: ^5.0.0
         version: 5.7.4(@capacitor/core@7.6.5)
       '@capacitor/android':
         specifier: ^7.4.2
         version: 7.6.5(@capacitor/core@7.6.5)
+      '@capacitor/app':
+        specifier: ^8.1.0
+        version: 8.1.0(@capacitor/core@7.6.5)
       '@capacitor/core':
         specifier: ^7.4.2
         version: 7.6.5
+      '@capacitor/dialog':
+        specifier: ^8.0.1
+        version: 8.0.1(@capacitor/core@7.6.5)
       '@capacitor/filesystem':
         specifier: ^8.1.2
         version: 8.1.2(@capacitor/core@7.6.5)
@@ -224,29 +236,66 @@ packages:
     resolution: {integrity: sha512-05WQkdpL9COIMz4LjTxGpPNCdlpyimKppYNoJ5Di5EUObifl8t4tuLuUBBZEpoLYOmfvIWrsp9fCl0HoPRVTdA==}
     engines: {node: '>=6.9.0'}
 
+  '@capacitor-community/file-opener@8.0.0':
+    resolution: {integrity: sha512-kbVNxt4G45RHHeOqrE1Z0nT5iOOzmZ3WwQytpUtaIPzDTlmZxVEA3nJYEiOfGFp6msZO6QWHK3k0Qbv7hnBx+w==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor-community/http@1.4.1':
+    resolution: {integrity: sha512-+pCkBXrwfm97UfjOgjV950H/qZ8SE36Mrcb46BlL1ps3VIsGuIO+AulL8GqTC6LewheRVtGJpRspNtneXQotNA==}
+
   '@capacitor-community/sqlite@5.7.4':
     resolution: {integrity: sha512-cpeMuHid+KBa7F6La5tKuiQOxRljrwHS/HYgQNDtyMq1qWwOCY4tbmYshAE7j9qd/PvIkKU5+bQbaCBdgdspBg==}
     engines: {node: '>=16.0.0'}
     peerDependencies:
       '@capacitor/core': ^5.0.0
 
+  '@capacitor/android@3.9.0':
+    resolution: {integrity: sha512-YTPyrh1NozEuYXWGtfqN27TLXUrLbZX9fggyd4JQ1yMaUZTmLPm5dCuznONhQ49aPkJnUJB02JfpHy/qGwa2Lw==}
+    peerDependencies:
+      '@capacitor/core': ^3.9.0
+
   '@capacitor/android@7.6.5':
     resolution: {integrity: sha512-FCNSo5bWkqCIuNt2OgG6IUsJJaYlghzbzlFf4IiHkFtir18FCyqHVGHszvtXB+npT7HQ9JQOZ4MQRDsgczKEGQ==}
     peerDependencies:
       '@capacitor/core': ^7.6.0
+
+  '@capacitor/app@8.1.0':
+    resolution: {integrity: sha512-MlmttTOWHDedr/G4SrhNRxsXMqY+R75S4MM4eIgzsgCzOYhb/MpCkA5Q3nuOCfL1oHm26xjUzqZ5aupbOwdfYg==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
 
   '@capacitor/cli@7.6.5':
     resolution: {integrity: sha512-nlhNoWZIL7YcV1JgNP8+p7WAVIG+zwsY20ZQJ0zd+2lLeCx9MijfELLhLzMCq33c2pILwOvLww8HUqZ5uYCvHg==}
     engines: {node: '>=20.0.0'}
     hasBin: true
 
+  '@capacitor/core@3.9.0':
+    resolution: {integrity: sha512-j1lL0+/7stY8YhIq1Lm6xixvUqIn89vtyH5ZpJNNmcZ0kwz6K9eLkcG6fvq1UWMDgSVZg9JrRGSFhb4LLoYOsw==}
+
   '@capacitor/core@7.6.5':
     resolution: {integrity: sha512-JWyxD9LaK1oY588B/khJIG3Ec4NHI/Ki4v1b4XzqPNt2a27au0F2AhLTwYexV4Bp3Ruxf+8oYqxFAC8/7sGBWA==}
+
+  '@capacitor/dialog@8.0.1':
+    resolution: {integrity: sha512-Dq0mZBsd++7CvPvpD2gfbUB44k/zCoe5K9IgYmMImQ4Yphu4/MxLVpFDFAqSya011UBBTGPrUQGVacIW3jDNkw==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/filesystem@1.1.0':
+    resolution: {integrity: sha512-8O3UuvL8HNUEJvZnmn8yUmvgB1evtXfcF0oxIo3YbSlylqywJwS3JTiuhKmsvSxCdpbTy8IaTsutVh3gZgWbKg==}
+    peerDependencies:
+      '@capacitor/core': ^3.0.0
 
   '@capacitor/filesystem@8.1.2':
     resolution: {integrity: sha512-doaaMfGoFR2hWU6aV6u83I+5ZsGyJVq+Gz4r9lMpJzUKMm1eMu0hLnFdV1aXZlU9FlK/RndFrVD8oRZfNOqWgQ==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/ios@3.9.0':
+    resolution: {integrity: sha512-GezPCJIujRHnF4wbrKJx6Q/mgFz0f9rmh/steTTXQZI+nEl6mHk6NWh8235p7YbhonYi5WD0rFNirrjGg1EaGw==}
+    peerDependencies:
+      '@capacitor/core': ^3.9.0
 
   '@capacitor/share@8.0.1':
     resolution: {integrity: sha512-3cSBKBCJVon54rKDROP2rqGyeGks4pBh9TbaEk9S375Kbek/ZHe72N50zIa0Vn9Eac/SuhwgehO/mmA4CsUOiw==}
@@ -2478,12 +2527,31 @@ snapshots:
 
   '@babel/runtime@7.28.6': {}
 
+  '@capacitor-community/file-opener@8.0.0(@capacitor/core@7.6.5)':
+    dependencies:
+      '@capacitor/core': 7.6.5
+
+  '@capacitor-community/http@1.4.1':
+    dependencies:
+      '@capacitor/android': 3.9.0(@capacitor/core@3.9.0)
+      '@capacitor/core': 3.9.0
+      '@capacitor/filesystem': 1.1.0(@capacitor/core@3.9.0)
+      '@capacitor/ios': 3.9.0(@capacitor/core@3.9.0)
+
   '@capacitor-community/sqlite@5.7.4(@capacitor/core@7.6.5)':
     dependencies:
       '@capacitor/core': 7.6.5
       jeep-sqlite: 2.8.0
 
+  '@capacitor/android@3.9.0(@capacitor/core@3.9.0)':
+    dependencies:
+      '@capacitor/core': 3.9.0
+
   '@capacitor/android@7.6.5(@capacitor/core@7.6.5)':
+    dependencies:
+      '@capacitor/core': 7.6.5
+
+  '@capacitor/app@8.1.0(@capacitor/core@7.6.5)':
     dependencies:
       '@capacitor/core': 7.6.5
 
@@ -2509,14 +2577,30 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@capacitor/core@3.9.0':
+    dependencies:
+      tslib: 2.8.1
+
   '@capacitor/core@7.6.5':
     dependencies:
       tslib: 2.8.1
+
+  '@capacitor/dialog@8.0.1(@capacitor/core@7.6.5)':
+    dependencies:
+      '@capacitor/core': 7.6.5
+
+  '@capacitor/filesystem@1.1.0(@capacitor/core@3.9.0)':
+    dependencies:
+      '@capacitor/core': 3.9.0
 
   '@capacitor/filesystem@8.1.2(@capacitor/core@7.6.5)':
     dependencies:
       '@capacitor/core': 7.6.5
       '@capacitor/synapse': 1.0.4
+
+  '@capacitor/ios@3.9.0(@capacitor/core@3.9.0)':
+    dependencies:
+      '@capacitor/core': 3.9.0
 
   '@capacitor/share@8.0.1(@capacitor/core@7.6.5)':
     dependencies:
