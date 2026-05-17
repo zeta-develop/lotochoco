@@ -14,19 +14,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
 
+      # 3️⃣ Setup pnpm
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
+      # 4️⃣ Enable Corepack & ensure pnpm
       - name: Enable Corepack & ensure pnpm
         run: |
           corepack enable
@@ -36,32 +40,41 @@ jobs:
           fi
           pnpm -v
 
+      # 5️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # 6️⃣ Set app version and code
       - name: Set app version
         run: |
-          echo "APP_VERSION=$(jq -r '.version' package.json)" >> "$GITHUB_ENV"
+          APP_VERSION=$(jq -r '.version' package.json)
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
+      # 7️⃣ Build Next.js
       - name: Build Next.js
         run: pnpm build
 
+      # 8️⃣ Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
+      # 9️⃣ Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # 🔟 Generate Android project
       - name: Generate Android project
         run: pnpm cap:add:android
 
+      # 1️⃣1️⃣ Sync Capacitor
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
+      # 1️⃣2️⃣ Configure release signing
       - name: Configure release signing
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
@@ -79,19 +92,22 @@ jobs:
             "RELEASE_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" \
             >> android/gradle.properties
 
+      # 1️⃣3️⃣ Build release APK
       - name: Build release APK
-        run: pnpm android:build:release
+        run: ./gradlew assembleRelease
 
+      # 1️⃣4️⃣ Upload APK artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: lotochoco-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/**/*.apk
 
+      # 1️⃣5️⃣ Create GitHub Release and upload APK
       - name: Create GitHub Release and upload APK
         uses: ncipollo/release-action@v1
         with:
-          artifacts: android/app/build/outputs/apk/release/app-release.apk
+          artifacts: android/app/build/outputs/apk/release/**/*.apk
           tag: "v${{ env.APP_VERSION }}"
           name: "LotoChoco v${{ env.APP_VERSION }}"
           draft: false
