@@ -1,46 +1,49 @@
-import getPrisma from '@/lib/db'
+import { query, execute, getDb } from '@/lib/db'
 import type { Game, DrawSchedule } from '@/lib/types'
 
 export async function getGames(): Promise<Game[]> {
-  const prisma = await getPrisma()
-  const games = await prisma.game.findMany({
-    include: {
-      schedules: {
-        where: { isActive: true },
-        orderBy: { time: 'asc' }
-      }
-    },
-    orderBy: { name: 'asc' }
-  })
-  return games as Game[]
+  const games = await query<Game>('SELECT * FROM Game ORDER BY name ASC')
+  
+  for (const game of games) {
+    game.isActive = Boolean(game.isActive)
+    game.schedules = await query<DrawSchedule>(
+      'SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1 ORDER BY time ASC',
+      [game.id]
+    )
+    for (const s of game.schedules) s.isActive = Boolean(s.isActive)
+  }
+  
+  return games
 }
 
 export async function getActiveGames(): Promise<Game[]> {
-  const prisma = await getPrisma()
-  const games = await prisma.game.findMany({
-    where: { isActive: true },
-    include: {
-      schedules: {
-        where: { isActive: true },
-        orderBy: { time: 'asc' }
-      }
-    },
-    orderBy: { name: 'asc' }
-  })
-  return games as Game[]
+  const games = await query<Game>('SELECT * FROM Game WHERE isActive = 1 ORDER BY name ASC')
+  
+  for (const game of games) {
+    game.isActive = true
+    game.schedules = await query<DrawSchedule>(
+      'SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1 ORDER BY time ASC',
+      [game.id]
+    )
+    for (const s of game.schedules) s.isActive = true
+  }
+  
+  return games
 }
 
 export async function getGameById(id: string): Promise<Game | null> {
-  const prisma = await getPrisma()
-  const game = await prisma.game.findUnique({
-    where: { id },
-    include: {
-      schedules: {
-        orderBy: { time: 'asc' }
-      }
-    }
-  })
-  return game as Game | null
+  const games = await query<Game>('SELECT * FROM Game WHERE id = ?', [id])
+  if (games.length === 0) return null
+  
+  const game = games[0]
+  game.isActive = Boolean(game.isActive)
+  game.schedules = await query<DrawSchedule>(
+    'SELECT * FROM DrawSchedule WHERE gameId = ? ORDER BY time ASC',
+    [game.id]
+  )
+  for (const s of game.schedules) s.isActive = Boolean(s.isActive)
+  
+  return game
 }
 
 export async function createGame(data: {
@@ -49,21 +52,23 @@ export async function createGame(data: {
   multiplier: number
   schedules?: { name: string; time: string }[]
 }): Promise<Game> {
-  const prisma = await getPrisma()
-  const game = await prisma.game.create({
-    data: {
-      name: data.name,
-      digitCount: data.digitCount,
-      multiplier: data.multiplier,
-      schedules: data.schedules ? {
-        create: data.schedules
-      } : undefined
-    },
-    include: {
-      schedules: true
+  const gameId = crypto.randomUUID()
+  
+  await execute(
+    'INSERT INTO Game (id, name, digitCount, multiplier, isActive) VALUES (?, ?, ?, ?, 1)',
+    [gameId, data.name, data.digitCount, data.multiplier]
+  )
+  
+  if (data.schedules) {
+    for (const s of data.schedules) {
+      await execute(
+        'INSERT INTO DrawSchedule (id, gameId, name, time, isActive) VALUES (?, ?, ?, ?, 1)',
+        [crypto.randomUUID(), gameId, s.name, s.time]
+      )
     }
-  })
-  return game as Game
+  }
+  
+  return (await getGameById(gameId))!
 }
 
 export async function updateGame(
@@ -75,75 +80,30 @@ export async function updateGame(
     isActive: boolean
   }>
 ): Promise<Game> {
-  const prisma = await getPrisma()
-  const game = await prisma.game.update({
-    where: { id },
-    data,
-    include: {
-      schedules: true
-    }
-  })
-  return game as Game
+  const fields: string[] = []
+  const values: any[] = []
+  
+  if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name) }
+  if (data.digitCount !== undefined) { fields.push('digitCount = ?'); values.push(data.digitCount) }
+  if (data.multiplier !== undefined) { fields.push('multiplier = ?'); values.push(data.multiplier) }
+  if (data.isActive !== undefined) { fields.push('isActive = ?'); values.push(data.isActive ? 1 : 0) }
+  
+  if (fields.length > 0) {
+    values.push(id)
+    await execute(`UPDATE Game SET ${fields.join(', ')}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`, values)
+  }
+  
+  return (await getGameById(id))!
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  const prisma = await getPrisma()
-  await prisma.game.delete({
-    where: { id }
-  })
-}
-
-// Schedule functions
-export async function getSchedulesByGame(gameId: string): Promise<DrawSchedule[]> {
-  const prisma = await getPrisma()
-  const schedules = await prisma.drawSchedule.findMany({
-    where: { gameId },
-    orderBy: { time: 'asc' }
-  })
-  return schedules as DrawSchedule[]
-}
-
-export async function createSchedule(data: {
-  gameId: string
-  name: string
-  time: string
-}): Promise<DrawSchedule> {
-  const prisma = await getPrisma()
-  const schedule = await prisma.drawSchedule.create({
-    data
-  })
-  return schedule as DrawSchedule
-}
-
-export async function updateSchedule(
-  id: string,
-  data: Partial<{
-    name: string
-    time: string
-    isActive: boolean
-  }>
-): Promise<DrawSchedule> {
-  const prisma = await getPrisma()
-  const schedule = await prisma.drawSchedule.update({
-    where: { id },
-    data
-  })
-  return schedule as DrawSchedule
-}
-
-export async function deleteSchedule(id: string): Promise<void> {
-  const prisma = await getPrisma()
-  await prisma.drawSchedule.delete({
-    where: { id }
-  })
+  await execute('DELETE FROM Game WHERE id = ?', [id])
 }
 
 // Seed default games
 export async function seedDefaultGames(): Promise<void> {
-  const prisma = await getPrisma()
-  const existingGames = await prisma.game.count()
-  
-  if (existingGames === 0) {
+  const results = await query('SELECT COUNT(*) as count FROM Game')
+  if (results[0].count === 0) {
     const defaultGames = [
       {
         name: 'Tica',
@@ -194,31 +154,11 @@ export const gamesService = {
   getAll: getGames,
   getActive: getActiveGames,
   getById: getGameById,
-  create: async (data: {
-    name: string
-    playType?: string
-    digitCount?: number
-    multiplier: number
-    isActive?: boolean
-    schedules?: { name: string; time: string }[]
-  }) => {
-    const digitCount =
-      data.digitCount ??
-      (data.playType === '3_digits' ? 3 : data.playType === '1_digit' ? 1 : 2)
-
-    return createGame({
-      name: data.name,
-      digitCount,
-      multiplier: data.multiplier,
-      schedules: data.schedules
-    })
+  create: async (data: any) => {
+    const digitCount = data.digitCount ?? (data.playType === '3_digits' ? 3 : data.playType === '1_digit' ? 1 : 2)
+    return createGame({ ...data, digitCount })
   },
   update: updateGame,
   delete: deleteGame,
-  addSchedule: async (gameId: string, schedule: { name: string; time: string }) => {
-    return createSchedule({ gameId, ...schedule })
-  },
-  updateSchedule,
-  deleteSchedule,
   seedDefaultGames
 }

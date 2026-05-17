@@ -1,5 +1,5 @@
-import getPrisma from '@/lib/db'
-import type { Ticket, TicketItem, CartItem } from '@/lib/types'
+import { query, execute } from '@/lib/db'
+import type { Ticket, TicketItem, CartItem, Game } from '@/lib/types'
 import { format } from 'date-fns'
 
 // Generate unique ticket number
@@ -11,101 +11,59 @@ function generateTicketNumber(): string {
 }
 
 export async function createTicket(items: CartItem[]): Promise<Ticket> {
-  const prisma = await getPrisma()
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
   const ticketNumber = generateTicketNumber()
   const client = items[0]?.client || null
+  const ticketId = crypto.randomUUID()
+  const now = new Date().toISOString()
 
-  const ticket = await prisma.ticket.create({
-    data: {
-      ticketNumber,
-      totalAmount,
-      status: 'active',
-      client,
-      items: {
-        create: items.map((item) => ({
-          gameId: item.gameId,
-          number: item.number,
-          amount: item.amount,
-          schedule: item.schedule
-        }))
-      }
-    },
-    include: {
-      items: {
-        include: {
-          game: true
-        }
-      }
-    }
-  })
+  // 1. Crear el Ticket
+  await execute(
+    'INSERT INTO Ticket (id, ticketNumber, totalAmount, status, client, createdAt, updatedAt) VALUES (?, ?, ?, "active", ?, ?, ?)',
+    [ticketId, ticketNumber, totalAmount, client, now, now]
+  )
 
-  // Update cash session sales if there's an open session
-  const openSession = await prisma.cashSession.findFirst({
-    where: { status: 'open' }
-  })
-
-  if (openSession) {
-    await prisma.cashSession.update({
-      where: { id: openSession.id },
-      data: {
-        salesTotal: {
-          increment: totalAmount
-        }
-      }
-    })
-
-    await prisma.cashMovement.create({
-      data: {
-        cashSessionId: openSession.id,
-        type: 'sale',
-        amount: totalAmount,
-        description: `Venta ticket ${ticketNumber}`
-      }
-    })
+  // 2. Crear los items
+  for (const item of items) {
+    await execute(
+      'INSERT INTO TicketItem (id, ticketId, gameId, number, amount, schedule, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [crypto.randomUUID(), ticketId, item.gameId, item.number, item.amount, item.schedule, now]
+    )
   }
 
-  return ticket as unknown as Ticket
+  // 3. Actualizar sesión de caja
+  const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
+  if (openSessions.length > 0) {
+    const sessionId = openSessions[0].id
+    await execute('UPDATE CashSession SET salesTotal = salesTotal + ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [totalAmount, sessionId])
+    await execute(
+      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "sale", ?, ?, ?)',
+      [crypto.randomUUID(), sessionId, totalAmount, `Venta ticket ${ticketNumber}`, now]
+    )
+  }
+
+  return (await getTicketById(ticketId))!
 }
 
 export async function getTicketById(id: string): Promise<Ticket | null> {
-  const prisma = await getPrisma()
-  const ticket = await prisma.ticket.findUnique({
-    where: { id },
-    include: {
-      items: {
-        include: {
-          game: true
-        }
-      },
-      winners: {
-        include: {
-          result: true
-        }
-      }
-    }
-  })
-  return ticket as unknown as Ticket | null
+  const tickets = await query<Ticket>('SELECT * FROM Ticket WHERE id = ?', [id])
+  if (tickets.length === 0) return null
+  
+  const ticket = tickets[0]
+  ticket.items = await query<TicketItem>('SELECT * FROM TicketItem WHERE ticketId = ?', [id])
+  
+  for (const item of ticket.items) {
+    const games = await query<Game>('SELECT * FROM Game WHERE id = ?', [item.gameId])
+    item.game = games[0]
+  }
+  
+  return ticket
 }
 
 export async function getTicketByNumber(ticketNumber: string): Promise<Ticket | null> {
-  const prisma = await getPrisma()
-  const ticket = await prisma.ticket.findUnique({
-    where: { ticketNumber },
-    include: {
-      items: {
-        include: {
-          game: true
-        }
-      },
-      winners: {
-        include: {
-          result: true
-        }
-      }
-    }
-  })
-  return ticket as unknown as Ticket | null
+  const tickets = await query<Ticket>('SELECT * FROM Ticket WHERE ticketNumber = ?', [ticketNumber])
+  if (tickets.length === 0) return null
+  return await getTicketById(tickets[0].id)
 }
 
 export async function getTickets(options?: {
@@ -115,168 +73,95 @@ export async function getTickets(options?: {
   limit?: number
   offset?: number
 }): Promise<{ tickets: Ticket[]; total: number }> {
-  const prisma = await getPrisma()
-  const where: Record<string, unknown> = {}
-  
+  let sql = 'SELECT * FROM Ticket'
+  let countSql = 'SELECT COUNT(*) as count FROM Ticket'
+  const params = []
+  const where = []
+
   if (options?.status) {
-    where.status = options.status
+    where.push('status = ?')
+    params.push(options.status)
+  }
+
+  if (options?.startDate) {
+    where.push('createdAt >= ?')
+    params.push(options.startDate.toISOString())
   }
   
-  if (options?.startDate || options?.endDate) {
-    where.createdAt = {}
-    if (options.startDate) {
-      (where.createdAt as Record<string, Date>).gte = options.startDate
-    }
-    if (options.endDate) {
-      (where.createdAt as Record<string, Date>).lte = options.endDate
+  if (options?.endDate) {
+    where.push('createdAt <= ?')
+    params.push(options.endDate.toISOString())
+  }
+
+  if (where.length > 0) {
+    const whereStr = ' WHERE ' + where.join(' AND ')
+    sql += whereStr
+    countSql += whereStr
+  }
+
+  sql += ' ORDER BY createdAt DESC'
+  if (options?.limit) {
+    sql += ' LIMIT ?'
+    params.push(options.limit)
+    if (options?.offset) {
+      sql += ' OFFSET ?'
+      params.push(options.offset)
     }
   }
 
-  const [tickets, total] = await Promise.all([
-    prisma.ticket.findMany({
-      where,
-      include: {
-        items: {
-          include: {
-            game: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: options?.limit || 50,
-      skip: options?.offset || 0
-    }),
-    prisma.ticket.count({ where })
-  ])
+  const tickets = await query<Ticket>(sql, params)
+  const totalResults = await query(countSql, params.slice(0, where.length))
+  
+  for (const t of tickets) {
+    t.items = await query<TicketItem>('SELECT * FROM TicketItem WHERE ticketId = ?', [t.id])
+    for (const item of t.items) {
+      const games = await query<Game>('SELECT * FROM Game WHERE id = ?', [item.gameId])
+      item.game = games[0]
+    }
+  }
 
-  return { tickets: tickets as unknown as Ticket[], total }
+  return { tickets, total: totalResults[0].count }
 }
 
 export async function getTodayTickets(): Promise<Ticket[]> {
-  const prisma = await getPrisma()
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  const d = new Date()
+  const startOfDay = new Date(d.setHours(0,0,0,0)).toISOString()
+  const endOfDay = new Date(d.setHours(23,59,59,999)).toISOString()
 
-  const tickets = await prisma.ticket.findMany({
-    where: {
-      createdAt: {
-        gte: today,
-        lt: tomorrow
-      }
-    },
-    include: {
-      items: {
-        include: {
-          game: true
-        }
-      }
-    },
-    orderBy: { createdAt: 'desc' }
-  })
-
-  return tickets as unknown as Ticket[]
+  const { tickets } = await getTickets({ startDate: new Date(startOfDay), endDate: new Date(endOfDay) })
+  return tickets
 }
 
-export async function cancelTicket(
-  ticketId: string,
-  reason: string
-): Promise<{ success: boolean; message: string }> {
-  const prisma = await getPrisma()
-  const ticket = await prisma.ticket.findUnique({
-    where: { id: ticketId },
-    include: { items: true }
-  })
+export async function cancelTicket(ticketId: string, reason: string): Promise<{ success: boolean; message: string }> {
+  const ticket = await getTicketById(ticketId)
+  if (!ticket) return { success: false, message: 'Ticket no encontrado' }
+  if (ticket.status !== 'active') return { success: false, message: 'Ticket no activo' }
 
-  if (!ticket) {
-    return { success: false, message: 'Ticket no encontrado' }
-  }
-
-  if (ticket.status !== 'active') {
-    return { success: false, message: 'El ticket ya fue cancelado o pagado' }
-  }
-
-  // Check if within 5 minutes
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
-  if (ticket.createdAt < fiveMinutesAgo) {
-    return { 
-      success: false, 
-      message: 'Solo se puede cancelar dentro de los primeros 5 minutos' 
-    }
+  if (new Date(ticket.createdAt) < fiveMinutesAgo) {
+    return { success: false, message: 'Solo se puede cancelar dentro de los primeros 5 minutos' }
   }
 
-  // Cancel the ticket
-  await prisma.ticket.update({
-    where: { id: ticketId },
-    data: {
-      status: 'cancelled',
-      cancelReason: reason,
-      cancelledAt: new Date()
-    }
-  })
+  const now = new Date().toISOString()
+  await execute('UPDATE Ticket SET status = "cancelled", cancelReason = ?, cancelledAt = ?, updatedAt = ? WHERE id = ?', 
+    [reason, now, now, ticketId])
 
-  // Log the cancellation
-  await prisma.cancellationLog.create({
-    data: {
-      ticketId: ticket.id,
-      ticketNumber: ticket.ticketNumber,
-      totalAmount: ticket.totalAmount,
-      reason,
-      itemsJson: JSON.stringify(ticket.items)
-    }
-  })
+  await execute(
+    'INSERT INTO CancellationLog (id, ticketId, ticketNumber, totalAmount, reason, itemsJson, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [crypto.randomUUID(), ticket.id, ticket.ticketNumber, ticket.totalAmount, reason, JSON.stringify(ticket.items), now]
+  )
 
-  // Update cash session
-  const openSession = await prisma.cashSession.findFirst({
-    where: { status: 'open' }
-  })
-
-  if (openSession) {
-    await prisma.cashSession.update({
-      where: { id: openSession.id },
-      data: {
-        salesTotal: {
-          decrement: ticket.totalAmount
-        }
-      }
-    })
-
-    await prisma.cashMovement.create({
-      data: {
-        cashSessionId: openSession.id,
-        type: 'expense',
-        amount: -ticket.totalAmount,
-        description: `Cancelación ticket ${ticket.ticketNumber}: ${reason}`
-      }
-    })
+  const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
+  if (openSessions.length > 0) {
+    const sessionId = openSessions[0].id
+    await execute('UPDATE CashSession SET salesTotal = salesTotal - ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ticket.totalAmount, sessionId])
+    await execute(
+      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "expense", ?, ?, ?)',
+      [crypto.randomUUID(), sessionId, -ticket.totalAmount, `Cancelación ticket ${ticket.ticketNumber}`, now]
+    )
   }
 
   return { success: true, message: 'Ticket cancelado exitosamente' }
-}
-
-export async function getCancellations(options?: {
-  startDate?: Date
-  endDate?: Date
-}): Promise<{ id: string; ticketNumber: string; totalAmount: number; reason: string; createdAt: Date }[]> {
-  const prisma = await getPrisma()
-  const where: Record<string, unknown> = {}
-
-  if (options?.startDate || options?.endDate) {
-    where.createdAt = {}
-    if (options.startDate) {
-      (where.createdAt as Record<string, Date>).gte = options.startDate
-    }
-    if (options.endDate) {
-      (where.createdAt as Record<string, Date>).lte = options.endDate
-    }
-  }
-
-  return prisma.cancellationLog.findMany({
-    where,
-    orderBy: { createdAt: 'desc' }
-  })
 }
 
 export const ticketService = {
@@ -285,6 +170,5 @@ export const ticketService = {
   getByNumber: getTicketByNumber,
   getTickets,
   getTodayTickets,
-  cancelTicket,
-  getCancellations
+  cancelTicket
 }

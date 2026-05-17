@@ -1,89 +1,49 @@
-import getPrisma from '@/lib/db'
+import { query, execute } from '@/lib/db'
 import type { CashSession, CashMovement } from '@/lib/types'
 
 export async function openCashSession(openingAmount: number): Promise<CashSession> {
-  const prisma = await getPrisma()
   // Check if there's already an open session
-  const existingSession = await prisma.cashSession.findFirst({
-    where: { status: 'open' }
-  })
+  const existing = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
+  if (existing.length > 0) throw new Error('Ya existe una sesión de caja abierta')
 
-  if (existingSession) {
-    throw new Error('Ya existe una sesión de caja abierta')
-  }
+  const id = crypto.randomUUID()
+  const now = new Date().toISOString()
+  
+  await execute(
+    'INSERT INTO CashSession (id, openingAmount, status, salesTotal, prizesTotal, openedAt, createdAt, updatedAt) VALUES (?, ?, "open", 0, 0, ?, ?, ?)',
+    [id, openingAmount, now, now, now]
+  )
 
-  const session = await prisma.cashSession.create({
-    data: {
-      openingAmount,
-      status: 'open'
-    },
-    include: {
-      movements: true
-    }
-  })
-
-  return session as unknown as CashSession
+  return (await getCashSessionById(id))!
 }
 
 export async function getCurrentSession(): Promise<CashSession | null> {
-  const prisma = await getPrisma()
-  const session = await prisma.cashSession.findFirst({
-    where: { status: 'open' },
-    include: {
-      movements: {
-        orderBy: { createdAt: 'desc' }
-      }
-    }
-  })
-
-  return session as unknown as CashSession | null
+  const sessions = await query<CashSession>('SELECT * FROM CashSession WHERE status = "open" LIMIT 1')
+  if (sessions.length === 0) return null
+  
+  const session = sessions[0]
+  session.movements = await query<CashMovement>(
+    'SELECT * FROM CashMovement WHERE cashSessionId = ? ORDER BY createdAt DESC',
+    [session.id]
+  )
+  
+  return session
 }
 
-export async function closeCashSession(
-  sessionId: string,
-  notes?: string
-): Promise<CashSession> {
-  const prisma = await getPrisma()
-  const session = await prisma.cashSession.findUnique({
-    where: { id: sessionId },
-    include: { movements: true }
-  })
+export async function closeCashSession(sessionId: string, notes?: string): Promise<CashSession> {
+  const session = await getCashSessionById(sessionId)
+  if (!session) throw new Error('Sesión no encontrada')
+  if (session.status === 'closed') throw new Error('Esta sesión ya está cerrada')
 
-  if (!session) {
-    throw new Error('Sesión no encontrada')
-  }
+  const summary = await getCashSummary(sessionId)
+  const now = new Date().toISOString()
+  
+  await execute(
+    'UPDATE CashSession SET status = "closed", closingAmount = ?, closedAt = ?, notes = ?, updatedAt = ? WHERE id = ?',
+    [summary.balance, now, notes, now, sessionId]
+  )
 
-  if (session.status === 'closed') {
-    throw new Error('Esta sesión ya está cerrada')
-  }
-
-  const closingAmount = 
-    session.openingAmount + 
-    session.salesTotal - 
-    session.prizesTotal + 
-    session.movements
-      .filter(m => m.type === 'income')
-      .reduce((sum, m) => sum + m.amount, 0) -
-    session.movements
-      .filter(m => m.type === 'expense' && m.amount > 0)
-      .reduce((sum, m) => sum + m.amount, 0)
-
-  const updatedSession = await prisma.cashSession.update({
-    where: { id: sessionId },
-    data: {
-      status: 'closed',
-      closingAmount,
-      closedAt: new Date(),
-      notes
-    },
-    include: {
-      movements: {
-        orderBy: { createdAt: 'desc' }
-      }
-    }
-  })
-
-  return updatedSession as unknown as CashSession
+  return (await getCashSessionById(sessionId))!
 }
 
 export async function addCashMovement(data: {
@@ -92,12 +52,16 @@ export async function addCashMovement(data: {
   amount: number
   description: string
 }): Promise<CashMovement> {
-  const prisma = await getPrisma()
-  const movement = await prisma.cashMovement.create({
-    data
-  })
+  const id = crypto.randomUUID()
+  const now = new Date().toISOString()
+  
+  await execute(
+    'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, data.cashSessionId, data.type, data.amount, data.description, now]
+  )
 
-  return movement as CashMovement
+  const results = await query<CashMovement>('SELECT * FROM CashMovement WHERE id = ?', [id])
+  return results[0]
 }
 
 export async function getCashSessions(options?: {
@@ -105,45 +69,44 @@ export async function getCashSessions(options?: {
   endDate?: Date
   limit?: number
 }): Promise<CashSession[]> {
-  const prisma = await getPrisma()
-  const where: Record<string, unknown> = {}
+  let sql = 'SELECT * FROM CashSession'
+  const params = []
+  const where = []
 
-  if (options?.startDate || options?.endDate) {
-    where.openedAt = {}
-    if (options.startDate) {
-      (where.openedAt as Record<string, Date>).gte = options.startDate
-    }
-    if (options.endDate) {
-      (where.openedAt as Record<string, Date>).lte = options.endDate
-    }
+  if (options?.startDate) {
+    where.push('openedAt >= ?')
+    params.push(options.startDate.toISOString())
+  }
+  if (options?.endDate) {
+    where.push('openedAt <= ?')
+    params.push(options.endDate.toISOString())
   }
 
-  const sessions = await prisma.cashSession.findMany({
-    where,
-    include: {
-      movements: {
-        orderBy: { createdAt: 'desc' }
-      }
-    },
-    orderBy: { openedAt: 'desc' },
-    take: options?.limit || 30
-  })
+  if (where.length > 0) sql += ' WHERE ' + where.join(' AND ')
+  sql += ' ORDER BY openedAt DESC'
+  if (options?.limit) {
+    sql += ' LIMIT ?'
+    params.push(options.limit)
+  }
 
-  return sessions as unknown as CashSession[]
+  const sessions = await query<CashSession>(sql, params)
+  for (const s of sessions) {
+    s.movements = await query<CashMovement>('SELECT * FROM CashMovement WHERE cashSessionId = ?', [s.id])
+  }
+  return sessions
 }
 
 export async function getCashSessionById(id: string): Promise<CashSession | null> {
-  const prisma = await getPrisma()
-  const session = await prisma.cashSession.findUnique({
-    where: { id },
-    include: {
-      movements: {
-        orderBy: { createdAt: 'desc' }
-      }
-    }
-  })
-
-  return session as unknown as CashSession | null
+  const sessions = await query<CashSession>('SELECT * FROM CashSession WHERE id = ?', [id])
+  if (sessions.length === 0) return null
+  
+  const session = sessions[0]
+  session.movements = await query<CashMovement>(
+    'SELECT * FROM CashMovement WHERE cashSessionId = ? ORDER BY createdAt DESC',
+    [session.id]
+  )
+  
+  return session
 }
 
 export async function getCashSummary(sessionId?: string): Promise<{
@@ -154,23 +117,10 @@ export async function getCashSummary(sessionId?: string): Promise<{
   expenseTotal: number
   balance: number
 }> {
-  let session: CashSession | null = null
-
-  if (sessionId) {
-    session = await getCashSessionById(sessionId)
-  } else {
-    session = await getCurrentSession()
-  }
+  const session = sessionId ? await getCashSessionById(sessionId) : await getCurrentSession()
 
   if (!session) {
-    return {
-      openingAmount: 0,
-      salesTotal: 0,
-      prizesTotal: 0,
-      incomeTotal: 0,
-      expenseTotal: 0,
-      balance: 0
-    }
+    return { openingAmount: 0, salesTotal: 0, prizesTotal: 0, incomeTotal: 0, expenseTotal: 0, balance: 0 }
   }
 
   const incomeTotal = session.movements
@@ -181,12 +131,7 @@ export async function getCashSummary(sessionId?: string): Promise<{
     ?.filter(m => m.type === 'expense' && m.amount > 0)
     .reduce((sum, m) => sum + m.amount, 0) || 0
 
-  const balance = 
-    session.openingAmount + 
-    session.salesTotal - 
-    session.prizesTotal + 
-    incomeTotal - 
-    expenseTotal
+  const balance = session.openingAmount + session.salesTotal - session.prizesTotal + incomeTotal - expenseTotal
 
   return {
     openingAmount: session.openingAmount,
