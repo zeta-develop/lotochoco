@@ -1,4 +1,4 @@
-import prisma from '@/lib/db'
+import getPrisma from '@/lib/db'
 import type { Result, Winner } from '@/lib/types'
 
 export async function createResult(data: {
@@ -7,6 +7,7 @@ export async function createResult(data: {
   winningNumber: string
   drawDate?: Date
 }): Promise<Result> {
+  const prisma = await getPrisma()
   const result = await prisma.result.create({
     data: {
       gameId: data.gameId,
@@ -27,6 +28,7 @@ export async function processResult(resultId: string): Promise<{
   winnersCount: number
   totalPrizes: number
 }> {
+  const prisma = await getPrisma()
   const result = await prisma.result.findUnique({
     where: { id: resultId },
     include: {
@@ -106,6 +108,7 @@ export async function getResults(options?: {
   endDate?: Date
   limit?: number
 }): Promise<Result[]> {
+  const prisma = await getPrisma()
   const where: Record<string, unknown> = {}
 
   if (options?.gameId) {
@@ -141,6 +144,7 @@ export async function getResults(options?: {
 }
 
 export async function getTodayResults(): Promise<Result[]> {
+  const prisma = await getPrisma()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   
@@ -169,6 +173,7 @@ export async function getWinners(options?: {
   startDate?: Date
   endDate?: Date
 }): Promise<Winner[]> {
+  const prisma = await getPrisma()
   const where: Record<string, unknown> = {}
 
   if (options?.isPaid !== undefined) {
@@ -211,6 +216,7 @@ export async function getWinners(options?: {
 }
 
 export async function markWinnerAsPaid(winnerId: string): Promise<Winner> {
+  const prisma = await getPrisma()
   const winner = await prisma.winner.update({
     where: { id: winnerId },
     data: {
@@ -255,6 +261,7 @@ export async function getHotColdNumbers(gameId: string, limit: number = 10): Pro
   hot: { number: string; frequency: number }[]
   cold: { number: string; frequency: number }[]
 }> {
+  const prisma = await getPrisma()
   const results = await prisma.result.findMany({
     where: { gameId },
     select: { winningNumber: true },

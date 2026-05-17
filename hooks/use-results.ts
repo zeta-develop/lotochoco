@@ -1,149 +1,109 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { Result, Winner } from '@/lib/types'
-import {
-  bootstrapOfflineData,
-  createOfflineResult,
-  getOfflineResults,
-  getOfflineTodayResults,
-  getOfflineWinners,
-  markOfflineWinnerAsPaid,
-  processOfflineResult,
-} from '@/lib/local-db'
+import type { Result } from '@/lib/types'
+import { getTodayResults, createResult, processResult } from '@/services/results'
+import { toast } from 'sonner'
 
-export function useResults(options?: {
-  today?: boolean
-  gameId?: string
-  startDate?: string
-  endDate?: string
-}) {
+export function useResults() {
   const [results, setResults] = useState<Result[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const refresh = useCallback(async () => {
+    setIsLoading(true)
     try {
-      setError(null)
-      setResults(
-        options?.today
-          ? getOfflineTodayResults()
-          : getOfflineResults({
-              gameId: options?.gameId,
-              startDate: options?.startDate ? new Date(options.startDate) : undefined,
-              endDate: options?.endDate ? new Date(options.endDate) : undefined,
-            })
-      )
+      const data = await getTodayResults()
+      setResults(data)
     } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar resultados'))
+      console.error('Error al cargar resultados:', error)
+      toast.error('Error al cargar resultados')
+    } finally {
+      setIsLoading(false)
     }
-  }, [options?.endDate, options?.gameId, options?.startDate, options?.today])
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
+    refresh()
+  }, [refresh])
 
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
-  }, [options?.today, options?.gameId, options?.startDate, options?.endDate, refresh])
-
-  const createResult = async (resultData: {
+  const addResult = async (data: {
     gameId: string
     scheduleId: string
     winningNumber: string
     drawDate?: Date
-    autoProcess?: boolean
   }) => {
-    const result = createOfflineResult(resultData)
-    if (resultData.autoProcess) {
-      processOfflineResult(result.id)
+    setIsSubmitting(true)
+    try {
+      const result = await createResult(data)
+      toast.success('Resultado guardado correctamente')
+      
+      // Proceso automático de ganadores
+      toast.info('Buscando ganadores...')
+      const processing = await processResult(result.id)
+      
+      if (processing.winnersCount > 0) {
+        toast.success(`¡Se encontraron ${processing.winnersCount} ganadores!`)
+      } else {
+        toast.info('No se encontraron ganadores para este sorteo')
+      }
+      
+      await refresh()
+      return result
+    } catch (error) {
+      console.error('Error al guardar resultado:', error)
+      toast.error(error instanceof Error ? error.message : 'Error al guardar resultado')
+      throw error
+    } finally {
+      setIsSubmitting(false)
     }
-    await refresh()
-    return result
   }
 
   return {
     results,
     isLoading,
-    error,
-    createResult,
-    refresh,
+    isSubmitting,
+    addResult,
+    refresh
   }
 }
 
-export function useTodayResults() {
-  return useResults({ today: true })
+export const useTodayResults = () => {
+  const { results, isLoading, refresh } = useResults()
+  return { results, isLoading, refresh }
 }
 
-export function useWinners(options?: {
-  isPaid?: boolean
-  startDate?: string
-  endDate?: string
-}) {
+export const useWinners = () => {
+  const { isLoading, refresh } = useResults()
   const [winners, setWinners] = useState<Winner[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      setWinners(
-        getOfflineWinners({
-          isPaid: options?.isPaid,
-          startDate: options?.startDate ? new Date(options.startDate) : undefined,
-          endDate: options?.endDate ? new Date(options.endDate) : undefined,
-        })
-      )
-    } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar ganadores'))
-    }
-  }, [options?.endDate, options?.isPaid, options?.startDate])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
+    const load = async () => {
+      const { getWinners } = await import('@/services/results')
+      const data = await getWinners()
+      setWinners(data)
     }
+    load()
+  }, [refresh])
 
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
-  }, [options?.isPaid, options?.startDate, options?.endDate, refresh])
-
-  const markAsPaid = async (winnerId: string) => {
-    const winner = markOfflineWinnerAsPaid(winnerId)
-    await refresh()
-    return winner
-  }
-
-  return {
-    winners,
-    isLoading,
-    error,
-    markAsPaid,
-    refresh,
-  }
+  return { winners, isLoading, refresh }
 }
 
-export function usePendingWinners() {
-  return useWinners({ isPaid: false })
+export const usePendingWinners = () => {
+  const { isLoading, refresh } = useResults()
+  const [winners, setWinners] = useState<Winner[]>([])
+
+  useEffect(() => {
+    const load = async () => {
+      const { getWinners } = await import('@/services/results')
+      const data = await getWinners({ isPaid: false })
+      setWinners(data)
+    }
+    load()
+  }, [refresh])
+
+  return { winners, isLoading, refresh }
 }
+
+import type { Winner } from '@/lib/types'
+

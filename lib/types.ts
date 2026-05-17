@@ -25,6 +25,7 @@ export interface DrawSchedule {
 export interface Ticket {
   id: string
   ticketNumber: string
+  client?: string | null
   totalAmount: number
   status: 'active' | 'cancelled' | 'paid'
   cancelReason?: string | null
@@ -127,6 +128,7 @@ export interface CartItem {
   schedule: string
   scheduleName: string
   multiplier: number
+  client?: string
 }
 
 export interface SalesReport {
@@ -158,3 +160,5 @@ export type SettingKey =
   | 'printerType'
   | 'printerAddress'
   | 'darkMode'
+  | 'bluetoothDeviceId'
+  | 'bluetoothDeviceName'

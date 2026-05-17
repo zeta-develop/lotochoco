@@ -3,15 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { SalesReport } from '@/lib/types'
-import {
-  OFFLINE_DB_UPDATED_EVENT,
-  bootstrapOfflineData,
-  getOfflineCancellations,
-  getOfflineDailyReport,
-  getOfflineGameReport,
-  getOfflineSalesReport,
-  getOfflineWeeklyReport,
-} from '@/lib/local-db'
+import { getSalesReport, getDailyReport, getWeeklyReport, getGameReport } from '@/services/reports'
 
 function parseLocalDate(value?: string) {
   if (!value) return undefined
@@ -20,30 +12,6 @@ function parseLocalDate(value?: string) {
   if (!year || !month || !day) return undefined
 
   return new Date(year, month - 1, day)
-}
-
-function useReportAutoRefresh(refresh: () => Promise<void>) {
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const handleUpdated = () => {
-      void refresh()
-    }
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        void refresh()
-      }
-    }
-
-    window.addEventListener(OFFLINE_DB_UPDATED_EVENT, handleUpdated)
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    return () => {
-      window.removeEventListener(OFFLINE_DB_UPDATED_EVENT, handleUpdated)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [refresh])
 }
 
 export function useSalesReport(options?: {
@@ -79,37 +47,22 @@ export function useSalesReport(options?: {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      setReport(
-        getOfflineSalesReport({
-          startDate: parsedStartDate,
-          endDate: parsedEndDate,
-        })
-      )
+      const data = await getSalesReport({
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+      })
+      setReport(data)
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte'))
     }
   }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [refresh])
-
-  useReportAutoRefresh(refresh)
 
   return {
     report,
@@ -134,32 +87,19 @@ export function useDailyReport(date?: string) {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      setReport(getOfflineDailyReport(date ? parseLocalDate(date) || new Date() : new Date()))
+      const data = await getDailyReport(date ? parseLocalDate(date) || new Date() : new Date())
+      setReport(data)
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte diario'))
     }
   }, [date])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [date, refresh])
-
-  useReportAutoRefresh(refresh)
 
   return {
     report,
@@ -185,7 +125,7 @@ export function useWeeklyReport() {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const data = getOfflineWeeklyReport()
+      const data = await getWeeklyReport()
       setDays(data.days)
       setTotals(data.totals)
     } catch (error) {
@@ -194,25 +134,11 @@ export function useWeeklyReport() {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [refresh])
-
-  useReportAutoRefresh(refresh)
 
   return {
     days,
@@ -255,37 +181,22 @@ export function useGameReport(options?: {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      setGames(
-        getOfflineGameReport({
-          startDate: parsedStartDate,
-          endDate: parsedEndDate,
-        })
-      )
+      const data = await getGameReport({
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+      })
+      setGames(data)
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte por juego'))
     }
   }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [refresh])
-
-  useReportAutoRefresh(refresh)
 
   return {
     games,
@@ -304,7 +215,7 @@ export function useCancellationsReport(options?: {
     ticketNumber: string
     totalAmount: number
     reason: string
-    createdAt: string
+    createdAt: Date
   }[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
@@ -321,37 +232,23 @@ export function useCancellationsReport(options?: {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      setCancellations(
-        getOfflineCancellations({
-          startDate: parsedStartDate,
-          endDate: parsedEndDate,
-        })
-      )
+      const { getCancellations } = await import('@/services/tickets')
+      const data = await getCancellations({
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+      })
+      setCancellations(data)
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar cancelaciones'))
     }
   }, [parsedEndDate, parsedStartDate])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [refresh])
-
-  useReportAutoRefresh(refresh)
 
   return {
     cancellations,

@@ -2,185 +2,121 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { CashSession } from '@/lib/types'
-import {
-  addOfflineCashMovement,
-  bootstrapOfflineData,
-  closeOfflineCashSession,
-  getOfflineCashSessions,
-  getOfflineCashSummary,
-  getOfflineCurrentSession,
-  openOfflineCashSession,
-} from '@/lib/local-db'
+import { getCurrentSession, openCashSession, closeCashSession, addCashMovement, getCashSummary } from '@/services/cash'
+import { toast } from 'sonner'
 
-export function useCurrentSession() {
-  const [session, setSession] = useState<CashSession | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      setSession(getOfflineCurrentSession())
-    } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar caja'))
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
-  }, [refresh])
-
-  const openSession = async (openingAmount: number) => {
-    const openedSession = openOfflineCashSession(openingAmount)
-    await refresh()
-    return openedSession
-  }
-
-  const closeSession = async (notes?: string) => {
-    if (!session?.id) {
-      throw new Error('No hay sesión abierta')
-    }
-
-    const closedSession = closeOfflineCashSession(session.id, notes)
-    await refresh()
-    return closedSession
-  }
-
-  const addMovement = async (type: 'income' | 'expense', amount: number, description: string) => {
-    if (!session?.id) {
-      throw new Error('No hay sesión abierta')
-    }
-
-    const movement = addOfflineCashMovement({
-      cashSessionId: session.id,
-      type,
-      amount,
-      description,
-    })
-    await refresh()
-    return movement
-  }
-
-  return {
-    session,
-    isOpen: session?.status === 'open',
-    isLoading,
-    error,
-    openSession,
-    closeSession,
-    addMovement,
-    refresh,
-  }
-}
-
-export function useCashSummary(sessionId?: string) {
+export function useCash() {
+  const [currentSession, setCurrentSession] = useState<CashSession | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [summary, setSummary] = useState({
     openingAmount: 0,
     salesTotal: 0,
     prizesTotal: 0,
     incomeTotal: 0,
     expenseTotal: 0,
-    balance: 0,
+    balance: 0
   })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
 
   const refresh = useCallback(async () => {
+    setIsLoading(true)
     try {
-      setError(null)
-      setSummary(getOfflineCashSummary(sessionId))
+      const [session, cashSummary] = await Promise.all([
+        getCurrentSession(),
+        getCashSummary()
+      ])
+      setCurrentSession(session)
+      setSummary(cashSummary)
     } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar resumen'))
+      console.error('Error al cargar datos de caja:', error)
+    } finally {
+      setIsLoading(false)
     }
-  }, [sessionId])
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
+    refresh()
+  }, [refresh])
 
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
+  const openSession = async (amount: number) => {
+    try {
+      const session = await openCashSession(amount)
+      toast.success('Caja abierta correctamente')
+      await refresh()
+      return session
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al abrir caja')
+      throw error
+    }
+  }
+
+  const closeSession = async (notes?: string) => {
+    if (!currentSession) return
+    try {
+      const session = await closeCashSession(currentSession.id, notes)
+      toast.success('Caja cerrada correctamente')
+      await refresh()
+      return session
+    } catch (error) {
+      toast.error('Error al cerrar caja')
+      throw error
+    }
+  }
+
+  const addMovement = async (type: 'income' | 'expense', amount: number, description: string) => {
+    if (!currentSession) {
+      toast.error('No hay una sesión de caja abierta')
+      return
+    }
+    try {
+      const movement = await addCashMovement({
+        cashSessionId: currentSession.id,
+        type,
+        amount,
+        description
       })
+      toast.success('Movimiento registrado')
+      await refresh()
+      return movement
+    } catch (error) {
+      toast.error('Error al registrar movimiento')
+      throw error
     }
-
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
-  }, [refresh, sessionId])
+  }
 
   return {
+    currentSession,
     summary,
     isLoading,
-    error,
-    refresh,
+    openSession,
+    closeSession,
+    addMovement,
+    refresh
   }
 }
 
-export function useCashSessions(options?: {
-  startDate?: string
-  endDate?: string
-}) {
-  const [sessions, setSessions] = useState<CashSession[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+export const useCurrentSession = () => {
+  const { currentSession, isLoading, refresh } = useCash()
+  return { session: currentSession, isLoading, refresh }
+}
 
-  const refresh = useCallback(async () => {
-    try {
-      setError(null)
-      setSessions(
-        getOfflineCashSessions({
-          startDate: options?.startDate ? new Date(options.startDate) : undefined,
-          endDate: options?.endDate ? new Date(options.endDate) : undefined,
-        })
-      )
-    } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar sesiones'))
-    }
-  }, [options?.endDate, options?.startDate])
+export const useCashSummary = () => {
+  const { summary, isLoading, refresh } = useCash()
+  return { summary, isLoading, refresh }
+}
+
+export const useCashSessions = () => {
+  const { isLoading, refresh } = useCash()
+  const [sessions, setSessions] = useState<CashSession[]>([])
 
   useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
+    const load = async () => {
+      const { getCashSessions } = await import('@/services/cash')
+      const data = await getCashSessions()
+      setSessions(data)
     }
+    load()
+  }, [refresh])
 
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
-  }, [options?.startDate, options?.endDate, refresh])
-
-  return {
-    sessions,
-    isLoading,
-    error,
-    refresh,
-  }
+  return { sessions, isLoading, refresh }
 }
+

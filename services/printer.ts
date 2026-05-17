@@ -1,5 +1,5 @@
 // ESC/POS Printer Service
-// Supports network (TCP/IP) and generates commands for thermal printers
+// Supports network (TCP/IP), Web Bluetooth, and generates commands for thermal printers
 
 import type { Ticket, TicketItem, CashSession } from '@/lib/types'
 import { format } from 'date-fns'
@@ -45,13 +45,18 @@ function repeatChar(char: string, count: number): string {
   return char.repeat(count)
 }
 
+function calculatePrize(amount: number, multiplier: number): number {
+  return amount * multiplier
+}
+
 export function generateTicketReceipt(
-  ticket: Ticket & { items: (TicketItem & { game?: { name: string } })[] },
+  ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
   settings: Record<string, string>
 ): string {
   const lineWidth = 32
   const separator = repeatChar('-', lineWidth)
   const doubleSeparator = repeatChar('=', lineWidth)
+  const currency = settings.currency || 'C$'
   
   let receipt = ''
   
@@ -60,25 +65,38 @@ export function generateTicketReceipt(
   
   // Header - Business name
   receipt += COMMANDS.ALIGN_CENTER
-  receipt += COMMANDS.DOUBLE_SIZE_ON
-  receipt += settings.businessName || 'LOTERÍA'
+  receipt += COMMANDS.BOLD_ON
+  receipt += COMMANDS.DOUBLE_WIDTH_ON
+  receipt += settings.businessName || 'LOTERIA'
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.NORMAL_SIZE
-  
-  // Date and ticket number
-  receipt += format(new Date(ticket.createdAt), "dd/MM/yyyy HH:mm", { locale: es })
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.BOLD_ON
-  receipt += `Ticket: ${ticket.ticketNumber}`
   receipt += COMMANDS.BOLD_OFF
+  
+  receipt += 'Ticket de Loteria'
   receipt += COMMANDS.FEED_LINE
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  // Items header
+  // Ticket info
   receipt += COMMANDS.ALIGN_LEFT
+  receipt += `Ticket: #${ticket.ticketNumber}`
+  receipt += COMMANDS.FEED_LINE
+  receipt += `Fecha: ${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}`
+  receipt += COMMANDS.FEED_LINE
+  receipt += `Hora: ${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}`
+  receipt += COMMANDS.FEED_LINE
+  
+  if (ticket.client) {
+    receipt += `Cliente: ${ticket.client}`
+    receipt += COMMANDS.FEED_LINE
+  }
+  
+  receipt += separator
+  receipt += COMMANDS.FEED_LINE
+  
+  // Items header
   receipt += COMMANDS.BOLD_ON
-  receipt += 'JUEGO      NUM  HOR   MONTO'
+  receipt += 'JUEGO       NUM  PREMIO'
   receipt += COMMANDS.BOLD_OFF
   receipt += COMMANDS.FEED_LINE
   receipt += separator
@@ -86,12 +104,17 @@ export function generateTicketReceipt(
   
   // Items
   for (const item of ticket.items) {
-    const gameName = (item.game?.name || 'N/A').substring(0, 10).padEnd(10)
-    const number = item.number.padStart(3)
-    const schedule = item.schedule.substring(0, 5)
-    const amount = `${settings.currency || 'C$'}${item.amount.toFixed(0)}`.padStart(7)
+    const gameName = (item.game?.name || 'N/A').substring(0, 11).padEnd(11)
+    const number = item.number.padStart(4)
+    const multiplier = item.game?.multiplier || 70
+    const prize = calculatePrize(item.amount, multiplier)
+    const prizeStr = `${currency}${prize.toFixed(0)}`.padStart(10)
     
-    receipt += `${gameName} ${number}  ${schedule} ${amount}`
+    receipt += `${gameName}${number} ${prizeStr}`
+    receipt += COMMANDS.FEED_LINE
+    
+    // Schedule time on next line
+    receipt += `            ${item.schedule}`
     receipt += COMMANDS.FEED_LINE
   }
   
@@ -99,11 +122,11 @@ export function generateTicketReceipt(
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.ALIGN_RIGHT
-  receipt += COMMANDS.DOUBLE_HEIGHT_ON
   receipt += COMMANDS.BOLD_ON
-  receipt += `TOTAL: ${settings.currency || 'C$'}${ticket.totalAmount.toFixed(2)}`
-  receipt += COMMANDS.BOLD_OFF
+  receipt += COMMANDS.DOUBLE_HEIGHT_ON
+  receipt += `TOTAL: ${currency}${ticket.totalAmount.toFixed(2)}`
   receipt += COMMANDS.NORMAL_SIZE
+  receipt += COMMANDS.BOLD_OFF
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.FEED_LINE
   
@@ -111,7 +134,7 @@ export function generateTicketReceipt(
   receipt += COMMANDS.ALIGN_CENTER
   receipt += doubleSeparator
   receipt += COMMANDS.FEED_LINE
-  receipt += settings.ticketMessage || '¡Buena suerte!'
+  receipt += settings.ticketMessage || '!Buena suerte!'
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.FEED_LINE
   
@@ -122,6 +145,11 @@ export function generateTicketReceipt(
   receipt += COMMANDS.BARCODE_CODE128
   receipt += String.fromCharCode(ticket.ticketNumber.length)
   receipt += ticket.ticketNumber
+  receipt += COMMANDS.FEED_LINE
+  receipt += COMMANDS.FEED_LINE
+  
+  receipt += '*** CONSERVE SU TICKET ***'
+  receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.FEED_LINE
   
   // Cut paper
@@ -151,7 +179,7 @@ export function generateCashCloseReceipt(
   receipt += 'CIERRE DE CAJA'
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.NORMAL_SIZE
-  receipt += settings.businessName || 'LOTERÍA'
+  receipt += settings.businessName || 'LOTERIA'
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.FEED_LINE
   
@@ -237,12 +265,11 @@ export function generateCashCloseReceipt(
 
 
 // Network printer interface (for browser use, this would need a backend proxy)
-export async function printToNetwork(  printerAddress: string,
+export async function printToNetwork(
+  printerAddress: string,
   data: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // In a real implementation, this would send to a local print server
-    // or use WebSocket/HTTP to a print proxy service
     const response = await fetch('/api/print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -256,7 +283,7 @@ export async function printToNetwork(  printerAddress: string,
       throw new Error('Error al imprimir')
     }
     
-    return { success: true, message: 'Impresión enviada' }
+    return { success: true, message: 'Impresion enviada' }
   } catch (error) {
     console.error('Print error:', error)
     return { 
@@ -266,9 +293,109 @@ export async function printToNetwork(  printerAddress: string,
   }
 }
 
+// Web Bluetooth printing for PT-210 and similar thermal printers
+const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb'
+const PRINTER_CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb'
+
+let bluetoothDevice: BluetoothDevice | null = null
+let bluetoothCharacteristic: BluetoothRemoteGATTCharacteristic | null = null
+
+export async function scanBluetoothPrinter(): Promise<{ name: string; id: string } | null> {
+  if (typeof navigator === 'undefined' || !navigator.bluetooth) {
+    throw new Error('Web Bluetooth no es compatible con este navegador')
+  }
+
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [PRINTER_SERVICE_UUID] }],
+      optionalServices: [PRINTER_SERVICE_UUID],
+      acceptAllDevices: false
+    })
+
+    return { name: device.name || 'Desconocido', id: device.id }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotFoundError') {
+      return null
+    }
+    throw error
+  }
+}
+
+export async function connectBluetoothPrinter(deviceId: string): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.bluetooth) {
+    return false
+  }
+
+  try {
+    // Get all devices (we need to request again as we can't get by ID directly)
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [PRINTER_SERVICE_UUID] }],
+      optionalServices: [PRINTER_SERVICE_UUID]
+    })
+
+    if (device.id !== deviceId) {
+      return false
+    }
+
+    bluetoothDevice = device
+
+    device.addEventListener('gattserverdisconnected', () => {
+      bluetoothDevice = null
+      bluetoothCharacteristic = null
+    })
+
+    const server = await device.gatt?.connect()
+    if (!server) return false
+
+    const service = await server.getPrimaryService(PRINTER_SERVICE_UUID)
+    bluetoothCharacteristic = await service.getCharacteristic(PRINTER_CHARACTERISTIC_UUID)
+
+    return true
+  } catch (error) {
+    console.error('Bluetooth connection error:', error)
+    return false
+  }
+}
+
+export async function printViaBluetooth(data: string): Promise<{ success: boolean; message: string }> {
+  if (!bluetoothCharacteristic) {
+    return { success: false, message: 'Impresora Bluetooth no conectada' }
+  }
+
+  try {
+    const encoder = new TextEncoder()
+    const bytes = encoder.encode(data)
+    
+    // Split into chunks (MTU is typically 20-512 bytes)
+    const chunkSize = 128
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.slice(i, i + chunkSize)
+      await bluetoothCharacteristic.writeValue(chunk)
+      // Small delay between chunks
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+
+    return { success: true, message: 'Impresion enviada por Bluetooth' }
+  } catch (error) {
+    console.error('Bluetooth print error:', error)
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Error al imprimir por Bluetooth' 
+    }
+  }
+}
+
+export async function disconnectBluetoothPrinter(): Promise<void> {
+  if (bluetoothDevice && bluetoothDevice.gatt?.connected) {
+    bluetoothDevice.gatt.disconnect()
+  }
+  bluetoothDevice = null
+  bluetoothCharacteristic = null
+}
+
 // Generate printable HTML for browser printing
 export function generatePrintableHTML(
-  ticket: Ticket & { items: (TicketItem & { game?: { name: string } })[] },
+  ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
   settings: Record<string, string>
 ): string {
   const currency = settings.currency || 'C$'
@@ -285,37 +412,39 @@ export function generatePrintableHTML(
         }
         body {
           font-family: 'Courier New', Courier, monospace;
-          font-size: 12px;
+          font-size: 11px;
           width: 58mm;
           margin: 0;
-          padding: 2mm;
+          padding: 3mm 2mm;
           color: #000;
+          line-height: 1.3;
         }
         .center { text-align: center; }
         .right { text-align: right; }
         .left { text-align: left; }
         .bold { font-weight: bold; }
-        .large { font-size: 18px; line-height: 1.2; margin-bottom: 2px; text-transform: uppercase; }
-        .separator { border-top: 1px dashed #000; margin: 6px 0; }
-        .double-separator { border-top: 2px solid #000; margin: 8px 0; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-        th { font-weight: bold; text-align: left; border-bottom: 1px solid #000; padding-bottom: 3px; }
+        .header { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .separator { border-top: 1px dashed #000; margin: 4px 0; }
+        .double-separator { border-top: 2px solid #000; margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+        th { font-weight: bold; text-align: left; border-bottom: 1px solid #000; padding: 2px 0; font-size: 10px; }
         th.center { text-align: center; }
         th.right { text-align: right; }
-        td { padding: 4px 0; vertical-align: top; }
-        td.number { font-weight: bold; font-size: 14px; text-align: center; }
-        .game-name { max-width: 25mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .schedule { font-size: 10px; color: #333; }
-        .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin: 5px 0; }
-        .barcode-container { display: flex; justify-content: center; height: 35px; margin: 10px 0 2px; }
+        td { padding: 3px 0; vertical-align: top; font-size: 11px; }
+        td.number { font-weight: bold; font-size: 13px; text-align: center; }
+        td.prize { font-weight: bold; text-align: right; }
+        td.schedule { font-size: 9px; color: #555; padding-top: 0; }
+        .total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin: 6px 0; }
+        .info-row { display: flex; justify-content: space-between; font-size: 11px; margin: 1px 0; }
+        .barcode-container { display: flex; justify-content: center; height: 30px; margin: 8px 0 2px; }
         .barcode-bar { background-color: #000; height: 100%; }
-        .ticket-num-small { font-size: 10px; letter-spacing: 2px; }
-        .info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
+        .ticket-num-small { font-size: 9px; letter-spacing: 1px; }
+        .footer-msg { font-size: 10px; margin-top: 8px; }
       </style>
     </head>
     <body>
-      <div class="center large bold">${settings.businessName || 'LOTERÍA'}</div>
-      <div class="center" style="margin-bottom: 6px;">Ticket de Loteria</div>
+      <div class="center header">${settings.businessName || 'LOTERIA'}</div>
+      <div class="center" style="font-size: 11px; margin-bottom: 4px;">Ticket de Loteria</div>
 
       <div class="separator"></div>
 
@@ -331,28 +460,38 @@ export function generatePrintableHTML(
         <span>HORA:</span>
         <span>${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}</span>
       </div>
+      ${ticket.client ? `
+      <div class="info-row">
+        <span>CLIENTE:</span>
+        <span>${ticket.client}</span>
+      </div>
+      ` : ''}
 
       <div class="separator"></div>
       
       <table>
         <thead>
           <tr>
-            <th>JUEGO</th>
-            <th class="center">NUM</th>
-            <th class="right">MONTO</th>
+            <th style="width: 35%;">JUEGO</th>
+            <th class="center" style="width: 20%;">NUM</th>
+            <th class="right" style="width: 45%;">PREMIO</th>
           </tr>
         </thead>
         <tbody>
-          ${ticket.items.map(item => `
+          ${ticket.items.map(item => {
+            const multiplier = item.game?.multiplier || 70
+            const prize = item.amount * multiplier
+            return `
             <tr>
               <td>
-                <div class="game-name">${item.game?.name || (item as any).gameName || 'Juego'}</div>
-                <div class="schedule">${item.schedule || (item as any).scheduleTime || ''}</div>
+                <div>${item.game?.name || 'Juego'}</div>
+                <div class="schedule">${item.schedule || ''}</div>
               </td>
               <td class="number">${item.number}</td>
-              <td class="right">${currency}${(item.amount || 0).toFixed(2)}</td>
+              <td class="prize">${currency}${prize.toFixed(0)}</td>
             </tr>
-          `).join('')}
+            `
+          }).join('')}
         </tbody>
       </table>
       
@@ -360,12 +499,12 @@ export function generatePrintableHTML(
 
       <div class="total-row">
         <span>TOTAL:</span>
-        <span>${currency}${(ticket.totalAmount || ticket.totalAmount || 0).toFixed(2)}</span>
+        <span>${currency}${ticket.totalAmount.toFixed(2)}</span>
       </div>
 
       <div class="double-separator"></div>
 
-      <div class="center bold" style="margin-top: 8px;">${settings.ticketMessage || '¡Buena suerte!'}</div>
+      <div class="center bold footer-msg">${settings.ticketMessage || '!Buena suerte!'}</div>
 
       <div class="barcode-container">
         ${ticket.ticketNumber.split('').map(char => {
@@ -375,7 +514,7 @@ export function generatePrintableHTML(
       </div>
       <div class="center ticket-num-small">${ticket.ticketNumber}</div>
 
-      <div class="center bold" style="margin-top: 15px; font-size: 11px;">*** CONSERVE SU TICKET ***</div>
+      <div class="center bold" style="margin-top: 10px; font-size: 10px;">*** CONSERVE SU TICKET ***</div>
     </body>
     </html>
   `
@@ -402,33 +541,36 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 export function generateTicketImageUrl(
-  ticket: Ticket & { items: (TicketItem & { game?: { name: string }; gameName?: string; scheduleTime?: string })[] },
+  ticket: Ticket & { items: (TicketItem & { game?: { name: string }; gameName?: string; scheduleTime?: string; multiplier?: number })[] },
   settings: Record<string, string>
 ): string {
   // 384px es el estandar para impresoras termicas de 58mm (48mm efectivos)
   const width = 384
-  const baseHeight = 310
-  const itemHeight = 40
+  const baseHeight = 340
+  const itemHeight = 45
   const height = baseHeight + ticket.items.length * itemHeight
   const currency = settings.currency || 'C$'
-  const businessName = escapeXml(settings.businessName || 'LOTERÍA')
-  const ticketMessage = escapeXml(settings.ticketMessage || '¡Buena suerte!')
+  const businessName = escapeXml(settings.businessName || 'LOTERIA')
+  const ticketMessage = escapeXml(settings.ticketMessage || '!Buena suerte!')
   const createdAt = escapeXml(format(new Date(ticket.createdAt), 'dd/MM/yyyy HH:mm', { locale: es }))
 
   const itemRows = ticket.items
     .map((item, index) => {
-      const y = 180 + index * itemHeight
-      const gameName = escapeXml((item.game?.name || (item as any).gameName || 'Juego').slice(0, 16))
+      const y = 200 + index * itemHeight
+      const gameName = escapeXml((item.game?.name || (item as any).gameName || 'Juego').slice(0, 14))
       const number = escapeXml(item.number)
       const schedule = escapeXml((item.schedule || (item as any).scheduleTime || '').slice(0, 8))
-      const amount = escapeXml(`${currency}${(item.amount || 0).toFixed(2)}`)
+      const multiplier = item.game?.multiplier || (item as any).multiplier || 70
+      const prize = (item.amount || 0) * multiplier
+      const amount = escapeXml(`${currency}${(item.amount || 0).toFixed(0)}`)
+      const prizeStr = escapeXml(`${currency}${prize.toFixed(0)}`)
 
       return `
         <g font-family="'Courier New', Courier, monospace">
-          <text x="20" y="${y}" font-size="15" font-weight="700" fill="#000">${gameName}</text>
-          <text x="20" y="${y + 14}" font-size="11" fill="#333">${schedule}</text>
-          <text x="200" y="${y}" font-size="16" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
-          <text x="${width - 20}" y="${y}" font-size="15" font-weight="700" fill="#000" text-anchor="end">${amount}</text>
+          <text x="15" y="${y}" font-size="14" font-weight="700" fill="#000">${gameName}</text>
+          <text x="15" y="${y + 14}" font-size="10" fill="#555">${schedule}</text>
+          <text x="170" y="${y}" font-size="15" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
+          <text x="${width - 15}" y="${y}" font-size="14" font-weight="700" fill="#000" text-anchor="end">${prizeStr}</text>
         </g>
       `
     })
@@ -441,54 +583,61 @@ export function generateTicketImageUrl(
 
   let currentX = (width - barcodeBars.reduce((a,b)=>a+b+1, 0)) / 2;
   const barcodeSvg = barcodeBars.map(w => {
-    const rect = `<rect x="${currentX}" y="${height - 100}" width="${w}" height="40" fill="#000" />`;
+    const rect = `<rect x="${currentX}" y="${height - 90}" width="${w}" height="35" fill="#000" />`;
     currentX += w + 1;
     return rect;
   }).join('');
+
+  const clientInfo = ticket.client ? `
+    <text x="20" y="140" font-size="13" font-weight="700">CLIENTE:</text>
+    <text x="${width-20}" y="140" text-anchor="end" font-size="13">${escapeXml(ticket.client)}</text>
+  ` : ''
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="#ffffff" />
       <g font-family="'Courier New', Courier, monospace" fill="#000">
         <!-- Header -->
-        <text x="${width/2}" y="45" text-anchor="middle" font-size="26" font-weight="900">${businessName}</text>
-        <text x="${width/2}" y="70" text-anchor="middle" font-size="15">Ticket de Loteria</text>
+        <text x="${width/2}" y="40" text-anchor="middle" font-size="24" font-weight="900">${businessName}</text>
+        <text x="${width/2}" y="62" text-anchor="middle" font-size="13">Ticket de Loteria</text>
 
-        <line x1="15" y1="85" x2="${width-15}" y2="85" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
+        <line x1="15" y1="75" x2="${width-15}" y2="75" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
 
         <!-- Info -->
-        <text x="20" y="105" font-size="15" font-weight="700">TICKET:</text>
-        <text x="${width-20}" y="105" text-anchor="end" font-size="15" font-weight="900">#${escapeXml(ticket.ticketNumber)}</text>
+        <text x="20" y="95" font-size="13" font-weight="700">TICKET:</text>
+        <text x="${width-20}" y="95" text-anchor="end" font-size="13" font-weight="900">#${escapeXml(ticket.ticketNumber)}</text>
 
-        <text x="20" y="125" font-size="15" font-weight="700">FECHA:</text>
-        <text x="${width-20}" y="125" text-anchor="end" font-size="15">${createdAt}</text>
+        <text x="20" y="115" font-size="13" font-weight="700">FECHA:</text>
+        <text x="${width-20}" y="115" text-anchor="end" font-size="13">${createdAt}</text>
 
-        <line x1="15" y1="140" x2="${width-15}" y2="140" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
+        ${clientInfo}
+
+        <line x1="15" y1="155" x2="${width-15}" y2="155" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
 
         <!-- Table Header -->
-        <text x="20" y="160" font-size="15" font-weight="900">JUEGO</text>
-        <text x="250" y="160" font-size="15" font-weight="900" text-anchor="middle">NUM</text>
-        <text x="${width-20}" y="160" font-size="15" font-weight="900" text-anchor="end">MONTO</text>
+        <text x="15" y="175" font-size="13" font-weight="900">JUEGO</text>
+        <text x="170" y="175" font-size="13" font-weight="900" text-anchor="middle">NUM</text>
+        <text x="${width-15}" y="175" font-size="13" font-weight="900" text-anchor="end">PREMIO</text>
 
-        <line x1="5" y1="168" x2="${width-5}" y2="168" stroke="#000" stroke-width="1.5" />
+        <line x1="5" y1="183" x2="${width-5}" y2="183" stroke="#000" stroke-width="1.5" />
 
         <!-- Items -->
         ${itemRows}
 
-        <line x1="5" y1="${height - 155}" x2="${width-5}" y2="${height - 155}" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
+        <line x1="5" y1="${height - 145}" x2="${width-5}" y2="${height - 145}" stroke="#000" stroke-dasharray="6 4" stroke-width="1.5" />
 
         <!-- Total -->
-        <text x="20" y="${height - 125}" font-size="18" font-weight="900">TOTAL:</text>
-        <text x="${width-20}" y="${height - 125}" text-anchor="end" font-size="20" font-weight="900">${escapeXml(`${currency}${(ticket.totalAmount || ticket.totalAmount || 0).toFixed(2)}`)}</text>
+        <text x="20" y="${height - 115}" font-size="16" font-weight="900">TOTAL:</text>
+        <text x="${width-20}" y="${height - 115}" text-anchor="end" font-size="18" font-weight="900">${escapeXml(`${currency}${(ticket.totalAmount || ticket.totalAmount || 0).toFixed(2)}`)}</text>
 
-        <line x1="5" y1="${height - 110}" x2="${width-5}" y2="${height - 110}" stroke="#000" stroke-width="2" />
+        <line x1="5" y1="${height - 100}" x2="${width-5}" y2="${height - 100}" stroke="#000" stroke-width="2" />
 
         <!-- Barcode and Footer -->
         ${barcodeSvg}
-        <text x="${width/2}" y="${height - 45}" text-anchor="middle" font-size="12" letter-spacing="2">${escapeXml(ticket.ticketNumber)}</text>
+        <text x="${width/2}" y="${height - 40}" text-anchor="middle" font-size="11" letter-spacing="2">${escapeXml(ticket.ticketNumber)}</text>
 
-        <text x="${width/2}" y="${height - 20}" text-anchor="middle" font-size="12" font-weight="700">${ticketMessage}</text>
-        <text x="${width/2}" y="${height - 5}" text-anchor="middle" font-size="10">*** CONSERVE SU TICKET ***</text>
+        <text x="${width/2}" y="${height - 15}" text-anchor="middle" font-size="11" font-weight="700">${ticketMessage}</text>
+        <text x="${width/2}" y="${height - 2}" text-anchor="middle" font-size="9">*** CONSERVE SU TICKET ***</text>
       </g>
     </svg>
   `
@@ -497,8 +646,10 @@ export function generateTicketImageUrl(
 }
 
 function generateTestPage(): string {
-  return `${COMMANDS.INIT}${COMMANDS.ALIGN_CENTER}PRUEBA DE IMPRESION${COMMANDS.FEED_LINE}${COMMANDS.FEED_LINE}${COMMANDS.CUT_PAPER}`
+  return `${COMMANDS.INIT}${COMMANDS.ALIGN_CENTER}${COMMANDS.BOLD_ON}PRUEBA DE IMPRESION${COMMANDS.BOLD_OFF}${COMMANDS.FEED_LINE}${COMMANDS.FEED_LINE}${COMMANDS.PARTIAL_CUT}`
 }
+
+import { generatePT210Receipt, printDirect } from './pt210-printer'
 
 export const printerService = {
   generateTicketCommands: generateTicketReceipt,
@@ -506,45 +657,31 @@ export const printerService = {
   generateTestPage,
   generatePrintableHTML,
   printToNetwork,
-  async printTicket(ticket: Ticket & { items: (TicketItem & { game?: { name: string } })[] }, settings: Record<string,string>) {
+  scanBluetoothPrinter,
+  connectBluetoothPrinter,
+  disconnectBluetoothPrinter,
+  printViaBluetooth,
+  async printTicket(ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }, settings: Record<string,string>) {
     try {
       const type = settings.printerType || 'browser'
+      const bluetoothDeviceId = settings.bluetoothDeviceId
 
-      // Native print dialog (cordova-plugin-printer)
-      if (type === 'native' && typeof window !== 'undefined' && (window as any).cordova?.plugins?.printer) {
-        const html = generatePrintableHTML(ticket, settings)
-        return new Promise<{success:boolean;message:string}>((resolve) => {
-          ;(window as any).cordova.plugins.printer.print(html, { name: `Ticket ${ticket.ticketNumber}` }, () => resolve({ success: true, message: 'Impresión nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
-        })
+      // Impresión Directa Bluetooth (PT-210 sin RawBT)
+      if (type === 'bluetooth' && bluetoothDeviceId) {
+        const commands = generatePT210Receipt(ticket, settings)
+        return await printDirect(bluetoothDeviceId, commands)
       }
 
-      // Thermal / raw plugin (if available)
-      if ((type === 'thermal' || type === 'raw') && typeof window !== 'undefined' && (window as any).thermalprinter) {
-        const commands = generateTicketReceipt(ticket, settings)
-        try {
-          await (window as any).thermalprinter.send(commands)
-          return { success: true, message: 'Enviado a impresora térmica' }
-        } catch (err) {
-          return { success: false, message: String(err) }
-        }
-      }
-
-      // RawBT intent printing (Android specific for Bluetooth printers like PT210)
+      // RawBT intent printing (Mantenemos como fallback pero el usuario no la quiere)
       if (type === 'rawbt' && typeof window !== 'undefined') {
-        const commands = generateTicketReceipt(ticket, settings)
-        // Convert to base64 correctly supporting special characters
+        const commands = generatePT210Receipt(ticket, settings)
         const encoded = btoa(unescape(encodeURIComponent(commands)));
         const intentUrl = `intent:${encoded}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`
-
-        // Try opening RawBT intent
         window.location.href = intentUrl;
-        return { success: true, message: 'Abriendo app RawBT para imprimir' }
+        return { success: true, message: 'Abriendo app RawBT' }
       }
 
       // Network printer
-
-
-
       if (type === 'network') {
         const commands = generateTicketReceipt(ticket, settings)
         return await printToNetwork(settings.printerAddress || '', commands)
@@ -555,7 +692,7 @@ export const printerService = {
       // dynamically import to avoid cycles
       const { printHtmlDocument } = await import('@/lib/print')
       printHtmlDocument(html)
-      return { success: true, message: 'Impresión por navegador iniciada' }
+      return { success: true, message: 'Impresion por navegador iniciada' }
     } catch (error) {
       return { success: false, message: error instanceof Error ? error.message : String(error) }
     }
@@ -567,10 +704,15 @@ export const printerService = {
       if (type === 'native' && typeof window !== 'undefined' && (window as any).cordova?.plugins?.printer) {
         const html = generatePrintableHTML(session as any, settings)
         return new Promise<{success:boolean;message:string}>((resolve) => {
-          ;(window as any).cordova.plugins.printer.print(html, { name: `Cierre de Caja ${session.id || ''}` }, () => resolve({ success: true, message: 'Impresión nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
+          ;(window as any).cordova.plugins.printer.print(html, { name: `Cierre de Caja ${session.id || ''}` }, () => resolve({ success: true, message: 'Impresion nativa enviada' }), (err: any) => resolve({ success: false, message: err?.message || String(err) }))
         })
       }
 
+      // Web Bluetooth printing
+      if (type === 'bluetooth' && typeof window !== 'undefined' && navigator.bluetooth) {
+        const commands = generateCashCloseReceipt(session, settings)
+        return await printViaBluetooth(commands)
+      }
 
       // RawBT intent printing
       if (type === 'rawbt' && typeof window !== 'undefined') {
@@ -590,7 +732,7 @@ export const printerService = {
       const html = generatePrintableHTML(session as any, settings)
       const { printHtmlDocument } = await import('@/lib/print')
       printHtmlDocument(html)
-      return { success: true, message: 'Impresión por navegador iniciada' }
+      return { success: true, message: 'Impresion por navegador iniciada' }
     } catch (error) {
       return { success: false, message: error instanceof Error ? error.message : String(error) }
     }

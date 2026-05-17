@@ -2,69 +2,51 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { usePOSStore } from '@/store/pos-store'
-import {
-  bootstrapOfflineData,
-  getOfflineSettings,
-  updateOfflineSettings,
-} from '@/lib/local-db'
 
 export function useSettings() {
-  const { settings: localSettings, setSettings: setLocalSettings, updateSetting: updateLocalSetting } = usePOSStore()
-  const [data, setData] = useState<Record<string, string> | null>(null)
+  const { settings: localSettings, setSettings } = usePOSStore()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const settings = getOfflineSettings()
-      setData(settings)
-      setLocalSettings(settings)
-    } catch (error) {
-      setError(error instanceof Error ? error : new Error('Error al cargar configuración'))
-    }
-  }, [setLocalSettings])
-
-  // Sync with Zustand store
-  useEffect(() => {
-    let cancelled = false
-
-    const initialize = async () => {
-      await bootstrapOfflineData()
-      if (cancelled) return
-      setIsLoading(true)
-      void refresh().finally(() => {
-        if (!cancelled) setIsLoading(false)
+      const { getSettings } = await import('@/services/settings')
+      const remoteSettings = await getSettings()
+      
+      // Sincronizar store con base de datos
+      Object.entries(remoteSettings).forEach(([key, value]) => {
+        setSettings({ [key]: value })
       })
+    } catch (error) {
+      console.error('Error al cargar ajustes:', error)
+      setError(error instanceof Error ? error : new Error('Error al cargar ajustes'))
     }
+  }, [setSettings])
 
-    void initialize()
-
-    return () => {
-      cancelled = true
-    }
+  useEffect(() => {
+    setIsLoading(true)
+    void refresh().finally(() => {
+      setIsLoading(false)
+    })
   }, [refresh])
 
-  const updateSettings = async (updates: Record<string, string>) => {
-    // Optimistic update
-    setLocalSettings({ ...localSettings, ...updates })
-
-    const settings = updateOfflineSettings(updates)
-    setData(settings)
-    setLocalSettings(settings)
-    return settings
-  }
-
-  const updateSetting = async (key: string, value: string) => {
-    return updateSettings({ [key]: value })
+  const updateSettings = async (newSettings: Partial<Record<string, string>>) => {
+    try {
+      const { updateSettings: updateRemoteSettings } = await import('@/services/settings')
+      await updateRemoteSettings(newSettings)
+      setSettings(newSettings)
+    } catch (error) {
+      console.error('Error al actualizar ajustes:', error)
+      throw error
+    }
   }
 
   return {
-    settings: data || localSettings,
+    settings: localSettings,
     isLoading,
     error,
     updateSettings,
-    updateSetting,
     refresh,
   }
 }

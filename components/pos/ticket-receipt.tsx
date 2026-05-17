@@ -1,11 +1,11 @@
 "use client";
 
 import { forwardRef } from "react";
-import type { Ticket, TicketItem, Setting as SettingType } from "@/lib/types";
+import type { Ticket, TicketItem } from "@/lib/types";
 
 interface TicketReceiptProps {
-  ticket: Ticket & { items: TicketItem[] };
-  settings?: SettingType;
+  ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] };
+  settings?: Record<string, string>;
 }
 
 export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
@@ -43,6 +43,12 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
               minute: "2-digit" 
             })}</span>
           </div>
+          {ticket.client && (
+            <div className="flex justify-between">
+              <span>CLIENTE:</span>
+              <span className="truncate ml-2">{ticket.client}</span>
+            </div>
+          )}
         </div>
 
         {/* Items */}
@@ -52,26 +58,30 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
               <tr className="border-b border-gray-300">
                 <th className="py-1 w-2/5 font-semibold">JUEGO</th>
                 <th className="py-1 w-1/5 text-center font-semibold">NUM</th>
-                <th className="py-1 w-2/5 text-right font-semibold">MONTO</th>
+                <th className="py-1 w-2/5 text-right font-semibold">PREMIO</th>
               </tr>
             </thead>
             <tbody>
-              {ticket.items.map((item, index) => (
-                <tr key={index} className="align-top">
-                  <td className="py-1">
-                    <div className="truncate pr-1">{(item.game?.name) || "Juego"}</div>
-                    {item.schedule && (
-                      <div className="text-[11px] text-gray-600">{item.schedule}</div>
-                    )}
-                  </td>
-                  <td className="py-1 text-center font-bold text-base">
-                    {item.number}
-                  </td>
-                  <td className="py-1 text-right">
-                    {currency}{item.amount.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
+              {ticket.items.map((item, index) => {
+                const multiplier = item.game?.multiplier || 70;
+                const prize = item.amount * multiplier;
+                return (
+                  <tr key={index} className="align-top">
+                    <td className="py-1">
+                      <div className="truncate pr-1">{(item.game?.name) || "Juego"}</div>
+                      {item.schedule && (
+                        <div className="text-[10px] text-gray-600">{item.schedule}</div>
+                      )}
+                    </td>
+                    <td className="py-1 text-center font-bold text-base">
+                      {item.number}
+                    </td>
+                    <td className="py-1 text-right font-semibold">
+                      {currency}{prize.toFixed(0)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -81,21 +91,6 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
           <span>TOTAL:</span>
           <span>{currency}{ticket.totalAmount.toFixed(2)}</span>
         </div>
-
-        {/* Prize Info */}
-        {ticket.items.some(item => ((item as any).multiplier || 0)) && (
-          <div className="text-sm border-t border-dashed border-gray-500 pt-2 mb-4">
-            <p className="text-center font-semibold mb-1">Multiplicadores:</p>
-            {ticket.items.map((item, index) => (
-              ((item as any).multiplier || 0) ? (
-                <div key={index} className="flex justify-between">
-                  <span>{item.number}</span>
-                  <span>x{((item as any).multiplier || 0)} = {currency}{(item.amount * ((item as any).multiplier || 0)).toFixed(2)}</span>
-                </div>
-              ) : null
-            ))}
-          </div>
-        )}
 
         {/* Footer */}
         <div className="text-center pt-2 border-t border-dashed border-gray-500">

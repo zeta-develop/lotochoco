@@ -52,9 +52,10 @@ export function POSSale() {
 
   const [number, setNumber] = useState('')
   const [amount, setAmount] = useState(20)
+  const [client, setClient] = useState('')
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [lastTicket, setLastTicket] = useState<(Ticket & { items: TicketItem[] }) | null>(null)
+  const [lastTicket, setLastTicket] = useState<Ticket | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
@@ -88,6 +89,7 @@ export function POSSale() {
       schedule: selectedSchedule.time,
       scheduleName: selectedSchedule.name,
       multiplier: selectedGame.multiplier,
+      client: client || undefined,
     })
 
     setNumber('')
@@ -124,7 +126,10 @@ export function POSSale() {
   const handlePrint = async () => {
     if (!lastTicket) return
 
-    const result = await printerService.printTicket(lastTicket, settings)
+    const result = await printerService.printTicket(
+      lastTicket as Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
+      settings
+    )
     if (!result.success) {
       toast.error(result.message || 'Error al imprimir')
       return
@@ -206,13 +211,13 @@ export function POSSale() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Número</label>
+              <label className="text-sm font-medium">Numero</label>
               <Input
                 value={number}
                 onChange={(event) =>
                   setNumber(event.target.value.replace(/\D/g, '').slice(0, selectedGame?.digitCount || 2))
                 }
-                placeholder={`${selectedGame?.digitCount || 2} dígitos`}
+                placeholder={`${selectedGame?.digitCount || 2} digitos`}
                 className="h-14 text-center text-2xl font-bold"
                 inputMode="numeric"
                 maxLength={selectedGame?.digitCount || 2}
@@ -230,6 +235,16 @@ export function POSSale() {
                 className="h-14 text-center text-2xl font-bold"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Cliente (opcional)</label>
+            <Input
+              value={client}
+              onChange={(event) => setClient(event.target.value)}
+              placeholder="Nombre del cliente"
+              className="h-11"
+            />
           </div>
 
           <Button
