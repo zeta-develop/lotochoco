@@ -84,11 +84,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p android/app
-
-          # Decode the JKS keystore
           echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
 
-          # Add signing info to gradle.properties
           printf '%s\n' \
             'RELEASE_STORE_FILE=release-keystore.jks' \
             "RELEASE_STORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD" \
@@ -100,19 +97,18 @@ jobs:
       - name: Build release APK
         run: pnpm android:build:release
 
-      # 1️⃣4️⃣ Upload APK artifact
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: lotochoco-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
-
-      # 1️⃣5️⃣ Create GitHub Release and upload APK
-      - name: Create GitHub Release and upload APK
+      # 1️⃣4️⃣ Create GitHub Release
+      - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: android/app/build/outputs/apk/release/app-release.apk
           tag: "v${{ env.APP_VERSION }}"
           name: "LotoChoco v${{ env.APP_VERSION }}"
           draft: false
           prerelease: false
+
+      # 1️⃣5️⃣ Upload APK using GitHub CLI
+      - name: Upload APK to release
+        run: |
+          sudo apt-get update && sudo apt-get install gh -y
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh release upload "v${{ env.APP_VERSION }}" android/app/build/outputs/apk/release/app-release.apk --clobber
