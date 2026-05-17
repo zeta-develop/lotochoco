@@ -44,11 +44,14 @@ export default function RootLayout({
           <Updater />
           {children}
           <Toaster 
-            position="top-right" 
+            position="bottom-center" 
             richColors 
-            closeButton
+            expand={false}
             toastOptions={{
-              duration: 3000,
+              duration: 2500,
+              style: {
+                marginBottom: 'env(safe-area-inset-bottom, 20px)',
+              }
             }}
           />
         </SWRProvider>
