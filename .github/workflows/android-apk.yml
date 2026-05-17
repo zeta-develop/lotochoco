@@ -83,8 +83,23 @@ jobs:
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      # 1️⃣2️⃣ Configure release signing
+      # 1️⃣2️⃣ Configure release signing (PRUEBA CON VALORES HARDCODED)
       - name: Configure release signing
+        run: |
+          set -euo pipefail
+          
+          # Forzamos la eliminación de archivos previos
+          rm -f android/gradle.properties
+          
+          # Escribimos los valores directamente en texto plano para probar
+          cat << 'EOF' > android/gradle.properties
+          RELEASE_STORE_FILE=release.keystore
+          RELEASE_STORE_PASSWORD=LotoChoco
+          RELEASE_KEY_ALIAS=lotochoco-alias
+          RELEASE_KEY_PASSWORD=LotoChoco
+          EOF
+
+          echo "=== Archivo gradle.properties generado con credenciales de prueba ==="
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
