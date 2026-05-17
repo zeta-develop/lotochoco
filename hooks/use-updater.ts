@@ -26,9 +26,12 @@ export function useUpdater() {
 
   const checkUpdate = async () => {
     try {
+      let currentAppVer = packageJson.version;
       if (Capacitor.isNativePlatform()) {
         const appInfo = await App.getInfo();
-        setCurrentVersion(appInfo.version);
+        // In Android, appInfo.build contains the versionCode (e.g. 44)
+        currentAppVer = appInfo.build ? `${appInfo.version}-${appInfo.build}` : appInfo.version;
+        setCurrentVersion(currentAppVer);
       }
 
       const response = await fetch("https://api.github.com/repos/zeta-develop/lotochoco/releases/latest");
@@ -37,8 +40,8 @@ export function useUpdater() {
       const latestTag = data.tag_name.replace('v', '');
       setLatestVersion(latestTag);
 
-      // Simple version comparison (assumes format like 1.1.3 or 1.1.3-43)
-      if (latestTag !== currentVersion) {
+      // Simple version comparison
+      if (latestTag !== currentAppVer) {
         setIsUpdateAvailable(true);
         // We could also show a dialog right here
       }

@@ -391,12 +391,13 @@ function escapeXml(value: string): string {
 }
 
 export function generateTicketImageUrl(
-  ticket: Ticket & { items: (TicketItem & { game?: { name: string } })[] },
+  ticket: Ticket & { items: (TicketItem & { game?: { name: string }; gameName?: string; scheduleTime?: string })[] },
   settings: Record<string, string>
 ): string {
-  const width = 420
-  const baseHeight = 260
-  const itemHeight = 42
+  // Thermal paper width equivalent 58mm (scaled to ~380px for high res)
+  const width = 380
+  const baseHeight = 300
+  const itemHeight = 35
   const height = baseHeight + ticket.items.length * itemHeight
   const currency = settings.currency || 'C$'
   const businessName = escapeXml(settings.businessName || 'LOTERÍA')
@@ -405,45 +406,83 @@ export function generateTicketImageUrl(
 
   const itemRows = ticket.items
     .map((item, index) => {
-      const y = 190 + index * itemHeight
-      const gameName = escapeXml((item.game?.name || 'Juego').slice(0, 18))
+      const y = 175 + index * itemHeight
+      const gameName = escapeXml((item.game?.name || item.gameName || 'Juego').slice(0, 15))
       const number = escapeXml(item.number)
-      const schedule = escapeXml(item.schedule.slice(0, 8))
-      const amount = escapeXml(`${currency}${item.amount.toFixed(2)}`)
+      const schedule = escapeXml((item.schedule || item.scheduleTime || '').slice(0, 8))
+      const amount = escapeXml(`${currency}${(item.amount || 0).toFixed(2)}`)
 
       return `
-        <g>
-          <text x="28" y="${y}" font-size="15" font-weight="700" fill="#111827">${gameName}</text>
-          <text x="190" y="${y}" font-size="15" font-weight="700" fill="#111827">${number}</text>
-          <text x="250" y="${y}" font-size="13" fill="#4b5563">${schedule}</text>
-          <text x="380" y="${y}" font-size="15" font-weight="700" fill="#111827" text-anchor="end">${amount}</text>
-          <line x1="24" y1="${y + 12}" x2="396" y2="${y + 12}" stroke="#e5e7eb" stroke-width="1" />
+        <g font-family="'Courier New', Courier, monospace">
+          <text x="20" y="${y}" font-size="14" font-weight="700" fill="#000">${gameName}</text>
+          <text x="20" y="${y + 12}" font-size="10" fill="#333">${schedule}</text>
+          <text x="200" y="${y}" font-size="16" font-weight="900" fill="#000" text-anchor="middle">${number}</text>
+          <text x="360" y="${y}" font-size="14" font-weight="700" fill="#000" text-anchor="end">${amount}</text>
         </g>
       `
     })
     .join('')
 
+  const barcodeBars = ticket.ticketNumber.split('').map((char, index) => {
+    const barWidth = (char.charCodeAt(0) % 3 === 0) ? 3 : (char.charCodeAt(0) % 2 === 0) ? 2 : 1;
+    // Calculate total width to center it roughly. Assuming avg width is 2.
+    // simpler is just generating right to left or starting at an offset.
+    // Let's just generate the SVG rects
+    // X position offset accumulates
+    return barWidth;
+  });
+
+  let currentX = (width - barcodeBars.reduce((a,b)=>a+b+1, 0)) / 2;
+  const barcodeSvg = barcodeBars.map(w => {
+    const rect = `<rect x="${currentX}" y="${height - 90}" width="${w}" height="35" fill="#000" />`;
+    currentX += w + 1;
+    return rect;
+  }).join('');
+
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
       <rect width="100%" height="100%" fill="#ffffff" />
-      <rect x="12" y="12" width="396" height="${height - 24}" rx="18" fill="#ffffff" stroke="#111827" stroke-width="1.5" />
-      <text x="210" y="52" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#111827">${businessName}</text>
-      <text x="210" y="76" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6b7280">Ticket de Loteria</text>
-      <line x1="28" y1="95" x2="392" y2="95" stroke="#111827" stroke-dasharray="6 5" stroke-width="1" />
-      <text x="28" y="122" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#374151">Ticket:</text>
-      <text x="390" y="122" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111827">${escapeXml(ticket.ticketNumber)}</text>
-      <text x="28" y="146" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#374151">Fecha:</text>
-      <text x="390" y="146" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#111827">${createdAt}</text>
-      <line x1="28" y1="160" x2="392" y2="160" stroke="#111827" stroke-dasharray="6 5" stroke-width="1" />
-      <text x="28" y="184" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">JUEGO</text>
-      <text x="190" y="184" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">NUM</text>
-      <text x="250" y="184" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">HOR</text>
-      <text x="380" y="184" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" fill="#6b7280">MONTO</text>
-      ${itemRows}
-      <line x1="28" y1="${height - 78}" x2="392" y2="${height - 78}" stroke="#111827" stroke-dasharray="6 5" stroke-width="1.2" />
-      <text x="28" y="${height - 48}" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#111827">TOTAL:</text>
-      <text x="390" y="${height - 48}" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#111827">${escapeXml(`${currency}${ticket.totalAmount.toFixed(2)}`)}</text>
-      <text x="210" y="${height - 22}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#6b7280">${ticketMessage}</text>
+      <g font-family="'Courier New', Courier, monospace" fill="#000">
+        <!-- Header -->
+        <text x="${width/2}" y="40" text-anchor="middle" font-size="24" font-weight="900">${businessName}</text>
+        <text x="${width/2}" y="60" text-anchor="middle" font-size="14">Ticket de Loteria</text>
+
+        <line x1="15" y1="75" x2="${width-15}" y2="75" stroke="#000" stroke-dasharray="4 4" stroke-width="1.5" />
+
+        <!-- Info -->
+        <text x="20" y="95" font-size="14" font-weight="700">TICKET:</text>
+        <text x="${width-20}" y="95" text-anchor="end" font-size="14" font-weight="900">#${escapeXml(ticket.ticketNumber)}</text>
+
+        <text x="20" y="115" font-size="14" font-weight="700">FECHA:</text>
+        <text x="${width-20}" y="115" text-anchor="end" font-size="14">${createdAt}</text>
+
+        <line x1="15" y1="130" x2="${width-15}" y2="130" stroke="#000" stroke-dasharray="4 4" stroke-width="1.5" />
+
+        <!-- Table Header -->
+        <text x="20" y="150" font-size="14" font-weight="900">JUEGO</text>
+        <text x="200" y="150" font-size="14" font-weight="900" text-anchor="middle">NUM</text>
+        <text x="${width-20}" y="150" font-size="14" font-weight="900" text-anchor="end">MONTO</text>
+
+        <line x1="15" y1="158" x2="${width-15}" y2="158" stroke="#000" stroke-width="1" />
+
+        <!-- Items -->
+        ${itemRows}
+
+        <line x1="15" y1="${height - 145}" x2="${width-15}" y2="${height - 145}" stroke="#000" stroke-dasharray="4 4" stroke-width="1.5" />
+
+        <!-- Total -->
+        <text x="20" y="${height - 120}" font-size="18" font-weight="900">TOTAL:</text>
+        <text x="${width-20}" y="${height - 120}" text-anchor="end" font-size="20" font-weight="900">${escapeXml(`${currency}${(ticket.totalAmount || ticket.total || 0).toFixed(2)}`)}</text>
+
+        <line x1="15" y1="${height - 105}" x2="${width-15}" y2="${height - 105}" stroke="#000" stroke-width="2" />
+
+        <!-- Barcode and Footer -->
+        ${barcodeSvg}
+        <text x="${width/2}" y="${height - 40}" text-anchor="middle" font-size="10" letter-spacing="2">${escapeXml(ticket.ticketNumber)}</text>
+
+        <text x="${width/2}" y="${height - 20}" text-anchor="middle" font-size="12" font-weight="700">${ticketMessage}</text>
+        <text x="${width/2}" y="${height - 5}" text-anchor="middle" font-size="10">*** CONSERVE SU TICKET ***</text>
+      </g>
     </svg>
   `
 
