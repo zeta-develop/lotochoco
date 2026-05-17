@@ -3,17 +3,29 @@ import type { Ticket, TicketItem, CartItem, Game } from '@/lib/types'
 import { format } from 'date-fns'
 import { generateId } from '@/lib/utils'
 
-// Generate unique ticket number
-function generateTicketNumber(): string {
-  const date = format(new Date(), 'yyyyMMdd')
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-  const time = Date.now().toString(36).toUpperCase().slice(-4)
-  return `TKT-${date}-${random}${time}`
+// Generate unique ticket number (sequential: #00000001)
+async function generateTicketNumber(): Promise<string> {
+  const result = await query('SELECT ticketNumber FROM Ticket ORDER BY ticketNumber DESC LIMIT 1')
+  
+  if (!result || result.length === 0) {
+    return '#00000001'
+  }
+  
+  const lastNumberStr = result[0].ticketNumber.replace('#', '')
+  const lastNumber = parseInt(lastNumberStr, 10)
+  
+  if (isNaN(lastNumber)) {
+     // Fallback if there are old string-based tickets
+     return `#${String(result.length + 1).padStart(8, '0')}`
+  }
+  
+  const nextNumber = lastNumber + 1
+  return `#${String(nextNumber).padStart(8, '0')}`
 }
 
 export async function createTicket(items: CartItem[]): Promise<Ticket> {
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
-  const ticketNumber = generateTicketNumber()
+  const ticketNumber = await generateTicketNumber()
   const client = items[0]?.client || null
   const ticketId = generateId()
   const now = new Date().toISOString()

@@ -435,8 +435,8 @@ export function Reports() {
 
                   <div className="relative group">
                     <Input
-                      placeholder="Escribe el número de ticket..."
-                      className="h-16 text-xl font-mono rounded-2xl border-2 border-primary/20 focus:border-primary shadow-2xl pl-6 pr-32 transition-all"
+                      placeholder="Escribe el número (#00000001)..."
+                      className="h-16 text-xl font-mono rounded-2xl border-2 border-primary/20 focus:border-primary shadow-2xl pl-10 pr-32 transition-all"
                       value={searchTicket}
                       onChange={(e) => setSearchTicket(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearchTicket()}
