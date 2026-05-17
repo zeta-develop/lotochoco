@@ -28,12 +28,24 @@ export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    // Check for dark mode preference
-    const savedTheme = localStorage.getItem("pos-theme");
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    }
-    setIsLoaded(true);
+    const initializeTheme = async () => {
+      try {
+        const { settingsService } = await import("@/services/settings");
+        const darkMode = await settingsService.get("darkMode");
+        
+        if (darkMode === "true") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      } catch (error) {
+        console.error("Error al cargar el tema:", error);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+
+    initializeTheme();
   }, []);
 
   const renderModule = () => {

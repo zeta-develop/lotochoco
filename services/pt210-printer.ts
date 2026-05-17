@@ -86,10 +86,10 @@ export function generatePT210Receipt(
     // Fila 1: Juego, Número y Premio calculado
     receipt += `${gameName}${number}${prizeStr}${COMMANDS.FEED_LINE}`;
     
-    // Fila 2: Hora del sorteo e inversión
+    // Fila 2: Hora del sorteo y MONTO (inversión)
     const scheduleInfo = ` SORTEO: ${item.schedule}`.padEnd(17);
-    const invInfo = `INV: ${currency}${item.amount.toFixed(0)}`.padStart(15);
-    receipt += `${scheduleInfo}${invInfo}${COMMANDS.FEED_LINE}`;
+    const montoInfo = `MONTO: ${currency}${item.amount.toFixed(0)}`.padStart(15);
+    receipt += `${scheduleInfo}${montoInfo}${COMMANDS.FEED_LINE}`;
     receipt += COMMANDS.FEED_LINE; // Espacio entre items para mejor lectura
   }
   
