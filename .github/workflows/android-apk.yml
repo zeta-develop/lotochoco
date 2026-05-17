@@ -83,15 +83,15 @@ jobs:
       - name: Sync Capacitor
         run: pnpm cap:sync:android
 
-      # 1️⃣2️⃣ Configure release signing (PRUEBA CON VALORES HARDCODED)
+      # 1️⃣2️⃣ Configure release signing (VALORES FIJOS DE PRUEBA)
       - name: Configure release signing
         run: |
           set -euo pipefail
           
-          # Forzamos la eliminación de archivos previos
+          # Forzamos la eliminación de archivos de propiedades previos
           rm -f android/gradle.properties
           
-          # Escribimos los valores directamente en texto plano para probar
+          # Escribimos los valores directamente en texto plano
           cat << 'EOF' > android/gradle.properties
           RELEASE_STORE_FILE=release.keystore
           RELEASE_STORE_PASSWORD=LotoChoco
@@ -99,32 +99,11 @@ jobs:
           RELEASE_KEY_PASSWORD=LotoChoco
           EOF
 
-          echo "=== Archivo gradle.properties generado con credenciales de prueba ==="
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          
-          # Forzamos la eliminación de archivos previos
-          rm -f android/gradle.properties
-          
-          # Escribimos las propiedades usando un bloque literal heredado seguro (evita fallos de escape)
-          cat << 'EOF' > android/gradle.properties
-          RELEASE_STORE_FILE=release.keystore
-          RELEASE_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}
-          EOF
+          echo "=== Archivo gradle.properties generado con credenciales fijas ==="
 
-          # Verificación segura en el log (Muestra el archivo SIN revelar tus contraseñas reales)
-          echo "=== Verificando estructura de gradle.properties ==="
-          sed 's/PASSWORD=.*/PASSWORD=*** /g' android/gradle.properties
-
-      # 1️⃣3️⃣ Build and auto-sign release APK
+      # 1️⃣3️⃣ Build and auto-sign release APK (Con banderas de diagnóstico)
       - name: Build release APK
-        run: pnpm android:build:release
+        run: pnpm android:build:release -- --info --stacktrace
 
       # 1️⃣4️⃣ Upload APK as artifact
       - name: Upload APK artifact
