@@ -280,58 +280,102 @@ export function generatePrintableHTML(
       <meta charset="UTF-8">
       <style>
         @page { 
-          size: 80mm auto; 
+          size: 58mm auto;
           margin: 0; 
         }
         body {
-          font-family: 'Courier New', monospace;
+          font-family: 'Courier New', Courier, monospace;
           font-size: 12px;
-          width: 80mm;
+          width: 58mm;
           margin: 0;
-          padding: 5mm;
+          padding: 2mm;
+          color: #000;
         }
         .center { text-align: center; }
         .right { text-align: right; }
+        .left { text-align: left; }
         .bold { font-weight: bold; }
-        .large { font-size: 16px; }
-        .separator { border-top: 1px dashed #000; margin: 5px 0; }
-        .double-separator { border-top: 2px solid #000; margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 2px 0; }
-        .total { font-size: 14px; font-weight: bold; }
+        .large { font-size: 18px; line-height: 1.2; margin-bottom: 2px; text-transform: uppercase; }
+        .separator { border-top: 1px dashed #000; margin: 6px 0; }
+        .double-separator { border-top: 2px solid #000; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+        th { font-weight: bold; text-align: left; border-bottom: 1px solid #000; padding-bottom: 3px; }
+        th.center { text-align: center; }
+        th.right { text-align: right; }
+        td { padding: 4px 0; vertical-align: top; }
+        td.number { font-weight: bold; font-size: 14px; text-align: center; }
+        .game-name { max-width: 25mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .schedule { font-size: 10px; color: #333; }
+        .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin: 5px 0; }
+        .barcode-container { display: flex; justify-content: center; height: 35px; margin: 10px 0 2px; }
+        .barcode-bar { background-color: #000; height: 100%; }
+        .ticket-num-small { font-size: 10px; letter-spacing: 2px; }
+        .info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
       </style>
     </head>
     <body>
       <div class="center large bold">${settings.businessName || 'LOTERÍA'}</div>
-      <div class="center">${format(new Date(ticket.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}</div>
-      <div class="center bold">Ticket: ${ticket.ticketNumber}</div>
+      <div class="center" style="margin-bottom: 6px;">Ticket de Loteria</div>
+
+      <div class="separator"></div>
+
+      <div class="info-row">
+        <span>TICKET:</span>
+        <span class="bold">#${ticket.ticketNumber}</span>
+      </div>
+      <div class="info-row">
+        <span>FECHA:</span>
+        <span>${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}</span>
+      </div>
+      <div class="info-row">
+        <span>HORA:</span>
+        <span>${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}</span>
+      </div>
+
       <div class="separator"></div>
       
       <table>
         <thead>
-          <tr class="bold">
-            <td>Juego</td>
-            <td>Núm</td>
-            <td>Hora</td>
-            <td class="right">Monto</td>
+          <tr>
+            <th>JUEGO</th>
+            <th class="center">NUM</th>
+            <th class="right">MONTO</th>
           </tr>
         </thead>
         <tbody>
           ${ticket.items.map(item => `
             <tr>
-              <td>${item.game?.name || 'N/A'}</td>
-              <td>${item.number}</td>
-              <td>${item.schedule}</td>
-              <td class="right">${currency}${item.amount}</td>
+              <td>
+                <div class="game-name">${item.game?.name || item.gameName || 'Juego'}</div>
+                <div class="schedule">${item.schedule || item.scheduleTime || ''}</div>
+              </td>
+              <td class="number">${item.number}</td>
+              <td class="right">${currency}${(item.amount || 0).toFixed(2)}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
       
       <div class="separator"></div>
-      <div class="right total">TOTAL: ${currency}${ticket.totalAmount.toFixed(2)}</div>
+
+      <div class="total-row">
+        <span>TOTAL:</span>
+        <span>${currency}${(ticket.totalAmount || ticket.total || 0).toFixed(2)}</span>
+      </div>
+
       <div class="double-separator"></div>
-      <div class="center">${settings.ticketMessage || '¡Buena suerte!'}</div>
+
+      <div class="center bold" style="margin-top: 8px;">${settings.ticketMessage || '¡Buena suerte!'}</div>
+
+      <div class="barcode-container">
+        ${ticket.ticketNumber.split('').map(char => {
+            const width = (char.charCodeAt(0) % 3 === 0) ? "3px" : (char.charCodeAt(0) % 2 === 0) ? "2px" : "1px";
+            return `<div class="barcode-bar" style="width: ${width}; margin-right: 1px;"></div>`;
+        }).join('')}
+      </div>
+      <div class="center ticket-num-small">${ticket.ticketNumber}</div>
+
+      <div class="center bold" style="margin-top: 15px; font-size: 11px;">*** CONSERVE SU TICKET ***</div>
     </body>
     </html>
   `

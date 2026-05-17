@@ -17,27 +17,27 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
     return (
       <div
         ref={ref}
-        className="bg-white text-black p-4 font-mono text-sm w-[280px] print:w-[58mm]"
-        style={{ fontFamily: "monospace" }}
+        className="bg-white text-black p-4 font-mono text-xs mx-auto w-full max-w-[300px] print:w-[58mm] print:p-0"
+        style={{ fontFamily: "'Courier New', Courier, monospace" }}
       >
         {/* Header */}
-        <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
-          <h1 className="font-bold text-lg uppercase tracking-wide">{businessName}</h1>
-          <p className="text-xs text-gray-600">Ticket de Loteria</p>
+        <div className="text-center pb-2 mb-2 border-b border-dashed border-gray-500">
+          <h1 className="font-bold text-xl uppercase leading-tight">{businessName}</h1>
+          <p className="text-sm mt-1">Ticket de Loteria</p>
         </div>
 
         {/* Ticket Info */}
-        <div className="space-y-1 border-b border-dashed border-gray-400 pb-3 mb-3 text-xs">
+        <div className="space-y-1 pb-2 mb-2 border-b border-dashed border-gray-500 text-sm">
           <div className="flex justify-between">
-            <span>Ticket:</span>
+            <span>TICKET:</span>
             <span className="font-bold">#{ticket.ticketNumber}</span>
           </div>
           <div className="flex justify-between">
-            <span>Fecha:</span>
+            <span>FECHA:</span>
             <span>{new Date(ticket.createdAt).toLocaleDateString("es-NI")}</span>
           </div>
           <div className="flex justify-between">
-            <span>Hora:</span>
+            <span>HORA:</span>
             <span>{new Date(ticket.createdAt).toLocaleTimeString("es-NI", { 
               hour: "2-digit", 
               minute: "2-digit" 
@@ -46,74 +46,79 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
         </div>
 
         {/* Items */}
-        <div className="border-b border-dashed border-gray-400 pb-3 mb-3">
-          <div className="flex justify-between text-xs font-bold mb-2 border-b border-gray-300 pb-1">
-            <span className="w-20">JUEGO</span>
-            <span className="w-12 text-center">NUM</span>
-            <span className="w-16 text-right">MONTO</span>
-          </div>
-          {ticket.items.map((item, index) => (
-            <div key={index} className="flex justify-between text-xs py-1">
-              <span className="w-20 truncate">
-                {item.gameName || "Juego"}
-                {item.scheduleTime && (
-                  <span className="block text-gray-500 text-[10px]">
-                    {item.scheduleTime}
-                  </span>
-                )}
-              </span>
-              <span className="w-12 text-center font-bold text-base">
-                {item.number}
-              </span>
-              <span className="w-16 text-right">
-                {currency}{item.amount.toFixed(2)}
-              </span>
-            </div>
-          ))}
+        <div className="pb-2 mb-2 border-b border-dashed border-gray-500">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-300">
+                <th className="py-1 w-2/5 font-semibold">JUEGO</th>
+                <th className="py-1 w-1/5 text-center font-semibold">NUM</th>
+                <th className="py-1 w-2/5 text-right font-semibold">MONTO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ticket.items.map((item, index) => (
+                <tr key={index} className="align-top">
+                  <td className="py-1">
+                    <div className="truncate pr-1">{item.gameName || "Juego"}</div>
+                    {item.scheduleTime && (
+                      <div className="text-[11px] text-gray-600">{item.scheduleTime}</div>
+                    )}
+                  </td>
+                  <td className="py-1 text-center font-bold text-base">
+                    {item.number}
+                  </td>
+                  <td className="py-1 text-right">
+                    {currency}{item.amount.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         {/* Total */}
-        <div className="flex justify-between font-bold text-base mb-3">
+        <div className="flex justify-between font-bold text-lg mb-4">
           <span>TOTAL:</span>
           <span>{currency}{ticket.total.toFixed(2)}</span>
         </div>
 
         {/* Prize Info */}
         {ticket.items.some(item => item.multiplier) && (
-          <div className="text-xs text-gray-600 border-t border-dashed border-gray-400 pt-2 mb-3">
-            <p className="text-center font-semibold">Multiplicadores:</p>
+          <div className="text-sm border-t border-dashed border-gray-500 pt-2 mb-4">
+            <p className="text-center font-semibold mb-1">Multiplicadores:</p>
             {ticket.items.map((item, index) => (
-              item.multiplier && (
+              item.multiplier ? (
                 <div key={index} className="flex justify-between">
                   <span>{item.number}</span>
                   <span>x{item.multiplier} = {currency}{(item.amount * item.multiplier).toFixed(2)}</span>
                 </div>
-              )
+              ) : null
             ))}
           </div>
         )}
 
         {/* Footer */}
-        <div className="text-center pt-2 border-t border-dashed border-gray-400">
-          <p className="text-xs text-gray-600 mb-2">{ticketMessage}</p>
-          <div className="flex justify-center my-2">
+        <div className="text-center pt-2 border-t border-dashed border-gray-500">
+          <p className="text-sm font-semibold mb-3">{ticketMessage}</p>
+
+          <div className="flex justify-center mb-1">
             {/* Simple barcode representation */}
-            <div className="flex gap-px">
-              {ticket.ticketNumber.split("").map((_, i) => (
+            <div className="flex gap-px items-end h-10 w-full max-w-[200px] justify-center">
+              {ticket.ticketNumber.split("").map((char, i) => (
                 <div
                   key={i}
-                  className="bg-black"
+                  className="bg-black h-full"
                   style={{
-                    width: i % 3 === 0 ? "2px" : "1px",
-                    height: "30px",
+                    width: (char.charCodeAt(0) % 3 === 0) ? "3px" : (char.charCodeAt(0) % 2 === 0) ? "2px" : "1px",
+                    marginRight: "1px"
                   }}
                 />
               ))}
             </div>
           </div>
-          <p className="text-[10px] text-gray-500">{ticket.ticketNumber}</p>
-          <p className="text-[10px] text-gray-400 mt-2">
-            Conserve este ticket para cobrar
+          <p className="text-xs tracking-widest">{ticket.ticketNumber}</p>
+          <p className="text-[11px] text-gray-600 mt-4">
+            *** CONSERVE ESTE TICKET ***
           </p>
         </div>
       </div>
