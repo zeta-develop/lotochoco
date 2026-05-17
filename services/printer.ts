@@ -6,6 +6,8 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Capacitor } from '@capacitor/core'
 import { BleClient } from '@capacitor-community/bluetooth-le'
+import { Dialog } from '@capacitor/dialog'
+import { toast } from 'sonner'
 
 // ESC/POS Commands
 const ESC = '\x1B'
@@ -307,13 +309,30 @@ export async function scanBluetoothPrinter(): Promise<{ name: string; id: string
   if (Capacitor.isNativePlatform()) {
     try {
       await BleClient.initialize();
+      
+      // Verificar si el Bluetooth está encendido
+      const enabled = await BleClient.isEnabled();
+      if (!enabled) {
+        await Dialog.alert({
+          title: 'Bluetooth Apagado',
+          message: 'Por favor, enciende el Bluetooth para buscar impresoras.'
+        });
+        return null;
+      }
+
+      // Escaneo sin filtros es más fiable para encontrar impresoras chinas genéricas
+      // Usamos requestDevice sin filtros para que aparezca la lista nativa de Android
       const device = await BleClient.requestDevice({
-        services: [PRINTER_SERVICE_UUID],
+        // No pasamos services para que muestre TODOS los dispositivos disponibles
       });
 
       return { name: device.name || 'Impresora Térmica', id: device.deviceId };
     } catch (error) {
       console.error('Error scanning native bluetooth:', error);
+      // No mostrar error si el usuario canceló el diálogo
+      if (error instanceof Error && error.message.includes('requestDevice')) return null;
+      
+      toast.error('No se pudo encontrar ningún dispositivo Bluetooth');
       return null;
     }
   }
@@ -324,9 +343,9 @@ export async function scanBluetoothPrinter(): Promise<{ name: string; id: string
 
   try {
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [PRINTER_SERVICE_UUID] }],
-      optionalServices: [PRINTER_SERVICE_UUID],
-      acceptAllDevices: false
+      // En Web es obligatorio usar filtros o acceptAllDevices
+      acceptAllDevices: true,
+      optionalServices: [PRINTER_SERVICE_UUID]
     })
 
     return { name: device.name || 'Desconocido', id: device.id }
