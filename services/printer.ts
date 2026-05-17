@@ -727,83 +727,138 @@ export const printerService = {
 
   async shareTicketPDF(ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }, settings: Record<string, string>) {
     try {
-      // Usar un formato más largo para evitar cortes
+      // Formato de 58mm con altura dinámica basada en items
+      const itemHeight = 12;
+      const baseHeight = 100;
+      const calculatedHeight = baseHeight + (ticket.items.length * itemHeight);
+      
       const doc = new jsPDF({
         unit: 'mm',
-        format: [58, 200] 
+        format: [58, calculatedHeight]
       });
 
       const currency = settings.currency || 'C$';
       const businessName = (settings.businessName || 'LOTERIA').toUpperCase();
       
-      doc.setFont('courier', 'bold');
+      // -- CABECERA PREMIUM --
+      doc.setFillColor(33, 33, 33); // Fondo oscuro para el nombre
+      doc.rect(0, 0, 58, 18, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
-      doc.text(businessName, 29, 10, { align: 'center' });
+      doc.text(businessName, 29, 11, { align: 'center' });
       
-      doc.setFontSize(10);
-      doc.setFont('courier', 'normal');
-      doc.text('Ticket de Loteria', 29, 15, { align: 'center' });
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TICKET DE VENTA ORIGINAL', 29, 23, { align: 'center' });
       
-      doc.setLineDashPattern([1, 1], 0);
-      doc.line(5, 18, 53, 18);
+      // Info del Ticket
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`TICKET:`, 5, 30);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`#${ticket.ticketNumber}`, 18, 30);
       
-      doc.setFontSize(9);
-      doc.text(`TICKET: ${ticket.ticketNumber}`, 5, 23);
-      doc.text(`FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}`, 5, 27);
-      doc.text(`HORA:   ${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}`, 5, 31);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`FECHA:`, 5, 34);
+      doc.setFont('helvetica', 'normal');
+      const dateStr = format(new Date(ticket.createdAt), "dd/MM/yyyy HH:mm", { locale: es });
+      doc.text(dateStr, 18, 34);
       
       if (ticket.client) {
-        doc.text(`CLIENTE: ${ticket.client.toUpperCase()}`, 5, 35);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`CLIENTE:`, 5, 38);
+        doc.setFont('helvetica', 'normal');
+        doc.text(ticket.client.toUpperCase(), 19, 38);
       }
 
-      doc.line(5, 38, 53, 38);
+      // Separador elegante
+      doc.setDrawColor(200, 200, 200);
+      doc.line(5, 42, 53, 42);
       
-      doc.setFont('courier', 'bold');
-      doc.text('JUEGO', 5, 43);
-      doc.text('NUM', 22, 43, { align: 'center' });
-      doc.text('VALOR', 35, 43, { align: 'center' });
-      doc.text('PREMIO', 53, 43, { align: 'right' });
-      doc.setFont('courier', 'normal');
+      // -- TABLA DE JUGADAS --
+      doc.setFillColor(245, 245, 245);
+      doc.rect(5, 44, 48, 6, 'F');
       
-      doc.line(5, 45, 53, 45);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('JUEGO', 7, 48);
+      doc.text('NUM', 25, 48, { align: 'center' });
+      doc.text('VALOR', 38, 48, { align: 'center' });
+      doc.text('PREMIO', 51, 48, { align: 'right' });
       
-      let y = 50;
+      let y = 55;
+      doc.setFontSize(8);
       for (const item of ticket.items) {
-        const gameName = (item.game?.name || 'NICA').substring(0, 10);
+        const gameName = (item.game?.name || 'NICA').substring(0, 12);
         const multiplier = item.game?.multiplier || 70;
         const prize = item.amount * multiplier;
 
-        doc.text(gameName, 5, y);
-        doc.setFont('courier', 'bold');
-        doc.text(item.number, 22, y, { align: 'center' });
-        doc.setFont('courier', 'normal');
-        doc.text(`${currency}${item.amount.toFixed(0)}`, 35, y, { align: 'center' });
-        doc.text(`${currency}${prize.toFixed(0)}`, 53, y, { align: 'right' });
+        // Fila principal
+        doc.setFont('helvetica', 'bold');
+        doc.text(gameName, 7, y);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.text(item.number, 25, y, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${currency}${item.amount.toFixed(0)}`, 38, y, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${currency}${prize.toFixed(0)}`, 51, y, { align: 'right' });
         
+        // Detalle inferior (horario)
         y += 4;
-        doc.setFontSize(7);
-        doc.text(`Sorteo: ${item.schedule}`, 5, y);
-        doc.setFontSize(9);
+        doc.setTextColor(120, 120, 120);
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'italic');
+        doc.text(`Sorteo: ${item.schedule}`, 7, y);
+        
         y += 6;
-
-        if (y > 180) {
-           doc.addPage([58, 200]);
-           y = 10;
-        }
+        doc.setTextColor(0, 0, 0);
+        doc.setDrawColor(240, 240, 240);
+        doc.line(5, y - 2, 53, y - 2);
       }
 
-      doc.line(5, y - 2, 53, y - 2);
+      // -- TOTAL --
+      y += 2;
+      doc.setFillColor(33, 33, 33);
+      doc.rect(25, y, 28, 10, 'F');
       
-      doc.setFontSize(12);
-      doc.setFont('courier', 'bold');
-      doc.text(`TOTAL: ${currency}${ticket.totalAmount.toFixed(2)}`, 53, y + 5, { align: 'right' });
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.text('TOTAL A PAGAR', 28, y + 4);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${currency}${ticket.totalAmount.toFixed(2)}`, 51, y + 8, { align: 'right' });
       
+      // -- PIE DE PÁGINA --
+      y += 18;
+      doc.setTextColor(80, 80, 80);
       doc.setFontSize(8);
-      doc.setFont('courier', 'normal');
-      doc.text(settings.ticketMessage || '¡Gracias por su compra!', 29, y + 12, { align: 'center' });
-      doc.text('*** CONSERVE SU TICKET ***', 29, y + 16, { align: 'center' });
+      doc.setFont('helvetica', 'bold');
+      doc.text(settings.ticketMessage || '¡Gracias por su compra!', 29, y, { align: 'center' });
+      
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+      doc.text('*** CONSERVE ESTE TICKET PARA RECLAMAR SU PREMIO ***', 29, y + 4, { align: 'center' });
+      
+      // Código de barras simulado (más estético)
+      y += 8;
+      const barcodeWidth = 0.5;
+      let startX = 15;
+      doc.setDrawColor(0, 0, 0);
+      ticket.ticketNumber.split('').forEach((char) => {
+        const w = (char.charCodeAt(0) % 3 === 0) ? 0.8 : 0.4;
+        doc.rect(startX, y, w, 6, 'F');
+        startX += w + 0.4;
+      });
+      
+      doc.text(ticket.ticketNumber, 29, y + 10, { align: 'center' });
 
-      // IMPORTANTE: Limpiar el nombre del archivo (quitar # y caracteres raros)
+      // IMPORTANTE: Limpiar el nombre del archivo
       const safeTicketNumber = ticket.ticketNumber.replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `ticket_${safeTicketNumber}.pdf`;
 
@@ -816,7 +871,7 @@ export const printerService = {
           directory: Directory.Cache,
         });
 
-        // Intentar abrir el PDF primero para vista previa
+        // Abrir visor nativo
         try {
           const { FileOpener } = await import('@capacitor-community/file-opener');
           await FileOpener.open({
@@ -824,7 +879,6 @@ export const printerService = {
             contentType: 'application/pdf',
           });
         } catch (e) {
-          // Si falla abrirlo, al menos compartirlo
           await Share.share({
             title: 'Compartir Ticket',
             text: `Ticket #${ticket.ticketNumber} - Lotochoco`,
