@@ -723,15 +723,15 @@ export const printerService = {
 
   async shareTicketPDF(ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }, settings: Record<string, string>) {
     try {
+      // Usar un formato más largo para evitar cortes
       const doc = new jsPDF({
         unit: 'mm',
-        format: [58, 150] // Estándar de 58mm
+        format: [58, 200] 
       });
 
       const currency = settings.currency || 'C$';
       const businessName = (settings.businessName || 'LOTERIA').toUpperCase();
       
-      // Estilos básicos
       doc.setFont('courier', 'bold');
       doc.setFontSize(14);
       doc.text(businessName, 29, 10, { align: 'center' });
@@ -744,7 +744,7 @@ export const printerService = {
       doc.line(5, 18, 53, 18);
       
       doc.setFontSize(9);
-      doc.text(`TICKET: #${ticket.ticketNumber}`, 5, 23);
+      doc.text(`TICKET: ${ticket.ticketNumber}`, 5, 23);
       doc.text(`FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}`, 5, 27);
       doc.text(`HORA:   ${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}`, 5, 31);
       
@@ -754,7 +754,6 @@ export const printerService = {
 
       doc.line(5, 38, 53, 38);
       
-      // Encabezado de tabla
       doc.setFont('courier', 'bold');
       doc.text('JUEGO', 5, 43);
       doc.text('NUM', 22, 43, { align: 'center' });
@@ -783,7 +782,10 @@ export const printerService = {
         doc.setFontSize(9);
         y += 6;
 
-        if (y > 140) doc.addPage([58, 150]);
+        if (y > 180) {
+           doc.addPage([58, 200]);
+           y = 10;
+        }
       }
 
       doc.line(5, y - 2, 53, y - 2);
@@ -797,30 +799,42 @@ export const printerService = {
       doc.text(settings.ticketMessage || '¡Gracias por su compra!', 29, y + 12, { align: 'center' });
       doc.text('*** CONSERVE SU TICKET ***', 29, y + 16, { align: 'center' });
 
-      const pdfBase64 = doc.output('datauristring').split(',')[1];
-      const fileName = `ticket_${ticket.ticketNumber}.pdf`;
+      // IMPORTANTE: Limpiar el nombre del archivo (quitar #)
+      const safeTicketNumber = ticket.ticketNumber.replace(/[^a-zA-Z0-0]/g, '_');
+      const fileName = `ticket_${safeTicketNumber}.pdf`;
 
       if (Capacitor.isNativePlatform()) {
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
+        
         const savedFile = await Filesystem.writeFile({
           path: fileName,
           data: pdfBase64,
           directory: Directory.Cache,
         });
 
-        await Share.share({
-          title: 'Compartir Ticket',
-          text: `Ticket #${ticket.ticketNumber} - Lotochoco`,
-          url: savedFile.uri,
-          dialogTitle: 'Enviar ticket vía...',
-        });
+        // Intentar abrir el PDF primero para vista previa
+        try {
+          const { FileOpener } = await import('@capacitor-community/file-opener');
+          await FileOpener.open({
+            filePath: savedFile.uri,
+            contentType: 'application/pdf',
+          });
+        } catch (e) {
+          // Si falla abrirlo, al menos compartirlo
+          await Share.share({
+            title: 'Compartir Ticket',
+            text: `Ticket #${ticket.ticketNumber} - Lotochoco`,
+            url: savedFile.uri,
+          });
+        }
         
-        return { success: true, message: 'Listo para compartir' };
+        return { success: true, message: 'PDF generado' };
       } else {
         doc.save(fileName);
         return { success: true, message: 'Descarga iniciada' };
       }
     } catch (error) {
-      console.error('Error al generar/compartir PDF:', error);
+      console.error('Error al generar PDF:', error);
       return { success: false, message: 'No se pudo generar el PDF' };
     }
   },
@@ -836,7 +850,7 @@ export const printerService = {
         return await printDirect(bluetoothDeviceId, commands)
       }
 
-      // RawBT intent printing (Mantenemos como fallback pero el usuario no la quiere)
+      // RawBT intent printing
       if (type === 'rawbt' && typeof window !== 'undefined') {
         const commands = generatePT210Receipt(ticket, settings)
         const encoded = btoa(unescape(encodeURIComponent(commands)));
@@ -851,9 +865,13 @@ export const printerService = {
         return await printToNetwork(settings.printerAddress || '', commands)
       }
 
-      // Fallback: browser printing
+      // EVITAR window.print() en el APK: Usar el flujo de PDF como fallback nativo
+      if (Capacitor.isNativePlatform()) {
+        return await this.shareTicketPDF(ticket, settings);
+      }
+
+      // Solo usar browser printing en entorno Web real
       const html = generatePrintableHTML(ticket, settings)
-      // dynamically import to avoid cycles
       const { printHtmlDocument } = await import('@/lib/print')
       printHtmlDocument(html)
       return { success: true, message: 'Impresion por navegador iniciada' }
