@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportBackup, importBackup } from "@/services/backup";
-import { sendErrorReport } from "@/services/report-service";
 import { 
   Dialog,
   DialogContent,
@@ -63,10 +62,6 @@ export function Settings() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [showReportDialog, setShowReportDialog] = useState(false);
-  const [reportTitle, setReportTitle] = useState("");
-  const [reportDetails, setReportDetails] = useState("");
-  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -586,80 +581,10 @@ export function Settings() {
                    </div>
                 </CardContent>
               </Card>
-
-              <Card className="border-none shadow-xl bg-card/40 rounded-3xl overflow-hidden group">
-                <CardHeader className="bg-red-500/5 pb-8 group-hover:bg-red-500/10 transition-colors">
-                  <div className="p-2.5 bg-red-100 rounded-xl text-red-600 w-fit mb-3"><AlertCircle className="h-5 w-5" /></div>
-                  <CardTitle className="text-lg font-black uppercase tracking-tighter">Soporte Técnico</CardTitle>
-                  <CardDescription className="text-[10px] font-bold uppercase text-muted-foreground leading-relaxed">Informa de errores o solicita ayuda directa</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                   <Button 
-                     onClick={() => setShowReportDialog(true)}
-                     className="w-full h-24 rounded-3xl font-black uppercase text-xs shadow-lg shadow-red-500/20 bg-red-600 hover:bg-red-700 flex flex-col gap-2 transition-all active:scale-95"
-                   >
-                     <Shield className="h-6 w-6" />
-                     Enviar Reporte de Error
-                   </Button>
-                   <p className="text-center text-[9px] font-black uppercase text-muted-foreground mt-4 tracking-widest">Atención directa vía GitHub Issues</p>
-                </CardContent>
-              </Card>
            </div>
         </TabsContent>
       </Tabs>
 
-      {/* Report Dialog Modernized */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent className="p-0 border-none shadow-2xl rounded-3xl overflow-hidden max-w-md">
-          <div className="bg-red-600 p-8 text-white">
-             <div className="flex justify-between items-start mb-6">
-               <div className="p-3 bg-white/20 rounded-2xl"><AlertCircle className="h-6 w-6"/></div>
-               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-full" onClick={() => setShowReportDialog(false)}><X/></Button>
-             </div>
-             <h3 className="text-2xl font-black tracking-tighter mb-2">Reportar Bug</h3>
-             <p className="text-xs font-bold text-white/70 uppercase tracking-widest">Enviaremos este reporte al desarrollador</p>
-          </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-3">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">¿Qué está fallando?</Label>
-              <Input 
-                value={reportTitle} 
-                onChange={(e) => setReportTitle(e.target.value)} 
-                placeholder="Ej: La impresora no corta el papel"
-                className="h-14 rounded-2xl border-2 font-bold focus:border-red-600 transition-all"
-              />
-            </div>
-            <div className="space-y-3">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Pasos para reproducir</Label>
-              <Textarea 
-                value={reportDetails} 
-                onChange={(e) => setReportDetails(e.target.value)} 
-                placeholder="Describe qué pasó antes del error..."
-                rows={4}
-                className="rounded-2xl border-2 font-bold focus:border-red-600 transition-all pt-4"
-              />
-            </div>
-            <Button 
-              className="w-full h-14 rounded-2xl bg-red-600 hover:bg-red-700 font-black uppercase shadow-xl shadow-red-500/25"
-              onClick={async () => {
-                if (!reportTitle || !reportDetails) return toast.error("Completa todos los campos");
-                setIsReporting(true);
-                const res = await sendErrorReport(reportTitle, reportDetails);
-                setIsReporting(false);
-                if (res.success) {
-                  toast.success("¡Reporte enviado!");
-                  setShowReportDialog(false);
-                  setReportTitle("");
-                  setReportDetails("");
-                } else toast.error(res.message);
-              }}
-              disabled={isReporting}
-            >
-              {isReporting ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : "Enviar Reporte Ahora"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
