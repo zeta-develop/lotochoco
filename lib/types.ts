@@ -162,3 +162,6 @@ export type SettingKey =
   | 'darkMode'
   | 'bluetoothDeviceId'
   | 'bluetoothDeviceName'
+  | 'ticketFontSize'
+  | 'ticketFontType'
+  | 'ticketDensity'

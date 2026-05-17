@@ -18,7 +18,12 @@ const COMMANDS = {
   BOLD_ON: `${ESC}E\x01`,
   BOLD_OFF: `${ESC}E\x00`,
   NORMAL_SIZE: `${GS}!\x00`,
+  DOUBLE_HEIGHT: `${GS}!\x01`,
+  DOUBLE_WIDTH: `${GS}!\x10`,
   DOUBLE_SIZE: `${GS}!\x11`,
+  QUAD_SIZE: `${GS}!\x22`,
+  FONT_A: `${ESC}M\x00`,
+  FONT_B: `${ESC}M\x01`,
   FEED_LINE: '\x0A',
   FEED_PAPER: `${ESC}d\x04`,
 };
@@ -38,16 +43,31 @@ export function generatePT210Receipt(
   const separator = repeatChar('-', lineWidth);
   const currency = settings.currency || 'C$';
   
+  // Custom font and size
+  const userFontSize = settings.ticketFontSize || 'normal';
+  const userFontType = settings.ticketFontType || 'A';
+  
   let receipt = '';
   receipt += COMMANDS.INIT;
+  
+  // Aplicar tipo de fuente global
+  receipt += userFontType === 'B' ? COMMANDS.FONT_B : COMMANDS.FONT_A;
   
   // Encabezado
   receipt += COMMANDS.ALIGN_CENTER;
   receipt += COMMANDS.BOLD_ON;
+  
+  // Tamaño del título (siempre grande o configurable?)
   receipt += COMMANDS.DOUBLE_SIZE;
   receipt += (settings.businessName || 'LOTERIA').toUpperCase();
   receipt += COMMANDS.FEED_LINE;
-  receipt += COMMANDS.NORMAL_SIZE;
+  
+  // Volver a tamaño configurado por el usuario o normal
+  if (userFontSize === 'large') receipt += COMMANDS.DOUBLE_SIZE;
+  else if (userFontSize === 'double-height') receipt += COMMANDS.DOUBLE_HEIGHT;
+  else if (userFontSize === 'double-width') receipt += COMMANDS.DOUBLE_WIDTH;
+  else receipt += COMMANDS.NORMAL_SIZE;
+  
   receipt += COMMANDS.BOLD_OFF;
   receipt += 'RECIBO DE VENTA';
   receipt += COMMANDS.FEED_LINE;
@@ -68,9 +88,9 @@ export function generatePT210Receipt(
   receipt += COMMANDS.FEED_LINE;
   
   // Tabla de Jugadas
-  // Columnas: JUEGO (10), NUM (5), PREMIO (15) -> Total 30 + espacios = 32
+  // Columnas: JUEGO (10), NUM (8), MONTO (14) -> Total 32
   receipt += COMMANDS.BOLD_ON;
-  receipt += 'JUEGO      NUM       PREMIO'.padEnd(lineWidth);
+  receipt += 'JUEGO     NUM          MONTO'.padEnd(lineWidth);
   receipt += COMMANDS.BOLD_OFF;
   receipt += COMMANDS.FEED_LINE;
   receipt += separator;
@@ -79,17 +99,16 @@ export function generatePT210Receipt(
   for (const item of ticket.items) {
     const gameName = (item.game?.name || 'NICA').substring(0, 10).padEnd(10);
     const number = item.number.padStart(5);
+    const monto = `${currency}${item.amount.toFixed(0)}`.padStart(15);
+    
+    // Fila 1: Juego, Número y MONTO (inversión)
+    receipt += `${gameName}${number}${monto}${COMMANDS.FEED_LINE}`;
+    
+    // Fila 2: Hora del sorteo y Premio potencial
     const multiplier = item.game?.multiplier || 70;
     const prize = item.amount * multiplier;
-    const prizeStr = `${currency}${prize.toFixed(0)}`.padStart(15);
-    
-    // Fila 1: Juego, Número y Premio calculado
-    receipt += `${gameName}${number}${prizeStr}${COMMANDS.FEED_LINE}`;
-    
-    // Fila 2: Hora del sorteo y MONTO (inversión)
-    const scheduleInfo = ` SORTEO: ${item.schedule}`.padEnd(17);
-    const montoInfo = `MONTO: ${currency}${item.amount.toFixed(0)}`.padStart(15);
-    receipt += `${scheduleInfo}${montoInfo}${COMMANDS.FEED_LINE}`;
+    const details = ` ${item.schedule} > Premio: ${currency}${prize.toFixed(0)}`;
+    receipt += `${details}${COMMANDS.FEED_LINE}`;
     receipt += COMMANDS.FEED_LINE; // Espacio entre items para mejor lectura
   }
   
@@ -99,9 +118,17 @@ export function generatePT210Receipt(
   // Total
   receipt += COMMANDS.ALIGN_RIGHT;
   receipt += COMMANDS.BOLD_ON;
+  
+  // El total siempre un poco más grande
   receipt += COMMANDS.DOUBLE_SIZE;
   receipt += `TOTAL: ${currency}${ticket.totalAmount.toFixed(2)}`;
-  receipt += COMMANDS.NORMAL_SIZE;
+  
+  // Volver a tamaño de usuario para el pie
+  if (userFontSize === 'large') receipt += COMMANDS.DOUBLE_SIZE;
+  else if (userFontSize === 'double-height') receipt += COMMANDS.DOUBLE_HEIGHT;
+  else if (userFontSize === 'double-width') receipt += COMMANDS.DOUBLE_WIDTH;
+  else receipt += COMMANDS.NORMAL_SIZE;
+  
   receipt += COMMANDS.BOLD_OFF;
   receipt += COMMANDS.FEED_LINE;
   receipt += COMMANDS.FEED_LINE;

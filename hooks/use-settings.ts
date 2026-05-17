@@ -11,13 +11,11 @@ export function useSettings() {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const { getSettings } = await import('@/services/settings')
-      const remoteSettings = await getSettings()
+      const { settingsService } = await import('@/services/settings')
+      const remoteSettings = await settingsService.getAll()
       
-      // Sincronizar store con base de datos
-      Object.entries(remoteSettings).forEach(([key, value]) => {
-        setSettings({ [key]: value })
-      })
+      // Sincronizar store con base de datos de forma masiva
+      setSettings(remoteSettings)
     } catch (error) {
       console.error('Error al cargar ajustes:', error)
       setError(error instanceof Error ? error : new Error('Error al cargar ajustes'))
