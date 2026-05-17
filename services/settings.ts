@@ -1,5 +1,6 @@
 import { query, execute } from '@/lib/db'
 import type { Setting, SettingKey } from '@/lib/types'
+import { generateId } from '@/lib/utils'
 
 const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   businessName: 'Loteria La Fortuna',
@@ -9,7 +10,10 @@ const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   printerAddress: '',
   darkMode: 'false',
   bluetoothDeviceId: '',
-  bluetoothDeviceName: ''
+  bluetoothDeviceName: '',
+  ticketFontSize: 'normal',
+  ticketFontType: 'A',
+  ticketDensity: '1'
 }
 
 export async function getSetting(key: SettingKey): Promise<string> {
@@ -30,7 +34,7 @@ export async function getAllSettings(): Promise<Record<string, string>> {
 }
 
 export async function updateSetting(key: SettingKey, value: string): Promise<void> {
-  const id = crypto.randomUUID()
+  const id = generateId()
   await execute(
     `INSERT OR REPLACE INTO Setting (id, key, value, updatedAt) 
      VALUES (
@@ -84,7 +88,10 @@ export const settingsService = {
         key === 'printerType' ||
         key === 'printerAddress' ||
         key === 'bluetoothDeviceId' ||
-        key === 'bluetoothDeviceName'
+        key === 'bluetoothDeviceName' ||
+        key === 'ticketFontSize' ||
+        key === 'ticketFontType' ||
+        key === 'ticketDensity'
       ) {
         normalized[key as SettingKey] = String(value)
       }

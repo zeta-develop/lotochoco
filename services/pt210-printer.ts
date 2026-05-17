@@ -18,7 +18,12 @@ const COMMANDS = {
   BOLD_ON: `${ESC}E\x01`,
   BOLD_OFF: `${ESC}E\x00`,
   NORMAL_SIZE: `${GS}!\x00`,
+  DOUBLE_HEIGHT: `${GS}!\x01`,
+  DOUBLE_WIDTH: `${GS}!\x10`,
   DOUBLE_SIZE: `${GS}!\x11`,
+  QUAD_SIZE: `${GS}!\x22`,
+  FONT_A: `${ESC}M\x00`,
+  FONT_B: `${ESC}M\x01`,
   FEED_LINE: '\x0A',
   FEED_PAPER: `${ESC}d\x04`,
 };
@@ -38,16 +43,31 @@ export function generatePT210Receipt(
   const separator = repeatChar('-', lineWidth);
   const currency = settings.currency || 'C$';
   
+  // Custom font and size
+  const userFontSize = settings.ticketFontSize || 'normal';
+  const userFontType = settings.ticketFontType || 'A';
+  
   let receipt = '';
   receipt += COMMANDS.INIT;
+  
+  // Aplicar tipo de fuente global
+  receipt += userFontType === 'B' ? COMMANDS.FONT_B : COMMANDS.FONT_A;
   
   // Encabezado
   receipt += COMMANDS.ALIGN_CENTER;
   receipt += COMMANDS.BOLD_ON;
+  
+  // Tamaño del título (siempre grande o configurable?)
   receipt += COMMANDS.DOUBLE_SIZE;
   receipt += (settings.businessName || 'LOTERIA').toUpperCase();
   receipt += COMMANDS.FEED_LINE;
-  receipt += COMMANDS.NORMAL_SIZE;
+  
+  // Volver a tamaño configurado por el usuario o normal
+  if (userFontSize === 'large') receipt += COMMANDS.DOUBLE_SIZE;
+  else if (userFontSize === 'double-height') receipt += COMMANDS.DOUBLE_HEIGHT;
+  else if (userFontSize === 'double-width') receipt += COMMANDS.DOUBLE_WIDTH;
+  else receipt += COMMANDS.NORMAL_SIZE;
+  
   receipt += COMMANDS.BOLD_OFF;
   receipt += 'RECIBO DE VENTA';
   receipt += COMMANDS.FEED_LINE;
@@ -98,9 +118,17 @@ export function generatePT210Receipt(
   // Total
   receipt += COMMANDS.ALIGN_RIGHT;
   receipt += COMMANDS.BOLD_ON;
+  
+  // El total siempre un poco más grande
   receipt += COMMANDS.DOUBLE_SIZE;
   receipt += `TOTAL: ${currency}${ticket.totalAmount.toFixed(2)}`;
-  receipt += COMMANDS.NORMAL_SIZE;
+  
+  // Volver a tamaño de usuario para el pie
+  if (userFontSize === 'large') receipt += COMMANDS.DOUBLE_SIZE;
+  else if (userFontSize === 'double-height') receipt += COMMANDS.DOUBLE_HEIGHT;
+  else if (userFontSize === 'double-width') receipt += COMMANDS.DOUBLE_WIDTH;
+  else receipt += COMMANDS.NORMAL_SIZE;
+  
   receipt += COMMANDS.BOLD_OFF;
   receipt += COMMANDS.FEED_LINE;
   receipt += COMMANDS.FEED_LINE;

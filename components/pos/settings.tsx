@@ -58,6 +58,8 @@ export function Settings() {
     bluetoothDeviceId: "",
     bluetoothDeviceName: "",
     darkMode: false,
+    ticketFontSize: "normal",
+    ticketFontType: "A",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
@@ -77,6 +79,8 @@ export function Settings() {
         bluetoothDeviceId: settings.bluetoothDeviceId || "",
         bluetoothDeviceName: settings.bluetoothDeviceName || "",
         darkMode: settings.darkMode === "true",
+        ticketFontSize: settings.ticketFontSize || "normal",
+        ticketFontType: settings.ticketFontType || "A",
       });
     }
   }, [settings]);
@@ -222,12 +226,58 @@ export function Settings() {
                     />
                   </div>
                 </div>
+
+                <div className="pt-4 space-y-6 border-t border-muted/50 mt-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-primary italic">Personalización de Impresión</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Tamaño de Letra</Label>
+                      <Select 
+                        value={formData.ticketFontSize} 
+                        onValueChange={(val) => setFormData({ ...formData, ticketFontSize: val })}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl border-2 border-muted font-bold shadow-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          <SelectItem value="normal" className="rounded-lg font-bold text-xs uppercase">Normal</SelectItem>
+                          <SelectItem value="double-height" className="rounded-lg font-bold text-xs uppercase">Doble Alto</SelectItem>
+                          <SelectItem value="double-width" className="rounded-lg font-bold text-xs uppercase">Doble Ancho</SelectItem>
+                          <SelectItem value="large" className="rounded-lg font-bold text-xs uppercase">Grande (Doble)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Tipo de Fuente</Label>
+                      <Select 
+                        value={formData.ticketFontType} 
+                        onValueChange={(val) => setFormData({ ...formData, ticketFontType: val })}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl border-2 border-muted font-bold shadow-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                          <SelectItem value="A" className="rounded-lg font-bold text-xs uppercase">Fuente A (Estandar)</SelectItem>
+                          <SelectItem value="B" className="rounded-lg font-bold text-xs uppercase">Fuente B (Condensada)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             <div className="space-y-6">
                <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground px-2">Vista Previa Real-Time</h4>
-               <div className="bg-white text-black p-8 rounded-[2.5rem] font-mono text-[11px] leading-relaxed shadow-2xl border-2 border-dashed border-gray-200 relative overflow-hidden">
+               <div className={cn(
+                 "bg-white text-black p-8 rounded-[2.5rem] font-mono shadow-2xl border-2 border-dashed border-gray-200 relative overflow-hidden transition-all duration-300 origin-top",
+                 formData.ticketFontType === "B" ? "text-[10px]" : "text-[11px] leading-relaxed",
+                 formData.ticketFontSize === "double-height" ? "scale-y-110" : 
+                 formData.ticketFontSize === "double-width" ? "scale-x-110" :
+                 formData.ticketFontSize === "large" ? "scale-110" : ""
+               )}>
                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-blue-500 opacity-50"></div>
                   <div className="text-center mb-6">
                     <h5 className="font-black text-xl tracking-tighter mb-1 uppercase">{formData.businessName}</h5>
