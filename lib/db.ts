@@ -22,13 +22,12 @@ class DatabaseManager {
       
       let db: SQLiteDBConnection
       const isConn = await this.sqlite.isConnection('lotochoco_db', false)
-      
+
       if (isConn.result) {
         db = await this.sqlite.retrieveConnection('lotochoco_db', false)
       } else {
-        db = await this.sqlite.createConnection('lotochoco_db', false, 'no-encryption', 1, false)
+        db = await sqlite.createConnection('lotochoco_db', false, 'no-encryption', 1, false)
       }
-
       await db.open()
       
       // Inicializar esquema si no existe

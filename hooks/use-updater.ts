@@ -6,6 +6,7 @@ import { Dialog } from "@capacitor/dialog";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Capacitor } from "@capacitor/core";
+import { toast } from "sonner";
 import packageJson from "../package.json";
 
 interface Release {
@@ -88,8 +89,25 @@ export function useUpdater() {
       });
 
       if (value) {
-        // Option A: Use native browser to handle download and install automatically
-        window.open(apkAsset.browser_download_url, '_system');
+        toast.info('Descargando actualización...');
+        
+        // Descargar el archivo
+        const downloadResult = await Filesystem.downloadFile({
+          url: apkAsset.browser_download_url,
+          path: `updates/${fileName}`,
+          directory: Directory.Cache,
+          recursive: true
+        });
+
+        if (downloadResult.path) {
+          toast.success('Descarga completada. Iniciando instalación...');
+          
+          // Abrir el instalador
+          await FileOpener.open({
+            filePath: downloadResult.path,
+            contentType: 'application/vnd.android.package-archive'
+          });
+        }
       }
 
     } catch (error) {
