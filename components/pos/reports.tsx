@@ -40,10 +40,14 @@ import { format, startOfDay, endOfDay, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { generateTicketImageUrl, printerService } from '@/services/printer'
-import type { Ticket, TicketItem } from '@/lib/types'
+import type { Ticket as TicketType, TicketItem } from '@/lib/types'
 import { toast } from 'sonner'
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
-type TicketWithDetails = Ticket & {
+
+type TicketWithDetails = TicketType & {
   items?: (TicketItem & { game?: { name?: string } })[]
 }
 
@@ -148,9 +152,28 @@ export function Reports() {
       const { jsPDF } = await import('jspdf')
       const pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] })
       pdf.addImage(pngData, 'PNG', 0, 0, canvas.width, canvas.height)
-      pdf.save(`${ticket.ticketNumber}.pdf`)
 
-      toast.success('Ticket descargado como PDF')
+      if (Capacitor.isNativePlatform()) {
+        const pdfBase64 = pdf.output('datauristring').split(',')[1];
+        const fileName = `ticket_${ticket.ticketNumber}.pdf`;
+
+        const writeResult = await Filesystem.writeFile({
+          path: fileName,
+          data: pdfBase64,
+          directory: Directory.Cache
+        });
+
+        await Share.share({
+          title: 'Compartir Ticket',
+          text: `Ticket ${ticket.ticketNumber}`,
+          url: writeResult.uri,
+          dialogTitle: 'Compartir Ticket'
+        });
+        toast.success('Ticket listo para compartir');
+      } else {
+        pdf.save(`${ticket.ticketNumber}.pdf`)
+        toast.success('Ticket descargado como PDF')
+      }
     } catch (err) {
       console.error('Error generando PDF:', err)
       // Fallback: open SVG in new tab for manual download
@@ -477,7 +500,7 @@ export function Reports() {
                 <div className="text-center py-8 text-muted-foreground">Sin tickets en el período seleccionado</div>
               ) : (
                 <div className="space-y-3">
-                  {reportTickets.map((ticket: Ticket) => (
+                  {reportTickets.map((ticket: TicketType) => (
                     <div key={ticket.id} className="flex items-center justify-between rounded-lg border p-4">
                       <div>
                         <div className="font-mono font-semibold">{ticket.ticketNumber}</div>

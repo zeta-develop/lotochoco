@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { endOfDay, startOfDay } from 'date-fns'
 import type { Ticket, CartItem } from '@/lib/types'
 import {
   bootstrapOfflineData,
@@ -42,8 +43,8 @@ export function useTickets(options?: {
       setData(
         getOfflineTickets({
           status: options?.status,
-          startDate: parseLocalDate(options?.startDate),
-          endDate: parseLocalDate(options?.endDate),
+          startDate: options?.startDate ? startOfDay(parseLocalDate(options.startDate) || new Date()) : undefined,
+          endDate: options?.endDate ? endOfDay(parseLocalDate(options.endDate) || new Date()) : undefined,
         })
       )
     } catch (error) {

@@ -767,7 +767,7 @@ export function getOfflineTickets(options?: { status?: string; startDate?: Date;
   const total = filtered.length
   const paged = filtered
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(options?.offset || 0, (options?.offset || 0) + (options?.limit || 50))
+    .slice(options?.offset || 0, (options?.offset || 0) + (options?.limit || 1000))
 
   return { tickets: paged.map((ticket) => hydrateTicket(ticket, state)), total }
 }
