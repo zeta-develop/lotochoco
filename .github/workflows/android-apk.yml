@@ -101,9 +101,9 @@ jobs:
 
           echo "=== Archivo gradle.properties generado con credenciales fijas ==="
 
-      # 1️⃣3️⃣ Build and auto-sign release APK (Con banderas de diagnóstico)
+      # 1️⃣3️⃣ Build and auto-sign release APK
       - name: Build release APK
-        run: pnpm android:build:release -- --info --stacktrace
+        run: pnpm android:build:release
 
       # 1️⃣4️⃣ Upload APK as artifact
       - name: Upload APK artifact
