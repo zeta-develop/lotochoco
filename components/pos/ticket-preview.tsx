@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Printer, X } from "lucide-react"
+import { Printer, X, Share2 } from "lucide-react"
 import type { Ticket, TicketItem, Game } from "@/lib/types"
 
 interface TicketPreviewProps {
@@ -84,26 +84,34 @@ export function TicketPreview({
               <table className="w-full text-left text-sm mb-2">
                 <thead>
                   <tr className="border-b border-gray-300">
-                    <th className="py-1 w-2/5 font-semibold">JUEGO</th>
-                    <th className="py-1 w-1/5 text-center font-semibold">NUM</th>
-                    <th className="py-1 w-2/5 text-right font-semibold">MONTO</th>
+                    <th className="py-1 w-1/4 font-semibold">JUEGO</th>
+                    <th className="py-1 w-1/4 text-center font-semibold">NUM</th>
+                    <th className="py-1 w-1/4 text-right font-semibold">MONTO</th>
+                    <th className="py-1 w-1/4 text-right font-semibold">PREMIO</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ticket.items.map((item, index) => (
-                    <tr key={index} className="align-top">
-                      <td className="py-1">
-                        <div className="truncate pr-1">{item.game?.name}</div>
-                        <div className="text-[11px] text-gray-600">{item.schedule}</div>
-                      </td>
-                      <td className="py-1 text-center font-bold text-base">
-                        {item.number}
-                      </td>
-                      <td className="py-1 text-right">
-                        {currency}{item.amount.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {ticket.items.map((item, index) => {
+                    const multiplier = item.game?.multiplier || 70;
+                    const prize = item.amount * multiplier;
+                    return (
+                      <tr key={index} className="align-top">
+                        <td className="py-1">
+                          <div className="truncate pr-1">{item.game?.name}</div>
+                          <div className="text-[10px] text-gray-600">{item.schedule}</div>
+                        </td>
+                        <td className="py-1 text-center font-bold text-base">
+                          {item.number}
+                        </td>
+                        <td className="py-1 text-right">
+                          {currency}{item.amount.toFixed(0)}
+                        </td>
+                        <td className="py-1 text-right font-semibold">
+                          {currency}{prize.toFixed(0)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
@@ -154,6 +162,16 @@ export function TicketPreview({
               <X className="h-4 w-4 mr-2" />
               Cerrar
             </Button>
+            {onShare && (
+              <Button
+                variant="secondary"
+                className="flex-1 font-semibold"
+                onClick={onShare}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Compartir
+              </Button>
+            )}
             <Button
               className="flex-1 font-semibold bg-black text-white hover:bg-gray-800"
               onClick={onPrint}

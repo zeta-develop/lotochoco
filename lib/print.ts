@@ -25,11 +25,7 @@ export function printHtmlDocument(html: string) {
   if (isMobile) {
     const newWin = window.open('', '_blank')
     if (!newWin) {
-      // Fallback: write into current document (will replace app) as last resort
-      document.open()
-      document.write(html)
-      document.close()
-      window.print()
+      console.error('No se pudo abrir la ventana de impresión. Los popups pueden estar bloqueados.')
       return
     }
     openAndPrint(newWin)
