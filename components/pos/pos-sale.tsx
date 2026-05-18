@@ -230,7 +230,7 @@ export function POSSale() {
                     {selectedGame?.schedules?.length ? (
                       selectedGame.schedules.map((schedule) => (
                         <option key={schedule.id} value={schedule.id}>
-                          {schedule.name} - {schedule.time}
+                          {schedule.name} - {formatTime12h(schedule.time)}
                         </option>
                       ))
                     ) : (

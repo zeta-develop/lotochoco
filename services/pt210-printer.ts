@@ -92,7 +92,7 @@ export function generatePT210Receipt(
 
     // Línea 1: JUEGO y HORARIO
     receipt += COMMANDS.BOLD_ON;
-    receipt += `${gameName} (${item.schedule})\n`;
+    receipt += `${gameName} (${formatTime12h(item.schedule)})\n`;
     receipt += COMMANDS.BOLD_OFF;
 
     // Línea 2: NUMERO, VALOR y PREMIO bien alineados

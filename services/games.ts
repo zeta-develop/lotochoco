@@ -118,7 +118,19 @@ export async function updateGame(
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  await execute('DELETE FROM Game WHERE id = ?', [id])
+  const itemsCount = await query('SELECT COUNT(*) as count FROM "TicketItem" WHERE gameId = ?', [id])
+  if (itemsCount[0].count > 0) {
+    await execute('UPDATE "Game" SET isActive = 0 WHERE id = ?', [id])
+    return
+  }
+
+  const resultsCount = await query('SELECT COUNT(*) as count FROM "Result" WHERE gameId = ?', [id])
+  if (resultsCount[0].count > 0) {
+    await execute('UPDATE "Game" SET isActive = 0 WHERE id = ?', [id])
+    return
+  }
+
+  await execute('DELETE FROM "Game" WHERE id = ?', [id])
 }
 
 // Seed default games

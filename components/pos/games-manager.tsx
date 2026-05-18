@@ -202,7 +202,7 @@ export function GamesManager() {
                   <div className="flex flex-wrap gap-1">
                     {game.schedules.map((schedule) => (
                       <Badge key={schedule.id} variant="secondary" className="text-xs">
-                        {schedule.name} - {schedule.time}
+                        {schedule.name} - {formatTime12h(schedule.time)}
                       </Badge>
                     ))}
                   </div>
