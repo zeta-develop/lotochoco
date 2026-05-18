@@ -134,7 +134,7 @@ export function WinnersManager() {
                           Número: <span className="font-mono font-bold">{winner.result?.winningNumber}</span>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {winner.result?.schedule?.name} - {format(new Date(winner.createdAt), "dd/MM HH:mm", { locale: es })}
+                          {winner.result?.schedule?.name} - {format(new Date(winner.createdAt), "dd/MM hh:mm a", { locale: es })}
                         </div>
                       </div>
                       <div className="text-right">
@@ -189,7 +189,7 @@ export function WinnersManager() {
                           {winner.result?.game?.name} - {winner.result?.winningNumber}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Pagado: {winner.paidAt && format(new Date(winner.paidAt), "dd/MM HH:mm", { locale: es })}
+                          Pagado: {winner.paidAt && format(new Date(winner.paidAt), "dd/MM hh:mm a", { locale: es })}
                         </div>
                       </div>
                       <div className="text-xl font-bold text-green-600 dark:text-green-400">

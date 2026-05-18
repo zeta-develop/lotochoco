@@ -56,7 +56,7 @@ export function generateTicketReceipt(
   receipt += COMMANDS.ALIGN_LEFT
   receipt += `TICKET: ${ticket.ticketNumber}${COMMANDS.FEED_LINE}`
   receipt += `FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}${COMMANDS.FEED_LINE}`
-  receipt += `HORA:   ${format(new Date(ticket.createdAt), "HH:mm:ss", { locale: es })}${COMMANDS.FEED_LINE}`
+  receipt += `HORA:   ${format(new Date(ticket.createdAt), "hh:mm:ss a", { locale: es })}${COMMANDS.FEED_LINE}`
   
   if (ticket.client) {
     receipt += `CLIENTE: ${ticket.client.toUpperCase()}${COMMANDS.FEED_LINE}`

@@ -1,27 +1,61 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
+import { endOfDay, startOfDay } from 'date-fns'
 import type { Ticket, CartItem } from '@/lib/types'
 import { ticketService } from '@/services/tickets'
 import { toast } from 'sonner'
 
-export function useTickets() {
+function parseLocalDate(value?: string) {
+  if (!value) return undefined
+
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return undefined
+
+  return new Date(year, month - 1, day)
+}
+
+export function useTickets(options?: { startDate?: string; endDate?: string }) {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const parsedStartDate = useMemo(
+    () => {
+      const parsedDate = parseLocalDate(options?.startDate)
+      return parsedDate ? startOfDay(parsedDate) : undefined
+    },
+    [options?.startDate]
+  )
+  
+  const parsedEndDate = useMemo(
+    () => {
+      const parsedDate = parseLocalDate(options?.endDate)
+      return parsedDate ? endOfDay(parsedDate) : undefined
+    },
+    [options?.endDate]
+  )
+
   const refresh = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await ticketService.getTodayTickets()
-      setTickets(data)
+      if (options?.startDate || options?.endDate) {
+        const { tickets: fetchedTickets } = await ticketService.getTickets({
+          startDate: parsedStartDate,
+          endDate: parsedEndDate
+        })
+        setTickets(fetchedTickets)
+      } else {
+        const data = await ticketService.getTodayTickets()
+        setTickets(data)
+      }
     } catch (error) {
       console.error('Error al cargar tickets:', error)
       toast.error('Error al cargar tickets')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [options?.startDate, options?.endDate, parsedStartDate, parsedEndDate])
 
   useEffect(() => {
     refresh()

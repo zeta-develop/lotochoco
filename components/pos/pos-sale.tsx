@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -29,9 +29,14 @@ import {
   ShoppingCart,
   Trash2,
   X,
+  Ticket,
+  Gamepad2,
+  User,
+  Banknote
 } from 'lucide-react'
-import type { Game, Ticket, TicketItem } from '@/lib/types'
+import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 export function POSSale() {
   const { games, isLoading: gamesLoading } = useGames()
@@ -56,7 +61,7 @@ export function POSSale() {
   const [client, setClient] = useState('')
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [lastTicket, setLastTicket] = useState<Ticket | null>(null)
+  const [lastTicket, setLastTicket] = useState<AppTicket | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
@@ -128,7 +133,7 @@ export function POSSale() {
     if (!lastTicket) return
 
     const result = await printerService.printTicket(
-      lastTicket as Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
+      lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
       settings
     )
     if (!result.success) {
@@ -143,7 +148,7 @@ export function POSSale() {
     if (!lastTicket) return
     toast.info('Generando PDF...')
     const result = await printerService.shareTicketPDF(
-      lastTicket as Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
+      lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
       settings
     )
     if (!result.success) toast.error(result.message)
@@ -153,255 +158,311 @@ export function POSSale() {
 
   if (gamesLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Cargando Juegos...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-4">
+    <div className="space-y-8 pb-24 max-w-4xl mx-auto">
+      {/* Header Premium */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
+        <div className="space-y-1">
+          <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase px-3 py-0.5 rounded-full mb-2">Terminal de Venta</Badge>
+          <h1 className="text-4xl font-black tracking-tighter text-foreground">Nueva Jugada</h1>
+          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-60">Registro de tickets y ventas directas</p>
+        </div>
+      </div>
+
       {!isCashOpen && (
-        <Card className="border-orange-500/50 bg-orange-500/10">
-          <CardContent className="flex items-center gap-3 py-3">
-            <AlertCircle className="h-5 w-5 text-orange-500" />
-            <span className="text-sm text-orange-600 dark:text-orange-400">
-              La caja está cerrada. Abre la caja para poder vender.
-            </span>
-          </CardContent>
-        </Card>
+        <div className="p-5 bg-orange-500/10 border-2 border-orange-500/20 rounded-2xl flex gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="bg-orange-500 h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-white"><AlertCircle /></div>
+          <p className="text-sm font-bold text-orange-700 dark:text-orange-400 leading-relaxed my-auto">
+            La caja registradora está <span className="font-black uppercase tracking-widest">cerrada</span>. Abre la caja en el panel de Estado para poder registrar ventas.
+          </p>
+        </div>
       )}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Nueva jugada</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Juego</label>
-              <select
-                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={selectedGame?.id || ''}
-                onChange={(event) => {
-                  const game = games.find((item) => item.id === event.target.value)
-                  if (game) handleGameSelect(game)
-                }}
-              >
-                {games.map((game) => (
-                  <option key={game.id} value={game.id}>
-                    {game.name} - {game.digitCount} dígito{game.digitCount > 1 ? 's' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <div className="grid gap-8 lg:grid-cols-5">
+        <div className="lg:col-span-3 space-y-6">
+          <Card className="border-none shadow-xl bg-card/40 rounded-3xl overflow-hidden animate-in fade-in slide-in-from-bottom-3">
+            <CardHeader className="bg-primary/5 pb-6 border-b border-primary/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Gamepad2 className="h-5 w-5" /></div>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter">Detalles de Jugada</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Juego</label>
+                  <select
+                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none"
+                    value={selectedGame?.id || ''}
+                    onChange={(event) => {
+                      const game = games.find((item) => item.id === event.target.value)
+                      if (game) handleGameSelect(game)
+                    }}
+                  >
+                    {games.map((game) => (
+                      <option key={game.id} value={game.id}>
+                        {game.name} ({game.digitCount} dígito{game.digitCount > 1 ? 's' : ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Horario</label>
-              <select
-                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={selectedSchedule?.id || ''}
-                onChange={(event) => {
-                  const schedule = selectedGame?.schedules?.find((item) => item.id === event.target.value)
-                  setSelectedSchedule(schedule || null)
-                }}
-                disabled={!selectedGame || !selectedGame.schedules?.length}
-              >
-                {selectedGame?.schedules?.length ? (
-                  selectedGame.schedules.map((schedule) => (
-                    <option key={schedule.id} value={schedule.id}>
-                      {schedule.name} - {schedule.time}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">Sin horarios</option>
-                )}
-              </select>
-            </div>
-          </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Horario</label>
+                  <select
+                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none disabled:opacity-50"
+                    value={selectedSchedule?.id || ''}
+                    onChange={(event) => {
+                      const schedule = selectedGame?.schedules?.find((item) => item.id === event.target.value)
+                      setSelectedSchedule(schedule || null)
+                    }}
+                    disabled={!selectedGame || !selectedGame.schedules?.length}
+                  >
+                    {selectedGame?.schedules?.length ? (
+                      selectedGame.schedules.map((schedule) => (
+                        <option key={schedule.id} value={schedule.id}>
+                          {schedule.name} - {schedule.time}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">Sin horarios configurados</option>
+                    )}
+                  </select>
+                </div>
+              </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Numero</label>
-              <Input
-                value={number}
-                onChange={(event) =>
-                  setNumber(event.target.value.replace(/\D/g, '').slice(0, selectedGame?.digitCount || 2))
-                }
-                placeholder={`${selectedGame?.digitCount || 2} digitos`}
-                className="h-14 text-center text-2xl font-bold"
-                inputMode="numeric"
-                maxLength={selectedGame?.digitCount || 2}
-              />
-            </div>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Número Jugado</label>
+                  <Input
+                    value={number}
+                    onChange={(event) =>
+                      setNumber(event.target.value.replace(/\D/g, '').slice(0, selectedGame?.digitCount || 2))
+                    }
+                    placeholder={`Ingrese ${selectedGame?.digitCount || 2} dígitos`}
+                    className="h-16 text-center text-3xl font-black rounded-2xl border-2 border-muted focus:border-primary transition-all tracking-[0.25em]"
+                    inputMode="numeric"
+                    maxLength={selectedGame?.digitCount || 2}
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Monto ({currency})</label>
-              <Input
-                type="number"
-                min="1"
-                step="1"
-                value={amount}
-                onChange={(event) => setAmount(Number(event.target.value) || 0)}
-                className="h-14 text-center text-2xl font-bold"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Cliente (opcional)</label>
-            <Input
-              value={client}
-              onChange={(event) => setClient(event.target.value)}
-              placeholder="Nombre del cliente"
-              className="h-11"
-            />
-          </div>
-
-          <Button
-            size="lg"
-            className="h-14 w-full text-lg"
-            onClick={handleAddToCart}
-            disabled={!selectedGame || !selectedSchedule || !number || amount <= 0 || !isCashOpen}
-          >
-            <Plus className="mr-2 h-5 w-5" />
-            Agregar jugada
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="flex-1">
-        <CardHeader className="pb-3 border-b">
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Jugadas agregadas ({cart.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 p-4">
-          {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
-              <ShoppingCart className="h-10 w-10 opacity-20" />
-              <p>No hay jugadas agregadas</p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg border bg-card p-3">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {item.gameName}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      <Clock className="mr-1 inline h-3 w-3" />
-                      {item.scheduleName}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xl font-bold">{item.number}</span>
-                    <span className="text-lg font-semibold text-primary">
-                      {currency}{item.amount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Premio: {currency}{(item.amount * item.multiplier).toLocaleString()}
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Monto de Apuesta ({currency})</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-5 font-black text-muted-foreground">{currency}</div>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={amount}
+                      onChange={(event) => setAmount(Number(event.target.value) || 0)}
+                      className="h-16 pl-10 text-2xl font-black rounded-2xl border-2 border-muted focus:border-primary transition-all"
+                    />
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => removeFromCart(item.id)}
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Nombre del Cliente (opcional)</label>
+                <div className="relative group">
+                  <div className="absolute top-4 left-4 text-muted-foreground group-focus-within:text-primary"><User size={20} /></div>
+                  <Input
+                    value={client}
+                    onChange={(event) => setClient(event.target.value)}
+                    placeholder="Identificador del cliente..."
+                    className="h-14 pl-12 rounded-2xl border-2 border-muted focus:border-primary transition-all font-bold"
+                  />
+                </div>
+              </div>
+
+              <Button
+                size="lg"
+                className="h-14 w-full text-sm font-black uppercase tracking-tighter rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95"
+                onClick={handleAddToCart}
+                disabled={!selectedGame || !selectedSchedule || !number || amount <= 0 || !isCashOpen}
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Añadir al Ticket
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-none shadow-xl bg-card/40 rounded-3xl overflow-hidden flex flex-col h-full animate-in fade-in slide-in-from-bottom-4">
+            <CardHeader className="bg-primary/5 pb-6 border-b border-primary/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Ticket className="h-5 w-5" /></div>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter">Ticket Actual</CardTitle>
+                <Badge className="ml-auto bg-primary text-white border-none rounded-full px-3">{cart.length}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+                  <div className="p-4 bg-muted/50 rounded-full"><ShoppingCart className="h-10 w-10 opacity-30" /></div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">El ticket está vacío</p>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.id} className="group flex flex-col gap-2 rounded-2xl border-2 border-muted bg-background p-4 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
+                    <div className="flex items-center justify-between">
+                      <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
+                        {item.gameName}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
+                        onClick={() => removeFromCart(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
+                          <Clock className="h-3 w-3" /> {item.scheduleName}
+                        </div>
+                        <div className="font-mono text-3xl font-black text-foreground">
+                          {item.number}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-black text-primary">
+                          {currency}{item.amount.toFixed(2)}
+                        </div>
+                        <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+                          Gana: {currency}{(item.amount * item.multiplier).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+
+            <div className="border-t-2 border-dashed border-muted p-6 space-y-6 bg-muted/10">
+              <div className="flex items-center justify-between text-lg font-black uppercase tracking-tighter">
+                <span>Total a Pagar</span>
+                <span className="text-3xl text-primary">{currency}{getCartTotal().toFixed(2)}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={clearCart} 
+                  disabled={cart.length === 0}
+                  className="h-14 rounded-2xl font-black uppercase text-[10px] border-2 shadow-sm"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <X className="mr-2 h-4 w-4" />
+                  Descartar
+                </Button>
+                <Button 
+                  onClick={() => setShowConfirmDialog(true)} 
+                  disabled={cart.length === 0 || !isCashOpen}
+                  className="h-14 rounded-2xl font-black uppercase text-[11px] shadow-xl shadow-primary/20 active:scale-95 transition-all"
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Imprimir Venta
                 </Button>
               </div>
-            ))
-          )}
-        </CardContent>
-
-        <div className="border-t p-4 space-y-3">
-          <div className="flex items-center justify-between text-lg font-semibold">
-            <span>Total:</span>
-            <span className="text-2xl text-primary">{currency}{getCartTotal().toFixed(2)}</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={clearCart} disabled={cart.length === 0}>
-              <X className="mr-2 h-4 w-4" />
-              Limpiar
-            </Button>
-            <Button onClick={() => setShowConfirmDialog(true)} disabled={cart.length === 0 || !isCashOpen}>
-              <Check className="mr-2 h-4 w-4" />
-              Vender
-            </Button>
-          </div>
+            </div>
+          </Card>
         </div>
-      </Card>
+      </div>
 
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar Venta</DialogTitle>
-            <DialogDescription>¿Deseas confirmar esta venta?</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-md p-0 overflow-hidden">
+          <div className="bg-primary/5 p-6 border-b border-primary/5">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
+                <Check className="h-5 w-5 text-primary" />
+                Confirmar Venta
+              </DialogTitle>
+              <DialogDescription className="text-xs font-bold uppercase tracking-widest mt-2">
+                Por favor, verifica el monto antes de generar el ticket.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-3 py-4">
-            <div className="rounded-lg bg-muted p-4">
-              <div className="flex justify-between text-sm">
-                <span>Jugadas:</span>
-                <span className="font-medium">{cart.length}</span>
+          <div className="p-6 space-y-4">
+            <div className="rounded-2xl border-2 border-dashed border-muted p-5 bg-muted/10 space-y-4">
+              <div className="flex justify-between items-center pb-4 border-b border-muted/50">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Líneas de Jugada</span>
+                <Badge className="bg-primary/10 text-primary border-none rounded-xl font-black">{cart.length}</Badge>
               </div>
-              <div className="mt-2 flex justify-between text-lg font-semibold">
-                <span>Total:</span>
-                <span className="text-primary">{currency}{getCartTotal().toFixed(2)}</span>
+              <div className="flex justify-between items-end">
+                <span className="text-xs font-black uppercase tracking-widest">Total:</span>
+                <span className="text-4xl font-black text-primary">{currency}{getCartTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmSale} disabled={isProcessing}>
-              {isProcessing ? 'Procesando...' : 'Confirmar'}
-            </Button>
-          </DialogFooter>
+          <div className="p-6 pt-0">
+            <DialogFooter className="gap-3 sm:gap-0">
+              <Button variant="outline" onClick={() => setShowConfirmDialog(false)} className="h-12 rounded-xl font-black uppercase text-[10px] border-2">
+                Cancelar
+              </Button>
+              <Button onClick={handleConfirmSale} disabled={isProcessing} className="h-12 rounded-xl font-black uppercase text-[10px] shadow-lg">
+                {isProcessing ? 'Procesando...' : 'Confirmar e Imprimir'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-green-600">Venta Exitosa</DialogTitle>
-            <DialogDescription>El ticket ha sido generado correctamente.</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-md p-0 overflow-hidden text-center">
+          <div className="bg-green-500/10 p-8 border-b border-green-500/10 flex flex-col items-center justify-center gap-4">
+            <div className="h-16 w-16 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/30">
+              <Check className="h-8 w-8" />
+            </div>
+            <DialogHeader className="text-center">
+              <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-green-700 dark:text-green-400">¡Venta Exitosa!</DialogTitle>
+              <DialogDescription className="text-xs font-bold uppercase tracking-widest mt-1">El ticket se generó en la base de datos.</DialogDescription>
+            </DialogHeader>
+          </div>
 
           {lastTicket && (
-            <div className="space-y-3 py-4">
-              <div className="rounded-lg bg-muted p-4 text-center">
-                <div className="text-sm text-muted-foreground">Ticket #</div>
-                <div className="font-mono text-lg font-bold">{lastTicket.ticketNumber}</div>
-              </div>
-              <div className="flex justify-between text-lg font-semibold">
-                <span>Total:</span>
-                <span className="text-primary">{currency}{lastTicket.totalAmount.toFixed(2)}</span>
+            <div className="p-6">
+              <div className="rounded-2xl bg-muted/30 border border-muted-foreground/10 p-6 flex flex-col gap-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Número de Ticket</span>
+                <span className="font-mono text-3xl font-black tracking-widest text-foreground">{lastTicket.ticketNumber}</span>
+                <div className="mt-4 pt-4 border-t border-muted-foreground/10 flex justify-between items-center">
+                   <span className="text-[10px] font-black uppercase tracking-widest">Total</span>
+                   <span className="text-xl font-black text-primary">{currency}{lastTicket.totalAmount.toFixed(2)}</span>
+                </div>
               </div>
             </div>
           )}
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => setShowSuccessDialog(false)} className="w-full sm:w-auto rounded-xl">
-              Cerrar
-            </Button>
-            <Button variant="secondary" onClick={handleShare} className="w-full sm:w-auto rounded-xl">
-              <Share2 className="mr-2 h-4 w-4" />
-              Compartir
-            </Button>
-            <Button onClick={handlePrint} className="w-full sm:w-auto rounded-xl">
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
-            </Button>
-          </DialogFooter>
+          <div className="p-6 pt-0 bg-background">
+            <DialogFooter className="flex-col gap-3 sm:flex-row sm:gap-2">
+              <Button variant="outline" onClick={() => setShowSuccessDialog(false)} className="w-full sm:w-1/3 h-12 rounded-xl font-black uppercase text-[10px] border-2">
+                Cerrar
+              </Button>
+              <Button variant="secondary" onClick={handleShare} className="w-full sm:w-1/3 h-12 rounded-xl font-black uppercase text-[10px] bg-blue-500/10 text-blue-700 hover:bg-blue-500/20">
+                <Share2 className="mr-2 h-4 w-4" />
+                Compartir
+              </Button>
+              <Button onClick={handlePrint} className="w-full sm:w-1/3 h-12 rounded-xl font-black uppercase text-[10px] shadow-lg">
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
