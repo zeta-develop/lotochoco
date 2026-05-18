@@ -27,9 +27,9 @@ const COMMANDS = {
   // Text formatting
   BOLD_ON: `${ESC}E\x01`,
   BOLD_OFF: `${ESC}E\x00`,
-  DOUBLE_HEIGHT_ON: `${GS}!\x11`,
-  DOUBLE_WIDTH_ON: `${GS}!\x20`,
-  DOUBLE_SIZE_ON: `${GS}!\x30`,
+  DOUBLE_HEIGHT_ON: `${GS}!\x01`,
+  DOUBLE_WIDTH_ON: `${GS}!\x10`,
+  DOUBLE_SIZE_ON: `${GS}!\x11`,
   NORMAL_SIZE: `${GS}!\x00`,
   UNDERLINE_ON: `${ESC}-\x01`,
   UNDERLINE_OFF: `${ESC}-\x00`,
@@ -61,7 +61,6 @@ export function generateTicketReceipt(
 ): string {
   const lineWidth = 32
   const separator = repeatChar('-', lineWidth)
-  const doubleSeparator = repeatChar('=', lineWidth)
   const currency = settings.currency || 'C$'
   
   let receipt = ''
@@ -72,57 +71,55 @@ export function generateTicketReceipt(
   // Header - Business name
   receipt += COMMANDS.ALIGN_CENTER
   receipt += COMMANDS.BOLD_ON
-  receipt += COMMANDS.DOUBLE_WIDTH_ON
-  receipt += settings.businessName || 'LOTERIA'
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.NORMAL_SIZE
-  receipt += COMMANDS.BOLD_OFF
   
-  receipt += 'Ticket de Loteria'
+  const businessName = (settings.businessName || 'LOTERIA').toUpperCase();
+  if (businessName.length <= 16) {
+    receipt += COMMANDS.DOUBLE_SIZE_ON
+    receipt += businessName
+    receipt += COMMANDS.NORMAL_SIZE
+  } else {
+    receipt += businessName.substring(0, lineWidth)
+  }
+  receipt += COMMANDS.FEED_LINE
+  
+  receipt += COMMANDS.BOLD_OFF
+  receipt += 'RECIBO DE VENTA'
   receipt += COMMANDS.FEED_LINE
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
   // Ticket info
   receipt += COMMANDS.ALIGN_LEFT
-  receipt += `Ticket: #${ticket.ticketNumber}`
-  receipt += COMMANDS.FEED_LINE
-  receipt += `Fecha: ${format(new Date(ticket.createdAt), "dd/MM/yyyy", { locale: es })}`
-  receipt += COMMANDS.FEED_LINE
-  receipt += `Hora: ${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}`
-  receipt += COMMANDS.FEED_LINE
+  receipt += `TICKET: ${ticket.ticketNumber}\n`
+  receipt += `FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yy HH:mm")}\n`
   
   if (ticket.client) {
-    receipt += `Cliente: ${ticket.client}`
-    receipt += COMMANDS.FEED_LINE
+    receipt += `CLIENTE: ${ticket.client.toUpperCase().substring(0, 23)}\n`
   }
   
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  // Items header
-  receipt += COMMANDS.BOLD_ON
-  receipt += 'JUEGO     NUM  MONTO   PREMIO'
-  receipt += COMMANDS.BOLD_OFF
-  receipt += COMMANDS.FEED_LINE
-  receipt += separator
-  receipt += COMMANDS.FEED_LINE
-  
-  // Items
+  // Cuerpo del Ticket (Jugadas)
   for (const item of ticket.items) {
-    const gameName = (item.game?.name || 'N/A').substring(0, 9).padEnd(10)
-    const number = item.number.padStart(3)
-    const multiplier = item.game?.multiplier || 70
-    const prize = calculatePrize(item.amount, multiplier)
-    const montoStr = `${currency}${item.amount.toFixed(0)}`.padStart(7)
-    const prizeStr = `${currency}${prize.toFixed(0)}`.padStart(9)
+    const gameName = (item.game?.name || 'JUEGO').toUpperCase();
+    const number = item.number;
+    const amount = `${currency}${item.amount.toFixed(0)}`;
+    const multiplier = item.game?.multiplier || 70;
+    const prize = `${currency}${(item.amount * multiplier).toFixed(0)}`;
+
+    // Línea 1: JUEGO y HORARIO
+    receipt += COMMANDS.BOLD_ON;
+    receipt += `${gameName} (${item.schedule})\n`;
+    receipt += COMMANDS.BOLD_OFF;
+
+    // Línea 2: NUMERO, VALOR y PREMIO bien alineados
+    const numPart = `NUM:${number}`.padEnd(7);
+    const valPart = `VAL:${amount}`.padEnd(10);
+    const prePart = `PRE:${prize}`.padStart(15);
     
-    receipt += `${gameName}${number}${montoStr}${prizeStr}`
-    receipt += COMMANDS.FEED_LINE
-    
-    // Schedule time on next line
-    receipt += `          ${item.schedule}`
-    receipt += COMMANDS.FEED_LINE
+    receipt += numPart + valPart + prePart + '\n';
+    receipt += COMMANDS.FEED_LINE;
   }
   
   // Total
@@ -139,25 +136,17 @@ export function generateTicketReceipt(
   
   // Footer message
   receipt += COMMANDS.ALIGN_CENTER
-  receipt += doubleSeparator
-  receipt += COMMANDS.FEED_LINE
-  receipt += settings.ticketMessage || '!Buena suerte!'
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.FEED_LINE
+  const msg = settings.ticketMessage || '¡GRACIAS POR SU COMPRA!';
+  receipt += msg.substring(0, lineWidth) + '\n';
+  receipt += 'BUENA SUERTE\n';
+  receipt += '*** CONSERVE SU TICKET ***\n';
   
-  // Barcode with ticket number
-  receipt += COMMANDS.BARCODE_HEIGHT
-  receipt += COMMANDS.BARCODE_WIDTH
-  receipt += COMMANDS.BARCODE_TEXT_BELOW
-  receipt += COMMANDS.BARCODE_CODE128
-  receipt += String.fromCharCode(ticket.ticketNumber.length)
-  receipt += ticket.ticketNumber
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.FEED_LINE
+  // Cut paper
+  receipt += COMMANDS.FEED_PAPER
+  receipt += COMMANDS.PARTIAL_CUT
   
-  receipt += '*** CONSERVE SU TICKET ***'
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.FEED_LINE
+  return receipt
+}
   
   // Cut paper
   receipt += COMMANDS.FEED_PAPER
