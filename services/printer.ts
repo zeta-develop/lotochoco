@@ -147,13 +147,6 @@ export function generateTicketReceipt(
   
   return receipt
 }
-  
-  // Cut paper
-  receipt += COMMANDS.FEED_PAPER
-  receipt += COMMANDS.PARTIAL_CUT
-  
-  return receipt
-}
 
 export function generateCashCloseReceipt(
   session: CashSession,
