@@ -39,7 +39,7 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
           <div className="flex justify-between">
             <span>HORA:</span>
             <span>{new Date(ticket.createdAt).toLocaleTimeString("es-NI", { 
-              hour: "2-digit", 
+              hour: "2-digit", hour12: true,
               minute: "2-digit" 
             })}</span>
           </div>
