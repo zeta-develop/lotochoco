@@ -91,7 +91,7 @@ export function generateTicketReceipt(
   // Ticket info
   receipt += COMMANDS.ALIGN_LEFT
   receipt += `TICKET: ${ticket.ticketNumber}\n`
-  receipt += `FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yy HH:mm")}\n`
+  receipt += `FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yy hh:mm a")}\n`
   
   if (ticket.client) {
     receipt += `CLIENTE: ${ticket.client.toUpperCase().substring(0, 23)}\n`
@@ -174,10 +174,10 @@ export function generateCashCloseReceipt(
   
   // Date range
   receipt += COMMANDS.ALIGN_LEFT
-  receipt += `Apertura: ${format(new Date(session.openedAt), "dd/MM/yyyy HH:mm", { locale: es })}`
+  receipt += `Apertura: ${format(new Date(session.openedAt), "dd/MM/yyyy hh:mm a", { locale: es })}`
   receipt += COMMANDS.FEED_LINE
   if (session.closedAt) {
-    receipt += `Cierre: ${format(new Date(session.closedAt), "dd/MM/yyyy HH:mm", { locale: es })}`
+    receipt += `Cierre: ${format(new Date(session.closedAt), "dd/MM/yyyy hh:mm a", { locale: es })}`
     receipt += COMMANDS.FEED_LINE
   }
   receipt += separator
@@ -498,7 +498,7 @@ export function generatePrintableHTML(
       </div>
       <div class="info-row">
         <span>HORA:</span>
-        <span>${format(new Date(ticket.createdAt), "HH:mm", { locale: es })}</span>
+        <span>${format(new Date(ticket.createdAt), "hh:mm a", { locale: es })}</span>
       </div>
       ${ticket.client ? `
       <div class="info-row">
@@ -594,7 +594,7 @@ export function generateTicketImageUrl(
   const currency = settings.currency || 'C$'
   const businessName = escapeXml(settings.businessName || 'LOTERIA')
   const ticketMessage = escapeXml(settings.ticketMessage || '!Buena suerte!')
-  const createdAt = escapeXml(format(new Date(ticket.createdAt), 'dd/MM/yyyy HH:mm', { locale: es }))
+  const createdAt = escapeXml(format(new Date(ticket.createdAt), 'dd/MM/yyyy hh:mm a', { locale: es }))
 
   const itemRows = ticket.items
     .map((item, index) => {
@@ -747,7 +747,7 @@ export const printerService = {
       doc.setFont('helvetica', 'bold');
       doc.text(`FECHA:`, 5, 34);
       doc.setFont('helvetica', 'normal');
-      const dateStr = format(new Date(ticket.createdAt), "dd/MM/yyyy HH:mm", { locale: es });
+      const dateStr = format(new Date(ticket.createdAt), "dd/MM/yyyy hh:mm a", { locale: es });
       doc.text(dateStr, 18, 34);
       
       if (ticket.client) {

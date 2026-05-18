@@ -73,7 +73,7 @@ export function generatePT210Receipt(
   // Info del Ticket
   receipt += COMMANDS.ALIGN_LEFT;
   receipt += `TICKET: ${ticket.ticketNumber}\n`;
-  receipt += `FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yy HH:mm")}\n`;
+  receipt += `FECHA:  ${format(new Date(ticket.createdAt), "dd/MM/yy hh:mm a")}\n`;
   
   if (ticket.client) {
     receipt += `CLIENTE: ${ticket.client.toUpperCase().substring(0, 23)}\n`;

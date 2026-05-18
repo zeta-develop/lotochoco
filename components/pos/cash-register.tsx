@@ -86,13 +86,15 @@ export function CashRegister() {
       setCloseNotes('')
       
       // Print close report
-      try {
-        const result = await printerService.printClose(closedSession, settings)
-        if (!result.success) {
-          toast.error(result.message || 'Error al imprimir cierre')
+      if (closedSession) {
+        try {
+          const result = await printerService.printClose(closedSession, settings)
+          if (!result.success) {
+            toast.error(result.message || 'Error al imprimir cierre')
+          }
+        } catch (err) {
+          // ignore
         }
-      } catch (err) {
-        // ignore
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al cerrar caja')
@@ -160,7 +162,7 @@ export function CashRegister() {
               </div>
               {session && (
                 <div className="text-sm text-muted-foreground">
-                  Desde: {format(new Date(session.openedAt), "dd/MM/yyyy HH:mm", { locale: es })}
+                  Desde: {format(new Date(session.openedAt), "dd/MM/yyyy hh:mm a", { locale: es })}
                 </div>
               )}
             </div>
@@ -323,7 +325,7 @@ export function CashRegister() {
                             <div>
                               <div className="text-sm font-medium">{movement.description}</div>
                               <div className="text-xs text-muted-foreground">
-                                {format(new Date(movement.createdAt), "HH:mm")}
+                                {format(new Date(movement.createdAt), "hh:mm a")}
                               </div>
                             </div>
                           </div>
@@ -370,7 +372,7 @@ export function CashRegister() {
                       {format(new Date(session.openedAt), "dd/MM/yyyy", { locale: es })}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {format(new Date(session.openedAt), "HH:mm")} - {session.closedAt && format(new Date(session.closedAt), "HH:mm")}
+                      {format(new Date(session.openedAt), "hh:mm a")} - {session.closedAt && format(new Date(session.closedAt), "hh:mm a")}
                     </div>
                   </div>
                   <div className="text-right">

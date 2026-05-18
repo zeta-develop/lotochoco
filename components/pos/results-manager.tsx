@@ -143,7 +143,7 @@ export function ResultsManager() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {format(new Date(result.drawDate), 'HH:mm')}
+                      {format(new Date(result.drawDate), 'hh:mm a')}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

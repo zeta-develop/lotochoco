@@ -384,7 +384,7 @@ export function Reports() {
                         <div>
                           <div className="font-mono font-black text-sm group-hover:text-primary transition-colors">{ticket.ticketNumber}</div>
                           <div className="text-[10px] text-muted-foreground uppercase font-black tracking-tight mt-0.5">
-                            {format(new Date(ticket.createdAt), "dd MMM · HH:mm", { locale: es })}
+                            {format(new Date(ticket.createdAt), "dd MMM · hh:mm a", { locale: es })}
                           </div>
                         </div>
                       </div>
@@ -528,7 +528,7 @@ export function Reports() {
                       <div className="text-right">
                         <div className="text-sm font-black text-red-600">-{currency}{cancel.totalAmount}</div>
                         <div className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
-                          {format(new Date(cancel.createdAt), "dd MMM · HH:mm", { locale: es })}
+                          {format(new Date(cancel.createdAt), "dd MMM · hh:mm a", { locale: es })}
                         </div>
                       </div>
                     </div>
