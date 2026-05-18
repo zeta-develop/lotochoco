@@ -59,7 +59,7 @@ export function useGames(activeOnly = true) {
     return game
   }
 
-  const updateGame = async (id: string, updates: Partial<Game>) => {
+  const updateGame = async (id: string, updates: Omit<Partial<Game>, 'schedules'> & { schedules?: { id?: string; name: string; time: string }[] }) => {
     const game = await gamesService.update(id, updates)
     await refresh()
     return game
