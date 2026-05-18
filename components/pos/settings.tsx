@@ -280,7 +280,7 @@ export function Settings() {
                   </div>
                   
                   <div className="space-y-1 mb-4 border-b border-dashed border-black/10 pb-4">
-                    <div className="flex justify-between uppercase opacity-60 font-bold"><span>FECHA: {new Date().toLocaleDateString()}</span><span>HORA: {new Date().toLocaleTimeString('es-NI', {hour:'2-digit', minute:'2-digit'})}</span></div>
+                    <div className="flex justify-between uppercase opacity-60 font-bold"><span>FECHA: {new Date().toLocaleDateString()}</span><span>HORA: {new Date().toLocaleTimeString('es-NI', {hour:'2-digit', minute:'2-digit', hour12: true})}</span></div>
                     <p className="font-black">TICKET: #00000001</p>
                   </div>
 
