@@ -79,6 +79,7 @@ export async function updateGame(
     digitCount: number
     multiplier: number
     isActive: boolean
+    schedules: { id?: string; name: string; time: string }[]
   }>
 ): Promise<Game> {
   const fields: string[] = []
@@ -92,6 +93,25 @@ export async function updateGame(
   if (fields.length > 0) {
     values.push(id)
     await execute(`UPDATE Game SET ${fields.join(', ')}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`, values)
+  }
+
+  if (data.schedules !== undefined) {
+    const existing = await query<DrawSchedule>('SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1', [id])
+    const newIds = data.schedules.map(s => s.id).filter(Boolean) as string[]
+    
+    for (const ex of existing) {
+      if (!newIds.includes(ex.id)) {
+        await execute('UPDATE DrawSchedule SET isActive = 0 WHERE id = ?', [ex.id])
+      }
+    }
+
+    for (const s of data.schedules) {
+      if (s.id) {
+        await execute('UPDATE DrawSchedule SET name = ?, time = ? WHERE id = ?', [s.name, s.time, s.id])
+      } else {
+        await execute('INSERT INTO DrawSchedule (id, gameId, name, time, isActive) VALUES (?, ?, ?, ?, 1)', [generateId(), id, s.name, s.time])
+      }
+    }
   }
   
   return (await getGameById(id))!

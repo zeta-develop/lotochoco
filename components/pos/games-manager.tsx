@@ -38,7 +38,7 @@ export function GamesManager() {
     name: '',
     digitCount: '2',
     multiplier: '70',
-    schedules: [{ name: 'Mañana', time: '11:00' }]
+    schedules: [{ id: '', name: 'Mañana', time: '11:00' }]
   })
 
   const resetForm = () => {
@@ -46,7 +46,7 @@ export function GamesManager() {
       name: '',
       digitCount: '2',
       multiplier: '70',
-      schedules: [{ name: 'Mañana', time: '11:00' }]
+      schedules: [{ id: '', name: 'Mañana', time: '11:00' }]
     })
   }
 
@@ -82,7 +82,8 @@ export function GamesManager() {
       await updateGame(editingGame.id, {
         name: formData.name.trim(),
         digitCount: parseInt(formData.digitCount),
-        multiplier: parseFloat(formData.multiplier)
+        multiplier: parseFloat(formData.multiplier),
+        schedules: formData.schedules.filter(s => s.name && s.time).map(s => ({ id: s.id, name: s.name, time: s.time }))
       })
       toast.success('Juego actualizado exitosamente')
       setEditingGame(null)
@@ -119,7 +120,7 @@ export function GamesManager() {
       name: game.name,
       digitCount: game.digitCount.toString(),
       multiplier: game.multiplier.toString(),
-      schedules: game.schedules?.map(s => ({ name: s.name, time: s.time })) || []
+      schedules: game.schedules?.map(s => ({ id: s.id, name: s.name, time: s.time })) || []
     })
     setEditingGame(game)
   }
@@ -127,7 +128,7 @@ export function GamesManager() {
   const addSchedule = () => {
     setFormData({
       ...formData,
-      schedules: [...formData.schedules, { name: '', time: '' }]
+      schedules: [...formData.schedules, { id: '', name: '', time: '' }]
     })
   }
 
@@ -295,49 +296,47 @@ export function GamesManager() {
               </div>
             </div>
 
-            {!editingGame && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Horarios</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addSchedule}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {formData.schedules.map((schedule, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        placeholder="Nombre (Mañana)"
-                        value={schedule.name}
-                        onChange={(e) => updateSchedule(index, 'name', e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        type="time"
-                        value={schedule.time}
-                        onChange={(e) => updateSchedule(index, 'time', e.target.value)}
-                        className="w-32"
-                      />
-                      {formData.schedules.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeSchedule(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Horarios</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addSchedule}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-            )}
+              <div className="space-y-2">
+                {formData.schedules.map((schedule, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder="Nombre (Mañana)"
+                      value={schedule.name}
+                      onChange={(e) => updateSchedule(index, 'name', e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="time"
+                      value={schedule.time}
+                      onChange={(e) => updateSchedule(index, 'time', e.target.value)}
+                      className="w-32"
+                    />
+                    {formData.schedules.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeSchedule(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
