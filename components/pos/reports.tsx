@@ -464,7 +464,7 @@ export function Reports() {
                                     </div>
                                     <div>
                                       <p className="text-[10px] font-black uppercase text-muted-foreground leading-none mb-1">{item.game?.name}</p>
-                                      <p className="text-[9px] font-black text-primary leading-none uppercase tracking-widest">{item.schedule}</p>
+                                      <p className="text-[9px] font-black text-primary leading-none uppercase tracking-widest">{formatTime12h(item.schedule)}</p>
                                     </div>
                                   </div>
                                   <div className="font-black text-base text-foreground">{currency}{item.amount}</div>
@@ -564,7 +564,7 @@ export function Reports() {
                            <div className="h-10 w-10 rounded-xl bg-background border font-black flex items-center justify-center text-primary">{item.number}</div>
                            <div>
                              <p className="text-[10px] font-black uppercase text-foreground leading-none mb-1">{item.game?.name || 'Juego'}</p>
-                             <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.schedule}</p>
+                             <p className="text-[9px] font-bold text-muted-foreground uppercase">{formatTime12h(item.schedule)}</p>
                            </div>
                         </div>
                         <div className="text-right">

@@ -13,3 +13,17 @@ export function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + 
          Math.random().toString(36).substring(2, 15)
 }
+
+import { parse, format } from 'date-fns'
+
+export function formatTime12h(timeStr?: string): string {
+  if (!timeStr) return '';
+  try {
+    if (timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) return timeStr;
+    const parsed = parse(timeStr, 'HH:mm', new Date());
+    if (isNaN(parsed.getTime())) return timeStr;
+    return format(parsed, 'hh:mm a');
+  } catch (e) {
+    return timeStr;
+  }
+}

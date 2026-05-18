@@ -110,7 +110,7 @@ export function generateTicketReceipt(
 
     // Línea 1: JUEGO y HORARIO
     receipt += COMMANDS.BOLD_ON;
-    receipt += `${gameName} (${item.schedule})\n`;
+    receipt += `${gameName} (${formatTime12h(item.schedule)})\n`;
     receipt += COMMANDS.BOLD_OFF;
 
     // Línea 2: NUMERO, VALOR y PREMIO bien alineados
@@ -526,7 +526,7 @@ export function generatePrintableHTML(
             <tr>
               <td>
                 <div>${item.game?.name || 'Juego'}</div>
-                <div class="schedule">${item.schedule || ''}</div>
+                <div class="schedule">${formatTime12h(item.schedule)}</div>
               </td>
               <td class="number">${item.number}</td>
               <td class="right">${currency}${item.amount.toFixed(0)}</td>
@@ -796,7 +796,7 @@ export const printerService = {
         doc.setTextColor(120, 120, 120);
         doc.setFontSize(6);
         doc.setFont('helvetica', 'italic');
-        doc.text(`Sorteo: ${item.schedule}`, 7, y);
+        doc.text(`Sorteo: ${formatTime12h(item.schedule)}`, 7, y);
         
         y += 6;
         doc.setTextColor(0, 0, 0);

@@ -235,7 +235,7 @@ export function ResultsManager() {
                   <SelectContent>
                     {selectedGame.schedules.map((schedule) => (
                       <SelectItem key={schedule.id} value={schedule.id}>
-                        {schedule.name} - {schedule.time}
+                        {schedule.name} - {formatTime12h(schedule.time)}
                       </SelectItem>
                     ))}
                   </SelectContent>
