@@ -112,22 +112,35 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          # El comando 'clean' borra compilaciones previas que causan el error del IncrementalSplitter
           ./gradlew clean assembleRelease
+
+          # Renombrar el APK para que tenga un nombre consistente
+          mkdir -p final-apk
+          cp app/build/outputs/apk/release/app-release.apk final-apk/app-release.apk
 
       # 1️⃣4️⃣ Upload APK as artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lotochoco-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          name: app-release
+          path: android/final-apk/app-release.apk
 
       # 1️⃣5️⃣ Create GitHub Release and upload APK
       - name: Create GitHub Release and upload APK
-        uses: ncipollo/release-action@v1
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main')
         with:
-          artifacts: android/app/build/outputs/apk/release/*.apk
-          tag: "v${{ env.APP_VERSION }}-${{ github.run_number }}"
-          name: "LotoChoco v${{ env.APP_VERSION }}"
+          files: android/final-apk/app-release.apk
+          tag_name: "v${{ env.APP_VERSION }}.${{ github.run_number }}"
+          name: "LotoChoco v${{ env.APP_VERSION }} (Build ${{ github.run_number }})"
           draft: false
           prerelease: false
+          body: |
+            ### 📱 Nueva Versión de LotoChoco
+            - Versión: `${{ env.APP_VERSION }}`
+            - Build: `${{ github.run_number }}`
+            - Commit: `${{ github.sha }}`
+
+            Descarga el archivo `app-release.apk` para instalar en tu dispositivo Android.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
