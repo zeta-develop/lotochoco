@@ -1,6 +1,7 @@
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import type { Ticket, TicketItem, CashSession } from '@/lib/types';
 import { format } from 'date-fns';
+import { formatTime12h } from '@/lib/utils';
 import { es } from 'date-fns/locale';
 
 // UUIDs estándar para impresoras térmicas Bluetooth (PT-210)
@@ -92,7 +93,7 @@ export function generatePT210Receipt(
 
     // Línea 1: JUEGO y HORARIO
     receipt += COMMANDS.BOLD_ON;
-    receipt += `${gameName} (${item.schedule})\n`;
+    receipt += `${gameName} (${formatTime12h(item.schedule)})\n`;
     receipt += COMMANDS.BOLD_OFF;
 
     // Línea 2: NUMERO, VALOR y PREMIO bien alineados
