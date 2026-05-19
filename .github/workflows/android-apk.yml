@@ -144,3 +144,4 @@ jobs:
             Descarga el archivo `app-release.apk` para instalar en tu dispositivo Android.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
