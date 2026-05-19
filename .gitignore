@@ -18,3 +18,4 @@ out/
 ignore
 *.log
 *.pem
+.env
