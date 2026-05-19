@@ -38,7 +38,6 @@ jobs:
         run: |
           corepack enable
           corepack prepare pnpm@10 --activate
-
       # 5️⃣ Install dependencies
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -49,7 +48,6 @@ jobs:
           if [ ! -d android ]; then
             pnpm cap:add:android
           fi
-
       # 7️⃣ Set app version and inject into Android App Gradle
       - name: Set app version and inject into Gradle
         run: |
@@ -63,7 +61,6 @@ jobs:
           sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" ./android/app/build.gradle
           
           echo "Inyectado en Android -> versionCode: $VERSION_CODE, versionName: $VERSION_NAME"
-
       # 8️⃣ Build Next.js
       - name: Build Next.js
         run: pnpm build
@@ -93,7 +90,7 @@ jobs:
           
           # Escribimos los valores de firma Y activamos las flags de compatibilidad necesarias por SQLite
           cat << 'EOF' > android/gradle.properties
-          RELEASE_STORE_FILE=app/release.keystore
+          RELEASE_STORE_FILE=release.keystore
           RELEASE_STORE_PASSWORD=LotoChoco
           RELEASE_KEY_ALIAS=lotochoco-alias
           RELEASE_KEY_PASSWORD=LotoChoco
@@ -101,47 +98,30 @@ jobs:
           # Soporte para plugins heredados y dependencias biométricas/sqlite
           android.useAndroidX=true
           android.enableJetifier=true
-
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
-
           echo "=== Archivo gradle.properties generado con éxito ==="
-
       # 1️⃣3️⃣ Build and auto-sign release APK (Con limpieza de caché incremental)
       - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
+          # El comando 'clean' borra compilaciones previas que causan el error del IncrementalSplitter
           ./gradlew clean assembleRelease
-
-          # Renombrar el APK para que tenga un nombre consistente
-          mkdir -p final-apk
-          cp app/build/outputs/apk/release/app-release.apk final-apk/app-release.apk
-
       # 1️⃣4️⃣ Upload APK as artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/final-apk/app-release.apk
+          name: lotochoco-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
 
       # 1️⃣5️⃣ Create GitHub Release and upload APK
       - name: Create GitHub Release and upload APK
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/heads/main')
+        uses: ncipollo/release-action@v1
         with:
-          files: android/final-apk/app-release.apk
-          tag_name: "v${{ env.APP_VERSION }}.${{ github.run_number }}"
-          name: "LotoChoco v${{ env.APP_VERSION }} (Build ${{ github.run_number }})"
+          artifacts: android/app/build/outputs/apk/release/*.apk
+          tag: "v${{ env.APP_VERSION }}-${{ github.run_number }}"
+          name: "LotoChoco v${{ env.APP_VERSION }}"
           draft: false
           prerelease: false
-          body: |
-            ### 📱 Nueva Versión de LotoChoco
-            - Versión: `${{ env.APP_VERSION }}`
-            - Build: `${{ github.run_number }}`
-            - Commit: `${{ github.sha }}`
-
-            Descarga el archivo `app-release.apk` para instalar en tu dispositivo Android.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
