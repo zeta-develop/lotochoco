@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Printer, X, Share2 } from "lucide-react"
 import type { Ticket, TicketItem, Game } from "@/lib/types"
+import { formatTime12h } from '@/lib/utils'
 
 interface TicketPreviewProps {
   ticket: Ticket & { items: (TicketItem & { game: Game })[] }
@@ -98,7 +99,7 @@ export function TicketPreview({
                       <tr key={index} className="align-top">
                         <td className="py-1">
                           <div className="truncate pr-1">{item.game?.name}</div>
-                          <div className="text-[10px] text-gray-600">{item.schedule}</div>
+                          <div className="text-[10px] text-gray-600">{formatTime12h(item.schedule)}</div>
                         </td>
                         <td className="py-1 text-center font-bold text-base">
                           {item.number}

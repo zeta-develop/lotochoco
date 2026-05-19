@@ -19,6 +19,7 @@ import { useTickets } from '@/hooks/use-tickets'
 import { useSettings } from '@/hooks/use-settings'
 import { useCurrentSession } from '@/hooks/use-cash'
 import { printerService } from '@/services/printer'
+import { formatTime12h } from '@/lib/utils'
 import {
   AlertCircle,
   Check,
@@ -230,7 +231,7 @@ export function POSSale() {
                     {selectedGame?.schedules?.length ? (
                       selectedGame.schedules.map((schedule) => (
                         <option key={schedule.id} value={schedule.id}>
-                          {schedule.name} - {schedule.time}
+                          {schedule.name} - {formatTime12h(schedule.time)}
                         </option>
                       ))
                     ) : (

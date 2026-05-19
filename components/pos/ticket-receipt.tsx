@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import type { Ticket, TicketItem } from "@/lib/types";
+import { formatTime12h } from '@/lib/utils';
 
 interface TicketReceiptProps {
   ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] };
@@ -71,7 +72,7 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
                     <td className="py-1">
                       <div className="truncate pr-1">{(item.game?.name) || "Juego"}</div>
                       {item.schedule && (
-                        <div className="text-[10px] text-gray-600">{item.schedule}</div>
+                        <div className="text-[10px] text-gray-600">{formatTime12h(item.schedule)}</div>
                       )}
                     </td>
                     <td className="py-1 text-center font-bold text-base">

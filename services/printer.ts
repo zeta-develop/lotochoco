@@ -3,6 +3,7 @@
 
 import type { Ticket, TicketItem, CashSession } from '@/lib/types'
 import { format } from 'date-fns'
+import { formatTime12h } from '@/lib/utils'
 import { es } from 'date-fns/locale'
 import { Capacitor } from '@capacitor/core'
 import { BleClient } from '@capacitor-community/bluetooth-le'
@@ -110,7 +111,7 @@ export function generateTicketReceipt(
 
     // Línea 1: JUEGO y HORARIO
     receipt += COMMANDS.BOLD_ON;
-    receipt += `${gameName} (${item.schedule})\n`;
+    receipt += `${gameName} (${formatTime12h(item.schedule)})\n`;
     receipt += COMMANDS.BOLD_OFF;
 
     // Línea 2: NUMERO, VALOR y PREMIO bien alineados
@@ -526,7 +527,7 @@ export function generatePrintableHTML(
             <tr>
               <td>
                 <div>${item.game?.name || 'Juego'}</div>
-                <div class="schedule">${item.schedule || ''}</div>
+                <div class="schedule">${formatTime12h(item.schedule)}</div>
               </td>
               <td class="number">${item.number}</td>
               <td class="right">${currency}${item.amount.toFixed(0)}</td>
@@ -601,7 +602,7 @@ export function generateTicketImageUrl(
       const y = 200 + index * itemHeight
       const gameName = escapeXml((item.game?.name || (item as any).gameName || 'Juego').slice(0, 14))
       const number = escapeXml(item.number)
-      const schedule = escapeXml((item.schedule || (item as any).scheduleTime || '').slice(0, 8))
+      const schedule = escapeXml(formatTime12h((item.schedule || (item as any).scheduleTime || '')));
       const multiplier = item.game?.multiplier || (item as any).multiplier || 70
       const prize = (item.amount || 0) * multiplier
       const amount = escapeXml(`${currency}${(item.amount || 0).toFixed(0)}`)
@@ -796,7 +797,7 @@ export const printerService = {
         doc.setTextColor(120, 120, 120);
         doc.setFontSize(6);
         doc.setFont('helvetica', 'italic');
-        doc.text(`Sorteo: ${item.schedule}`, 7, y);
+        doc.text(`Sorteo: ${formatTime12h(item.schedule)}`, 7, y);
         
         y += 6;
         doc.setTextColor(0, 0, 0);
