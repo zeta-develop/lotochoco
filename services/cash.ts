@@ -1,21 +1,25 @@
-import { query, execute } from '@/lib/db'
+import { query, execute, withTransaction } from '@/lib/db'
 import type { CashSession, CashMovement } from '@/lib/types'
 import { generateId } from '@/lib/utils'
 
 export async function openCashSession(openingAmount: number): Promise<CashSession> {
-  // Check if there's already an open session
-  const existing = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
-  if (existing.length > 0) throw new Error('Ya existe una sesión de caja abierta')
+  return withTransaction(async (db) => {
+    const existing = await db.query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
+    if (existing.values && existing.values.length > 0) {
+      throw new Error('Ya existe una sesión de caja abierta')
+    }
 
-  const id = generateId()
-  const now = new Date().toISOString()
-  
-  await execute(
-    'INSERT INTO CashSession (id, openingAmount, status, salesTotal, prizesTotal, openedAt, createdAt, updatedAt) VALUES (?, ?, "open", 0, 0, ?, ?, ?)',
-    [id, openingAmount, now, now, now]
-  )
+    const id = generateId()
+    const now = new Date().toISOString()
+    
+    await db.run(
+      'INSERT INTO CashSession (id, openingAmount, status, salesTotal, prizesTotal, openedAt, createdAt, updatedAt) VALUES (?, ?, "open", 0, 0, ?, ?, ?)',
+      [id, openingAmount, now, now, now]
+    )
 
-  return (await getCashSessionById(id))!
+    const sessions = await db.query<CashSession>('SELECT * FROM CashSession WHERE id = ?', [id])
+    return sessions.values![0]
+  })
 }
 
 export async function getCurrentSession(): Promise<CashSession | null> {
@@ -32,19 +36,30 @@ export async function getCurrentSession(): Promise<CashSession | null> {
 }
 
 export async function closeCashSession(sessionId: string, notes?: string): Promise<CashSession> {
-  const session = await getCashSessionById(sessionId)
-  if (!session) throw new Error('Sesión no encontrada')
-  if (session.status === 'closed') throw new Error('Esta sesión ya está cerrada')
+  return withTransaction(async (db) => {
+    const sessionRows = await db.query('SELECT * FROM CashSession WHERE id = ?', [sessionId])
+    if (!sessionRows.values || sessionRows.values.length === 0) throw new Error('Sesión no encontrada')
+    const session = sessionRows.values[0] as CashSession
 
-  const summary = await getCashSummary(sessionId)
-  const now = new Date().toISOString()
-  
-  await execute(
-    'UPDATE CashSession SET status = "closed", closingAmount = ?, closedAt = ?, notes = ?, updatedAt = ? WHERE id = ?',
-    [summary.balance, now, notes, now, sessionId]
-  )
+    if (session.status === 'closed') throw new Error('Esta sesión ya está cerrada')
 
-  return (await getCashSessionById(sessionId))!
+    const summary = await getCashSummary(sessionId)
+    const now = new Date().toISOString()
+    
+    await db.run(
+      'UPDATE CashSession SET status = "closed", closingAmount = ?, closedAt = ?, notes = ?, updatedAt = ? WHERE id = ?',
+      [summary.balance, now, notes, now, sessionId]
+    )
+
+    const closedSessions = await db.query('SELECT * FROM CashSession WHERE id = ?', [sessionId])
+    const closedSession = closedSessions.values![0] as CashSession
+    closedSession.movements = await query<CashMovement>(
+      'SELECT * FROM CashMovement WHERE cashSessionId = ? ORDER BY createdAt DESC',
+      [closedSession.id]
+    )
+    
+    return closedSession
+  })
 }
 
 export async function addCashMovement(data: {
@@ -53,16 +68,18 @@ export async function addCashMovement(data: {
   amount: number
   description: string
 }): Promise<CashMovement> {
-  const id = generateId()
-  const now = new Date().toISOString()
-  
-  await execute(
-    'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, data.cashSessionId, data.type, data.amount, data.description, now]
-  )
+  return withTransaction(async (db) => {
+    const id = generateId()
+    const now = new Date().toISOString()
+    
+    await db.run(
+      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, data.cashSessionId, data.type, data.amount, data.description, now]
+    )
 
-  const results = await query<CashMovement>('SELECT * FROM CashMovement WHERE id = ?', [id])
-  return results[0]
+    const results = await db.query('SELECT * FROM CashMovement WHERE id = ?', [id])
+    return results.values![0] as CashMovement
+  })
 }
 
 export async function getCashSessions(options?: {

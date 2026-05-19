@@ -175,6 +175,27 @@ class DatabaseManager {
       throw e
     }
   }
+  
+  async withTransaction<T>(action: (db: SQLiteDBConnection) => Promise<T>): Promise<T> {
+    const db = await this.getDb();
+    try {
+      await db.run('BEGIN TRANSACTION;');
+      console.log('[DB] Transaction started');
+      const result = await action(db);
+      await db.run('COMMIT;');
+      console.log('[DB] Transaction committed');
+      return result;
+    } catch (error) {
+      console.error('[DB] Error in transaction, rolling back...', error);
+      try {
+        await db.run('ROLLBACK;');
+        console.log('[DB] Transaction rolled back');
+      } catch (rollbackError) {
+        console.error('[DB] CRITICAL: Failed to rollback transaction', rollbackError);
+      }
+      throw error;
+    }
+  }
 
   async getSqliteConnection(): Promise<SQLiteConnection> {
     return this.getSqlite()
@@ -187,4 +208,5 @@ export default dbManager
 export const query = dbManager.query.bind(dbManager)
 export const execute = dbManager.execute.bind(dbManager)
 export const getDb = dbManager.getDb.bind(dbManager)
+export const withTransaction = dbManager.withTransaction.bind(dbManager)
 export const getSqliteConnection = dbManager.getSqliteConnection.bind(dbManager)

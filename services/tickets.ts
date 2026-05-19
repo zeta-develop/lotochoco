@@ -1,4 +1,4 @@
-import { query, execute } from '@/lib/db'
+import { query, execute, withTransaction } from '@/lib/db'
 import type { Ticket, TicketItem, CartItem, Game } from '@/lib/types'
 import { format } from 'date-fns'
 import { generateId } from '@/lib/utils'
@@ -24,38 +24,40 @@ async function generateTicketNumber(): Promise<string> {
 }
 
 export async function createTicket(items: CartItem[]): Promise<Ticket> {
-  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
-  const ticketNumber = await generateTicketNumber()
-  const client = items[0]?.client || null
-  const ticketId = generateId()
-  const now = new Date().toISOString()
+  return withTransaction(async (db) => {
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
+    const ticketNumber = await generateTicketNumber()
+    const client = items[0]?.client || null
+    const ticketId = generateId()
+    const now = new Date().toISOString()
 
-  // 1. Crear el Ticket
-  await execute(
-    'INSERT INTO Ticket (id, ticketNumber, totalAmount, status, client, createdAt, updatedAt) VALUES (?, ?, ?, "active", ?, ?, ?)',
-    [ticketId, ticketNumber, totalAmount, client, now, now]
-  )
-
-  // 2. Crear los items
-  for (const item of items) {
-    await execute(
-      'INSERT INTO TicketItem (id, ticketId, gameId, number, amount, schedule, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [generateId(), ticketId, item.gameId, item.number, item.amount, item.schedule, now]
+    // 1. Crear el Ticket
+    await db.run(
+      'INSERT INTO Ticket (id, ticketNumber, totalAmount, status, client, createdAt, updatedAt) VALUES (?, ?, ?, "active", ?, ?, ?)',
+      [ticketId, ticketNumber, totalAmount, client, now, now]
     )
-  }
 
-  // 3. Actualizar sesión de caja
-  const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
-  if (openSessions.length > 0) {
-    const sessionId = openSessions[0].id
-    await execute('UPDATE CashSession SET salesTotal = salesTotal + ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [totalAmount, sessionId])
-    await execute(
-      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "sale", ?, ?, ?)',
-      [generateId(), sessionId, totalAmount, `Venta ticket ${ticketNumber}`, now]
-    )
-  }
+    // 2. Crear los items
+    for (const item of items) {
+      await db.run(
+        'INSERT INTO TicketItem (id, ticketId, gameId, number, amount, schedule, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [generateId(), ticketId, item.gameId, item.number, item.amount, item.schedule, now]
+      )
+    }
 
-  return (await getTicketById(ticketId))!
+    // 3. Actualizar sesión de caja
+    const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
+    if (openSessions.length > 0) {
+      const sessionId = openSessions[0].id
+      await db.run('UPDATE CashSession SET salesTotal = salesTotal + ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [totalAmount, sessionId])
+      await db.run(
+        'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "sale", ?, ?, ?)',
+        [generateId(), sessionId, totalAmount, `Venta ticket ${ticketNumber}`, now]
+      )
+    }
+
+    return (await getTicketById(ticketId))!
+  })
 }
 
 export async function getTicketById(id: string): Promise<Ticket | null> {
@@ -158,35 +160,37 @@ export async function getTodayTickets(): Promise<Ticket[]> {
 }
 
 export async function cancelTicket(ticketId: string, reason: string): Promise<{ success: boolean; message: string }> {
-  const ticket = await getTicketById(ticketId)
-  if (!ticket) return { success: false, message: 'Ticket no encontrado' }
-  if (ticket.status !== 'active') return { success: false, message: 'Ticket no activo' }
+  return withTransaction(async (db) => {
+    const ticket = await getTicketById(ticketId)
+    if (!ticket) return { success: false, message: 'Ticket no encontrado' }
+    if (ticket.status !== 'active') return { success: false, message: 'Ticket no activo' }
 
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
-  if (new Date(ticket.createdAt) < fiveMinutesAgo) {
-    return { success: false, message: 'Solo se puede cancelar dentro de los primeros 5 minutos' }
-  }
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    if (new Date(ticket.createdAt) < fiveMinutesAgo) {
+      return { success: false, message: 'Solo se puede cancelar dentro de los primeros 5 minutos' }
+    }
 
-  const now = new Date().toISOString()
-  await execute('UPDATE Ticket SET status = "cancelled", cancelReason = ?, cancelledAt = ?, updatedAt = ? WHERE id = ?', 
-    [reason, now, now, ticketId])
+    const now = new Date().toISOString()
+    await db.run('UPDATE Ticket SET status = "cancelled", cancelReason = ?, cancelledAt = ?, updatedAt = ? WHERE id = ?', 
+      [reason, now, now, ticketId])
 
-  await execute(
-    'INSERT INTO CancellationLog (id, ticketId, ticketNumber, totalAmount, reason, itemsJson, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [generateId(), ticket.id, ticket.ticketNumber, ticket.totalAmount, reason, JSON.stringify(ticket.items), now]
-  )
-
-  const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
-  if (openSessions.length > 0) {
-    const sessionId = openSessions[0].id
-    await execute('UPDATE CashSession SET salesTotal = salesTotal - ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ticket.totalAmount, sessionId])
-    await execute(
-      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "expense", ?, ?, ?)',
-      [generateId(), sessionId, -ticket.totalAmount, `Cancelación ticket ${ticket.ticketNumber}`, now]
+    await db.run(
+      'INSERT INTO CancellationLog (id, ticketId, ticketNumber, totalAmount, reason, itemsJson, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [generateId(), ticket.id, ticket.ticketNumber, ticket.totalAmount, reason, JSON.stringify(ticket.items), now]
     )
-  }
 
-  return { success: true, message: 'Ticket cancelado exitosamente' }
+    const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
+    if (openSessions.length > 0) {
+      const sessionId = openSessions[0].id
+      await db.run('UPDATE CashSession SET salesTotal = salesTotal - ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ticket.totalAmount, sessionId])
+      await db.run(
+        'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "expense", ?, ?, ?)',
+        [generateId(), sessionId, -ticket.totalAmount, `Cancelación ticket ${ticket.ticketNumber}`, now]
+      )
+    }
+
+    return { success: true, message: 'Ticket cancelado exitosamente' }
+  })
 }
 
 export const ticketService = {
