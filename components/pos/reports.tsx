@@ -56,18 +56,25 @@ import { format, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { generateTicketImageUrl, printerService } from '@/services/printer'
-import type { Ticket as TicketType, TicketItem } from '@/lib/types'
+import type { Ticket as TicketType, TicketItem, Game } from '@/lib/types'
 import { toast } from 'sonner'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
+import { usePOSStore } from '@/store/pos-store'
+import type { Module } from '@/components/pos/main-layout'
 
 type TicketWithDetails = TicketType & {
-  items?: (TicketItem & { game?: { name?: string } })[]
+  items?: (TicketItem & { game?: Game })[]
 }
 
-export function Reports() {
+interface ReportsProps {
+  onModuleChange: (module: Module) => void
+}
+
+export function Reports({ onModuleChange }: ReportsProps) {
   const { settings } = useSettings()
+  const { addToCart, clearCart, setSelectedGame, setSelectedSchedule } = usePOSStore()
   const currency = settings.currency || 'C$'
   
   const [dateRange, setDateRange] = useState({
@@ -124,6 +131,39 @@ export function Reports() {
     toast.info('Generando PDF...')
     const result = await printerService.shareTicketPDF(ticket as any, settings as any)
     if (!result.success) toast.error(result.message)
+  }
+
+  const handleRepeatTicket = (ticket: TicketWithDetails) => {
+    const ticketItems = ticket.items?.filter((item): item is TicketItem & { game: Game } => Boolean(item.game)) || []
+
+    if (ticketItems.length === 0) {
+      toast.error('No se pudo cargar este ticket para repetir')
+      return
+    }
+
+    clearCart()
+
+    ticketItems.forEach((item) => {
+      addToCart({
+        gameId: item.game.id,
+        gameName: item.game.name,
+        number: item.number,
+        amount: item.amount,
+        schedule: item.schedule,
+        scheduleName: item.schedule,
+        multiplier: item.game.multiplier ?? 70,
+        client: ticket.client || undefined,
+      })
+    })
+
+    const firstItem = ticketItems[0]
+    if (firstItem?.game) {
+      setSelectedGame(firstItem.game)
+      setSelectedSchedule(null)
+    }
+
+    onModuleChange('pos')
+    toast.success(`Ticket ${ticket.ticketNumber} cargado para repetir`)
   }
 
   return (
@@ -581,9 +621,12 @@ export function Reports() {
                      <span className="text-3xl font-black text-primary tracking-tighter">{currency}{selectedTicket.totalAmount.toFixed(2)}</span>
                    </div>
 
-                   <div className="grid grid-cols-2 gap-3">
+                   <div className="grid grid-cols-3 gap-3">
                       <Button variant="outline" className="h-12 rounded-2xl font-black uppercase text-[10px] border-2" onClick={() => handleSendTicketImage(selectedTicket)}>
                         Compartir
+                      </Button>
+                      <Button variant="secondary" className="h-12 rounded-2xl font-black uppercase text-[10px]" onClick={() => handleRepeatTicket(selectedTicket)}>
+                        Repetir
                       </Button>
                       <Button className="h-12 rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-primary/20" onClick={() => handleReprintTicket(selectedTicket)}>
                         <Printer className="h-4 w-4 mr-2" />

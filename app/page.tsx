@@ -61,7 +61,7 @@ export default function HomePage() {
       case "winners":
         return <WinnersManager />;
       case "reports":
-        return <Reports />;
+        return <Reports onModuleChange={setActiveModule} />;
       case "cash":
         return <CashRegister />;
       case "pyramid":

@@ -20,7 +20,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 
-type Module = 
+export type Module = 
   | 'dashboard'
   | 'pos'
   | 'games'
