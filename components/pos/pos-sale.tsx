@@ -56,6 +56,7 @@ export function POSSale() {
     selectedSchedule,
     updateAllCartItems,
     setSelectedSchedule,
+    setCart,
   } = usePOSStore()
 
   const [number, setNumber] = useState('')
@@ -75,7 +76,32 @@ export function POSSale() {
 
   const handleGameSelect = (game: Game) => {
     setSelectedGame(game)
-    setSelectedSchedule(game.schedules?.[0] || null)
+    const firstSchedule = game.schedules?.[0] || null
+    setSelectedSchedule(firstSchedule)
+
+    if (cart.length > 0) {
+      const updatedCart = cart.map(item => {
+        let newNumber = item.number;
+        if (newNumber.length > game.digitCount) {
+          newNumber = newNumber.slice(-game.digitCount);
+        } else if (newNumber.length < game.digitCount) {
+          newNumber = newNumber.padStart(game.digitCount, '0');
+        }
+
+        return {
+          ...item,
+          gameId: game.id,
+          gameName: game.name,
+          multiplier: game.multiplier,
+          number: newNumber,
+          ...(firstSchedule ? {
+            schedule: firstSchedule.time,
+            scheduleName: firstSchedule.name
+          } : {})
+        };
+      });
+      setCart(updatedCart);
+    }
   }
 
   const handleAddToCart = () => {
