@@ -12,6 +12,7 @@ interface POSState {
   updateCartItem: (id: string, updates: Partial<CartItem>) => void
   updateAllCartItems: (updates: Partial<CartItem>) => void
   clearCart: () => void
+  setCart: (cart: CartItem[]) => void
   
   // Games cache
   games: Game[]
@@ -70,6 +71,7 @@ export const usePOSStore = create<POSState>()(
         }))
       },
       clearCart: () => set({ cart: [] }),
+      setCart: (cart) => set({ cart }),
       
       // Games
       games: [],
