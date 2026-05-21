@@ -10,6 +10,7 @@ interface POSState {
   addToCart: (item: Omit<CartItem, 'id'>) => void
   removeFromCart: (id: string) => void
   updateCartItem: (id: string, updates: Partial<CartItem>) => void
+  updateAllCartItems: (updates: Partial<CartItem>) => void
   clearCart: () => void
   
   // Games cache
@@ -61,6 +62,11 @@ export const usePOSStore = create<POSState>()(
           cart: state.cart.map((item) =>
             item.id === id ? { ...item, ...updates } : item
           )
+        }))
+      },
+      updateAllCartItems: (updates) => {
+        set((state) => ({
+          cart: state.cart.map((item) => ({ ...item, ...updates }))
         }))
       },
       clearCart: () => set({ cart: [] }),

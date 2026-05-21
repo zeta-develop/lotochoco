@@ -54,6 +54,7 @@ export function POSSale() {
     selectedGame,
     setSelectedGame,
     selectedSchedule,
+    updateAllCartItems,
     setSelectedSchedule,
   } = usePOSStore()
 
@@ -225,6 +226,9 @@ export function POSSale() {
                     onChange={(event) => {
                       const schedule = selectedGame?.schedules?.find((item) => item.id === event.target.value)
                       setSelectedSchedule(schedule || null)
+                      if (schedule) {
+                        updateAllCartItems({ schedule: schedule.time, scheduleName: schedule.name })
+                      }
                     }}
                     disabled={!selectedGame || !selectedGame.schedules?.length}
                   >
