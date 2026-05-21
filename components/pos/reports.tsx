@@ -144,13 +144,15 @@ export function Reports({ onModuleChange }: ReportsProps) {
     clearCart()
 
     ticketItems.forEach((item) => {
+      const scheduleObj = item.game.schedules?.find(s => s.id === item.schedule || s.name === item.schedule)
+
       addToCart({
         gameId: item.game.id,
         gameName: item.game.name,
         number: item.number,
         amount: item.amount,
-        schedule: item.schedule,
-        scheduleName: item.schedule,
+        schedule: scheduleObj ? scheduleObj.id : item.schedule,
+        scheduleName: scheduleObj ? scheduleObj.name : item.schedule,
         multiplier: item.game.multiplier ?? 70,
         client: ticket.client || undefined,
       })
@@ -159,7 +161,8 @@ export function Reports({ onModuleChange }: ReportsProps) {
     const firstItem = ticketItems[0]
     if (firstItem?.game) {
       setSelectedGame(firstItem.game)
-      setSelectedSchedule(null)
+      const scheduleObj = firstItem.game.schedules?.find(s => s.id === firstItem.schedule || s.name === firstItem.schedule)
+      setSelectedSchedule(scheduleObj || null)
     }
 
     onModuleChange('pos')

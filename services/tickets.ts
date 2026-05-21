@@ -1,5 +1,5 @@
 import { query, execute } from '@/lib/db'
-import type { Ticket, TicketItem, CartItem, Game } from '@/lib/types'
+import type { Ticket, TicketItem, CartItem, Game, DrawSchedule } from '@/lib/types'
 import { format } from 'date-fns'
 import { generateId } from '@/lib/utils'
 
@@ -68,6 +68,11 @@ export async function getTicketById(id: string): Promise<Ticket | null> {
   for (const item of ticket.items) {
     const games = await query<Game>('SELECT * FROM Game WHERE id = ?', [item.gameId])
     item.game = games[0]
+    if (item.game) {
+      item.game.schedules = await query<DrawSchedule>(
+        'SELECT * FROM DrawSchedule WHERE gameId = ? ORDER BY time ASC', [item.game.id]
+      )
+    }
   }
   
   return ticket
@@ -142,6 +147,11 @@ export async function getTickets(options?: {
     for (const item of t.items) {
       const games = await query<Game>('SELECT * FROM Game WHERE id = ?', [item.gameId])
       item.game = games[0]
+      if (item.game) {
+        item.game.schedules = await query<DrawSchedule>(
+          'SELECT * FROM DrawSchedule WHERE gameId = ? ORDER BY time ASC', [item.game.id]
+        )
+      }
     }
   }
 
