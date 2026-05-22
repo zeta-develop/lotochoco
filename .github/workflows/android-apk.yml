@@ -66,7 +66,16 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        run: pnpm build
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::🚨 SECRETOS NO DETECTADOS 🚨"
+            echo "Las variables NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY están vacías."
+            echo "Por favor, verifica lo siguiente en GitHub:"
+            echo "1. Fueron agregados en 'Settings > Secrets and variables > Actions > Repository secrets'."
+            echo "2. Si los agregaste en 'Environment secrets', necesitas definir 'environment: nombre_del_entorno' en este job (build-apk)."
+            exit 1
+          fi
+          pnpm build
 
       # 9️⃣ Setup Java
       - name: Setup Java
