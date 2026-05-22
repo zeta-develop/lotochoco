@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useState } from 'react'
 import type { Result } from '@/lib/types'
 import { getTodayResults, createResult, processResult } from '@/services/results'
@@ -59,6 +61,11 @@ export function useResults() {
     }
   }
 
+
+  useEffect(() => {
+    return dbEvents.on('results:changed', refresh)
+  }, [refresh])
+
   return {
     results,
     isLoading,
@@ -70,6 +77,7 @@ export function useResults() {
 
 export const useTodayResults = () => {
   const { results, isLoading, refresh } = useResults()
+
   return { results, isLoading, refresh }
 }
 
@@ -91,6 +99,16 @@ export const useWinners = () => {
     await markWinnerAsPaid(winnerId)
   }
 
+
+  useEffect(() => {
+    const load = async () => {
+      const { getWinners } = await import('@/services/results')
+      const data = await getWinners()
+      setWinners(data)
+    }
+    return dbEvents.on('winners:changed', load)
+  }, [])
+
   return { winners, isLoading, refresh, markAsPaid }
 }
 
@@ -106,6 +124,16 @@ export const usePendingWinners = () => {
     }
     load()
   }, [refresh])
+
+
+  useEffect(() => {
+    const load = async () => {
+      const { getWinners } = await import('@/services/results')
+      const data = await getWinners({ isPaid: false })
+      setWinners(data)
+    }
+    return dbEvents.on('winners:changed', load)
+  }, [])
 
   return { winners, isLoading, refresh }
 }

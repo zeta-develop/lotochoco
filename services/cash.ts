@@ -1,3 +1,4 @@
+import { dbEvents } from '@/lib/events'
 import { query, execute } from '@/lib/db'
 import type { CashSession, CashMovement } from '@/lib/types'
 import { generateId } from '@/lib/utils'
@@ -15,7 +16,9 @@ export async function openCashSession(openingAmount: number): Promise<CashSessio
     [id, openingAmount, now, now, now]
   )
 
-  return (await getCashSessionById(id))!
+  const retSession = await getCashSessionById(id);
+  dbEvents.emit('cash:changed');
+  return retSession!;
 }
 
 export async function getCurrentSession(): Promise<CashSession | null> {
@@ -44,7 +47,9 @@ export async function closeCashSession(sessionId: string, notes?: string): Promi
     [summary.balance, now, notes, now, sessionId]
   )
 
-  return (await getCashSessionById(sessionId))!
+  const retSession = await getCashSessionById(sessionId);
+  dbEvents.emit('cash:changed');
+  return retSession!;
 }
 
 export async function addCashMovement(data: {

@@ -1,3 +1,4 @@
+import { dbEvents } from '@/lib/events'
 import { query, execute, getDb } from '@/lib/db'
 import type { Game, DrawSchedule } from '@/lib/types'
 import { generateId } from '@/lib/utils'
@@ -69,7 +70,9 @@ export async function createGame(data: {
     }
   }
   
-  return (await getGameById(gameId))!
+  const game = await getGameById(gameId);
+  dbEvents.emit('games:changed');
+  return game!;
 }
 
 export async function updateGame(
@@ -114,11 +117,14 @@ export async function updateGame(
     }
   }
   
-  return (await getGameById(id))!
+  const game = await getGameById(id);
+  dbEvents.emit('games:changed');
+  return game!;
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  await execute('DELETE FROM Game WHERE id = ?', [id])
+  await execute('DELETE FROM Game WHERE id = ?', [id]);
+  dbEvents.emit('games:changed');
 }
 
 // Seed default games

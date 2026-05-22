@@ -163,11 +163,11 @@ export function TicketPreview({
               <X className="h-4 w-4 mr-2" />
               Cerrar
             </Button>
-            {onShare && (
+            {false && (
               <Button
                 variant="secondary"
                 className="flex-1 font-semibold"
-                onClick={onShare}
+
               >
                 <Share2 className="h-4 w-4 mr-2" />
                 Compartir

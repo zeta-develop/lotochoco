@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { SalesReport } from '@/lib/types'
@@ -64,6 +66,16 @@ export function useSalesReport(options?: {
     })
   }, [refresh])
 
+
+  useEffect(() => {
+    const offTickets = dbEvents.on('tickets:changed', refresh);
+    const offCash = dbEvents.on('cash:changed', refresh);
+    return () => {
+      offTickets();
+      offCash();
+    }
+  }, [refresh])
+
   return {
     report,
     isLoading,
@@ -100,6 +112,16 @@ export function useDailyReport(date?: string) {
       setIsLoading(false)
     })
   }, [date, refresh])
+
+
+  useEffect(() => {
+    const offTickets = dbEvents.on('tickets:changed', refresh);
+    const offCash = dbEvents.on('cash:changed', refresh);
+    return () => {
+      offTickets();
+      offCash();
+    }
+  }, [refresh])
 
   return {
     report,
@@ -138,6 +160,16 @@ export function useWeeklyReport() {
     void refresh().finally(() => {
       setIsLoading(false)
     })
+  }, [refresh])
+
+
+  useEffect(() => {
+    const offTickets = dbEvents.on('tickets:changed', refresh);
+    const offCash = dbEvents.on('cash:changed', refresh);
+    return () => {
+      offTickets();
+      offCash();
+    }
   }, [refresh])
 
   return {
@@ -198,6 +230,16 @@ export function useGameReport(options?: {
     })
   }, [refresh])
 
+
+  useEffect(() => {
+    const offTickets = dbEvents.on('tickets:changed', refresh);
+    const offCash = dbEvents.on('cash:changed', refresh);
+    return () => {
+      offTickets();
+      offCash();
+    }
+  }, [refresh])
+
   return {
     games,
     isLoading,
@@ -248,6 +290,16 @@ export function useCancellationsReport(options?: {
     void refresh().finally(() => {
       setIsLoading(false)
     })
+  }, [refresh])
+
+
+  useEffect(() => {
+    const offTickets = dbEvents.on('tickets:changed', refresh);
+    const offCash = dbEvents.on('cash:changed', refresh);
+    return () => {
+      offTickets();
+      offCash();
+    }
   }, [refresh])
 
   return {

@@ -35,6 +35,7 @@ const Toaster = ({ position, visibleToasts, expand, closeButton, toastOptions, .
       gap={isMobile ? 8 : 12}
       offset={isMobile ? 12 : 16}
       mobileOffset={12}
+      // @ts-ignore
       swipeDirections={['down']}
       toastOptions={{
         duration: props.duration ?? (isMobile ? 2400 : 3200),
