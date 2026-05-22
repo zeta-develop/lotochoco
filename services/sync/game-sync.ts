@@ -32,17 +32,19 @@ export async function syncGames() {
       // En un caso real LWW revisaríamos el updatedAt local vs remoto, pero por simplicidad el pull remoto tiene prioridad
       const existingRows = await query<Game>('SELECT * FROM Game WHERE id = ?', [remote.id]);
 
+      const isActiveNum = Number(remote.is_active) ? 1 : 0;
+
       if (existingRows.length > 0) {
         // Update local
         await execute(
           'UPDATE Game SET name = ?, isActive = ?, digitCount = ?, multiplier = ?, updatedAt = ?, deletedAt = ?, isDirty = 0 WHERE id = ?',
-          [remote.name, remote.is_active, remote.digit_count, remote.multiplier, remote.updated_at, remote.deleted_at, remote.id]
+          [remote.name, isActiveNum, remote.digit_count, remote.multiplier, remote.updated_at, remote.deleted_at, remote.id]
         );
       } else {
         // Insert local
         await execute(
           'INSERT INTO Game (id, name, isActive, digitCount, multiplier, createdAt, updatedAt, deletedAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)',
-          [remote.id, remote.name, remote.is_active, remote.digit_count, remote.multiplier, remote.created_at, remote.updated_at, remote.deleted_at]
+          [remote.id, remote.name, isActiveNum, remote.digit_count, remote.multiplier, remote.created_at, remote.updated_at, remote.deleted_at]
         );
       }
 
@@ -64,13 +66,10 @@ export async function syncGames() {
     const { data: { session } } = await supabase.auth.getSession();
 
     if (session) {
-      // Necesitamos asegurar que company_id esté presente o el backend se encargue a través del JWT o profile.
-      // Para este código asumo que RLS o un trigger en Supabase manejará el `company_id` basado en el `auth.uid()`,
-      // o que se debe enviar un company_id explícito. Lo dejaremos genérico.
       const payload = dirtyLocalGames.map(g => ({
         id: g.id,
         name: g.name,
-        is_active: g.isActive,
+        is_active: Boolean(g.isActive) ? 1 : 0,
         digit_count: g.digitCount,
         multiplier: g.multiplier,
         created_at: g.createdAt,
@@ -98,6 +97,97 @@ export async function syncGames() {
     );
   }
 
-  // === NOTA: Aquí iría también la sincronización de DrawSchedule ===
-  // Para simplificar esta iteración inicial, nos centraremos en el cascarón de Game.
+  // ==========================================
+  // SINCRONIZACIÓN DE DRAW SCHEDULES
+  // ==========================================
+  console.log('[Sync] Iniciando sincronización de DrawSchedules...');
+  const syncStateSched = await query('SELECT lastSync FROM SyncState WHERE tableName = ?', ['DrawSchedule']);
+  const lastSyncSchedStr = syncStateSched.length > 0 ? syncStateSched[0].lastSync : '1970-01-01T00:00:00.000Z';
+  const lastSyncSchedDate = new Date(lastSyncSchedStr);
+
+  // === PULL (Descarga) ===
+  const { data: remoteSchedules, error: pullSchedError } = await supabase
+    .from('draw_schedules')
+    .select('*')
+    .gt('updated_at', lastSyncSchedStr)
+    .order('updated_at', { ascending: true });
+
+  if (pullSchedError) {
+    console.error('[Sync] Error en Pull de DrawSchedules:', pullSchedError);
+    throw pullSchedError;
+  }
+
+  let latestSchedRemoteSync = lastSyncSchedDate;
+
+  if (remoteSchedules && remoteSchedules.length > 0) {
+    console.log(`[Sync] Encontrados ${remoteSchedules.length} horarios modificados remotamente.`);
+    for (const remote of remoteSchedules) {
+      const existingRows = await query<DrawSchedule>('SELECT * FROM DrawSchedule WHERE id = ?', [remote.id]);
+
+      const isActiveNum = Number(remote.is_active) ? 1 : 0;
+
+      // Solo insertamos si el gameId ya existe localmente (integridad referencial de SQLite)
+      const gameExists = await query('SELECT id FROM Game WHERE id = ?', [remote.game_id]);
+      if (gameExists.length === 0) {
+         console.warn(`[Sync] Saltando DrawSchedule ${remote.id} porque no existe el Game local ${remote.game_id}`);
+         continue;
+      }
+
+      if (existingRows.length > 0) {
+        await execute(
+          'UPDATE DrawSchedule SET gameId = ?, name = ?, time = ?, isActive = ?, updatedAt = ?, deletedAt = ?, isDirty = 0 WHERE id = ?',
+          [remote.game_id, remote.name, remote.time, isActiveNum, remote.updated_at, remote.deleted_at, remote.id]
+        );
+      } else {
+        await execute(
+          'INSERT INTO DrawSchedule (id, gameId, name, time, isActive, createdAt, updatedAt, deletedAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)',
+          [remote.id, remote.game_id, remote.name, remote.time, isActiveNum, remote.created_at, remote.updated_at, remote.deleted_at]
+        );
+      }
+
+      const remoteUpdatedAt = new Date(remote.updated_at);
+      if (remoteUpdatedAt > latestSchedRemoteSync) {
+        latestSchedRemoteSync = remoteUpdatedAt;
+      }
+    }
+  }
+
+  // === PUSH (Subida) ===
+  const dirtyLocalSchedules = await query<DrawSchedule & { deletedAt?: Date | null }>('SELECT * FROM DrawSchedule WHERE isDirty = 1');
+
+  if (dirtyLocalSchedules.length > 0) {
+    console.log(`[Sync] Subiendo ${dirtyLocalSchedules.length} horarios modificados localmente.`);
+
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (session) {
+      const payload = dirtyLocalSchedules.map(s => ({
+        id: s.id,
+        game_id: s.gameId,
+        name: s.name,
+        time: s.time,
+        is_active: Boolean(s.isActive) ? 1 : 0,
+        created_at: s.createdAt,
+        updated_at: s.updatedAt,
+        deleted_at: s.deletedAt
+      }));
+
+      const { error: pushError } = await supabase.from('draw_schedules').upsert(payload);
+
+      if (pushError) {
+        console.error('[Sync] Error en Push de DrawSchedules:', pushError);
+      } else {
+        const ids = dirtyLocalSchedules.map(s => `'${s.id}'`).join(',');
+        await execute(`UPDATE DrawSchedule SET isDirty = 0 WHERE id IN (${ids})`);
+      }
+    }
+  }
+
+  // Actualizar Watermark si hubo pull
+  if (remoteSchedules && remoteSchedules.length > 0) {
+    await execute(
+      'INSERT INTO SyncState (tableName, lastSync) VALUES (?, ?) ON CONFLICT(tableName) DO UPDATE SET lastSync = ?',
+      ['DrawSchedule', latestSchedRemoteSync.toISOString(), latestSchedRemoteSync.toISOString()]
+    );
+  }
 }

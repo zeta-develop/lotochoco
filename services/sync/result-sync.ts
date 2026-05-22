@@ -29,17 +29,34 @@ export async function syncResults() {
     for (const remote of remoteResults) {
       const existingRows = await query<Result>('SELECT * FROM "Result" WHERE id = ?', [remote.id]);
 
+      const isProcessedNum = Number(remote.is_processed) ? 1 : 0;
+
+      // Solo insertamos si el gameId y scheduleId ya existen localmente (integridad referencial de SQLite)
+      const gameExists = await query('SELECT id FROM Game WHERE id = ?', [remote.game_id]);
+      if (gameExists.length === 0) {
+         console.warn(`[Sync] Saltando Result ${remote.id} porque no existe el Game local ${remote.game_id}`);
+         continue;
+      }
+
+      if (remote.schedule_id) {
+        const scheduleExists = await query('SELECT id FROM DrawSchedule WHERE id = ?', [remote.schedule_id]);
+        if (scheduleExists.length === 0) {
+           console.warn(`[Sync] Saltando Result ${remote.id} porque no existe el DrawSchedule local ${remote.schedule_id}`);
+           continue;
+        }
+      }
+
       if (existingRows.length > 0) {
         // Update local
         await execute(
           'UPDATE "Result" SET gameId = ?, scheduleId = ?, winningNumber = ?, drawDate = ?, isProcessed = ?, updatedAt = ?, deletedAt = ?, isDirty = 0 WHERE id = ?',
-          [remote.game_id, remote.schedule_id, remote.winning_number, remote.draw_date, remote.is_processed, remote.updated_at, remote.deleted_at, remote.id]
+          [remote.game_id, remote.schedule_id, remote.winning_number, remote.draw_date, isProcessedNum, remote.updated_at, remote.deleted_at, remote.id]
         );
       } else {
         // Insert local
         await execute(
           'INSERT INTO "Result" (id, gameId, scheduleId, winningNumber, drawDate, isProcessed, createdAt, updatedAt, deletedAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
-          [remote.id, remote.game_id, remote.schedule_id, remote.winning_number, remote.draw_date, remote.is_processed, remote.created_at, remote.updated_at, remote.deleted_at]
+          [remote.id, remote.game_id, remote.schedule_id, remote.winning_number, remote.draw_date, isProcessedNum, remote.created_at, remote.updated_at, remote.deleted_at]
         );
       }
 
@@ -66,7 +83,7 @@ export async function syncResults() {
         schedule_id: r.scheduleId,
         winning_number: r.winningNumber,
         draw_date: r.drawDate,
-        is_processed: r.isProcessed,
+        is_processed: Boolean(r.isProcessed) ? 1 : 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
         deleted_at: r.deletedAt
