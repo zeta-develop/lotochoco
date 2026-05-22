@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useState } from 'react'
 import { usePOSStore } from '@/store/pos-store'
 
@@ -33,12 +35,17 @@ export function useSettings() {
     try {
       const { updateSettings: updateRemoteSettings } = await import('@/services/settings')
       await updateRemoteSettings(newSettings)
-      setSettings(newSettings)
+      setSettings(newSettings as Record<string, string>)
     } catch (error) {
       console.error('Error al actualizar ajustes:', error)
       throw error
     }
   }
+
+
+  useEffect(() => {
+    return dbEvents.on('settings:changed', refresh)
+  }, [refresh])
 
   return {
     settings: localSettings,

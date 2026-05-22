@@ -1,4 +1,4 @@
-import { BleClient, Numbers } from '@capacitor-community/bluetooth-le';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 
 // UUIDs estándar para impresoras térmicas Bluetooth (PT-210 usa estos por defecto)
 const PRINTER_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';

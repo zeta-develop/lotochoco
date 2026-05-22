@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { Ticket, CartItem } from '@/lib/types'
@@ -102,6 +104,11 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
       return null
     }
   }
+
+
+  useEffect(() => {
+    return dbEvents.on('tickets:changed', refresh)
+  }, [refresh])
 
   return {
     tickets,

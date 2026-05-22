@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useState } from 'react'
 import type { Game } from '@/lib/types'
 import { gamesService } from '@/services/games'
@@ -69,6 +71,11 @@ export function useGames(activeOnly = true) {
     await gamesService.delete(id)
     await refresh()
   }
+
+
+  useEffect(() => {
+    return dbEvents.on('games:changed', refresh)
+  }, [refresh])
 
   return {
     games,

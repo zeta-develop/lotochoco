@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useState } from 'react'
 import type { PyramidResult } from '@/lib/types'
 import {
@@ -105,6 +107,10 @@ export function useHotColdNumbers(gameId: string) {
       setIsLoading(false)
     })
   }, [gameId, refresh])
+
+  useEffect(() => {
+    return dbEvents.on('results:changed', refresh)
+  }, [refresh])
 
   return {
     hot: data.hot,

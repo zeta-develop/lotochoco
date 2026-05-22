@@ -1,3 +1,4 @@
+import { dbEvents } from '@/lib/events'
 import { query, execute } from '@/lib/db'
 import type { Setting, SettingKey } from '@/lib/types'
 import { generateId } from '@/lib/utils'
@@ -98,6 +99,7 @@ export const settingsService = {
     }
 
     await updateSettings(normalized)
+    dbEvents.emit('settings:changed')
     return getAllSettings()
   },
   updateMany: updateSettings,

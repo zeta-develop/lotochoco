@@ -78,7 +78,7 @@ export function LuckyPyramid() {
                 </div>
                 ) : data?.pyramid ? (
                 <div className="flex flex-col items-center space-y-3 py-6 px-2">
-                  {data.pyramid.rows.map((row: number[], rowIndex: number) => (
+                  {data?.pyramid.rows.map((row: number[], rowIndex: number) => (
                     <div key={rowIndex} className="flex gap-1 sm:gap-2 justify-center flex-nowrap">
                       {row.map((num: number, colIndex: number) => (
                         <div
@@ -86,7 +86,7 @@ export function LuckyPyramid() {
                           className={`
                             w-8 h-8 sm:w-10 md:w-12 sm:h-10 md:h-12 flex items-center justify-center rounded-lg font-bold text-sm sm:text-base md:text-lg
                             transition-all duration-300 hover:scale-110
-                            ${rowIndex === data.pyramid.rows.length - 1
+                            ${rowIndex === (data?.pyramid?.rows?.length || 0) - 1
                               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-2 ring-primary/50"
                               : rowIndex === 0
                               ? "bg-secondary text-secondary-foreground"
@@ -103,7 +103,7 @@ export function LuckyPyramid() {
                   <div className="mt-6 text-center space-y-2">
                     <p className="text-sm text-muted-foreground">Numero de la Suerte</p>
                     <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-2xl sm:text-3xl font-bold shadow-xl">
-                      {data.pyramid.luckyNumber}
+                      {data?.pyramid.luckyNumber}
                     </div>
                   </div>
 
@@ -111,7 +111,7 @@ export function LuckyPyramid() {
                     <h4 className="font-semibold mb-2 text-center">Como se calcula:</h4>
                     <ol className="text-sm text-muted-foreground space-y-1">
                       <li>1. Se toma la fecha: {selectedDate}</li>
-                      <li>2. Se separan los digitos: {data.pyramid.rows[0]?.join(", ")}</li>
+                      <li>2. Se separan los digitos: {data?.pyramid.rows[0]?.join(", ")}</li>
                       <li>3. Se suman los digitos adyacentes</li>
                       <li>4. Se reduce cada suma a un solo digito si es mayor a 9</li>
                       <li>5. Se repite hasta obtener un solo numero</li>

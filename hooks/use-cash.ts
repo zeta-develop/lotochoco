@@ -1,5 +1,7 @@
 'use client'
 
+import { dbEvents } from '@/lib/events'
+
 import { useCallback, useEffect, useState } from 'react'
 import type { CashSession } from '@/lib/types'
 import { getCurrentSession, openCashSession, closeCashSession, addCashMovement, getCashSummary } from '@/services/cash'
@@ -83,6 +85,11 @@ export function useCash() {
     }
   }
 
+
+  useEffect(() => {
+    return dbEvents.on('cash:changed', refresh)
+  }, [refresh])
+
   return {
     currentSession,
     isOpen: !!currentSession,
@@ -97,11 +104,18 @@ export function useCash() {
 
 export const useCurrentSession = () => {
   const { currentSession, isOpen, isLoading, refresh, openSession, closeSession, addMovement } = useCash()
+
+  useEffect(() => {
+    return dbEvents.on('cash:changed', refresh)
+  }, [refresh])
+
+
   return { session: currentSession, isOpen, isLoading, refresh, openSession, closeSession, addMovement }
 }
 
 export const useCashSummary = () => {
   const { summary, isLoading, refresh } = useCash()
+
   return { summary, isLoading, refresh }
 }
 
@@ -117,6 +131,16 @@ export const useCashSessions = () => {
     }
     load()
   }, [refresh])
+
+
+  useEffect(() => {
+    const load = async () => {
+      const { getCashSessions } = await import('@/services/cash')
+      const data = await getCashSessions()
+      setSessions(data)
+    }
+    return dbEvents.on('cash:changed', load)
+  }, [])
 
   return { sessions, isLoading, refresh }
 }
