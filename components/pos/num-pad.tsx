@@ -1,5 +1,6 @@
 'use client'
 
+import { memo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Delete, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -12,24 +13,27 @@ interface NumPadProps {
   className?: string
 }
 
-export function NumPad({ value, onChange, onConfirm, maxLength = 6, className }: NumPadProps) {
-  const handleNumber = (num: string) => {
+// Arrays estáticos fuera del componente para evitar recreación en cada render
+const NUMPAD_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+export const NumPad = memo(function NumPad({ value, onChange, onConfirm, maxLength = 6, className }: NumPadProps) {
+  const handleNumber = useCallback((num: string) => {
     if (value.length < maxLength) {
       onChange(value + num)
     }
-  }
+  }, [value, maxLength, onChange])
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     onChange(value.slice(0, -1))
-  }
+  }, [value, onChange])
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     onChange('')
-  }
+  }, [onChange])
 
   return (
     <div className={cn("grid grid-cols-3 gap-2", className)}>
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+      {NUMPAD_KEYS.map((num) => (
         <Button
           key={num}
           variant="outline"
@@ -81,7 +85,7 @@ export function NumPad({ value, onChange, onConfirm, maxLength = 6, className }:
       )}
     </div>
   )
-}
+})
 
 interface AmountPadProps {
   value: number
@@ -90,7 +94,10 @@ interface AmountPadProps {
   className?: string
 }
 
-export function AmountPad({ value, onChange, quickAmounts = [10, 20, 50, 100, 200, 500], className }: AmountPadProps) {
+const DEFAULT_QUICK_AMOUNTS = [10, 20, 50, 100, 200, 500]
+const AMOUNT_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
+
+export const AmountPad = memo(function AmountPad({ value, onChange, quickAmounts = DEFAULT_QUICK_AMOUNTS, className }: AmountPadProps) {
   return (
     <div className={cn("space-y-3", className)}>
       <div className="grid grid-cols-3 gap-2">
@@ -108,7 +115,7 @@ export function AmountPad({ value, onChange, quickAmounts = [10, 20, 50, 100, 20
       </div>
       
       <div className="grid grid-cols-4 gap-2">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((num, idx) => (
+        {AMOUNT_KEYS.map((num, idx) => (
           <Button
             key={num}
             variant="outline"
@@ -146,4 +153,4 @@ export function AmountPad({ value, onChange, quickAmounts = [10, 20, 50, 100, 20
       </div>
     </div>
   )
-}
+})
