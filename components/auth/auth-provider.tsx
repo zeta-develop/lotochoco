@@ -33,18 +33,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (Capacitor.isNativePlatform()) {
       appListener = App.addListener('appUrlOpen', async (data) => {
         if (data.url.includes('supabase.co') || data.url.includes('lotochoco://')) {
-          // Extraer los tokens de la URL
           const url = new URL(data.url);
-          const hashParams = new URLSearchParams(url.hash.substring(1));
 
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
+          // Supabase v2 uses PKCE by default and returns a 'code' parameter in the query string
+          const code = url.searchParams.get('code');
 
-          if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
+          if (code) {
+            await supabase.auth.exchangeCodeForSession(code);
+            // Close the browser after successful exchange
+            Browser.close().catch(() => {});
+          } else {
+            // Fallback for implicit flow (legacy)
+            const hashParams = new URLSearchParams(url.hash.substring(1));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+
+            if (accessToken && refreshToken) {
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+              Browser.close().catch(() => {});
+            }
           }
         }
       });
