@@ -91,9 +91,26 @@ export async function getCashSessions(options?: {
   }
 
   const sessions = await query<CashSession>(sql, params)
-  for (const s of sessions) {
-    s.movements = await query<CashMovement>('SELECT * FROM CashMovement WHERE cashSessionId = ?', [s.id])
+
+  if (sessions.length > 0) {
+    const sessionIds = sessions.map(s => s.id)
+    const placeholders = sessionIds.map(() => '?').join(', ')
+    const movements = await query<CashMovement>(
+      `SELECT * FROM CashMovement WHERE cashSessionId IN (${placeholders})`,
+      sessionIds
+    )
+
+    const movementsBySessionId = movements.reduce((acc, m) => {
+      if (!acc[m.cashSessionId]) acc[m.cashSessionId] = []
+      acc[m.cashSessionId].push(m)
+      return acc
+    }, {} as Record<string, CashMovement[]>)
+
+    for (const s of sessions) {
+      s.movements = movementsBySessionId[s.id] || []
+    }
   }
+
   return sessions
 }
 
