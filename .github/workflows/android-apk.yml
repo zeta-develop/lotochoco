@@ -63,6 +63,9 @@ jobs:
           echo "Inyectado en Android -> versionCode: $VERSION_CODE, versionName: $VERSION_NAME"
       # 8️⃣ Build Next.js
       - name: Build Next.js
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: pnpm build
 
       # 9️⃣ Setup Java
