@@ -89,19 +89,38 @@ class DatabaseManager {
       if (!tableCheck.values || tableCheck.values.length === 0) {
         console.log('[DB] Configurando tablas iniciales...')
         const statements = [
-          `CREATE TABLE IF NOT EXISTS "Game" ("id" TEXT PRIMARY KEY, "name" TEXT UNIQUE, "isActive" INTEGER DEFAULT 1, "digitCount" INTEGER DEFAULT 2, "multiplier" REAL DEFAULT 70, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
-          `CREATE TABLE IF NOT EXISTS "DrawSchedule" ("id" TEXT PRIMARY KEY, "gameId" TEXT, "name" TEXT, "time" TEXT, "isActive" INTEGER DEFAULT 1, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("gameId") REFERENCES "Game" ("id") ON DELETE CASCADE);`,
+          `CREATE TABLE IF NOT EXISTS "Game" ("id" TEXT PRIMARY KEY, "name" TEXT UNIQUE, "isActive" INTEGER DEFAULT 1, "digitCount" INTEGER DEFAULT 2, "multiplier" REAL DEFAULT 70, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "isDirty" INTEGER DEFAULT 1, "deletedAt" DATETIME);`,
+          `CREATE TABLE IF NOT EXISTS "DrawSchedule" ("id" TEXT PRIMARY KEY, "gameId" TEXT, "name" TEXT, "time" TEXT, "isActive" INTEGER DEFAULT 1, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "isDirty" INTEGER DEFAULT 1, "deletedAt" DATETIME, FOREIGN KEY ("gameId") REFERENCES "Game" ("id") ON DELETE CASCADE);`,
           `CREATE TABLE IF NOT EXISTS "Ticket" ("id" TEXT PRIMARY KEY, "ticketNumber" TEXT UNIQUE, "client" TEXT, "totalAmount" REAL, "status" TEXT DEFAULT 'active', "cancelReason" TEXT, "cancelledAt" DATETIME, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
           `CREATE TABLE IF NOT EXISTS "TicketItem" ("id" TEXT PRIMARY KEY, "ticketId" TEXT, "gameId" TEXT, "number" TEXT, "amount" REAL, "schedule" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("ticketId") REFERENCES "Ticket" ("id") ON DELETE CASCADE, FOREIGN KEY ("gameId") REFERENCES "Game" ("id"));`,
-          `CREATE TABLE IF NOT EXISTS "Result" ("id" TEXT PRIMARY KEY, "gameId" TEXT, "scheduleId" TEXT, "winningNumber" TEXT, "drawDate" DATETIME DEFAULT CURRENT_TIMESTAMP, "isProcessed" INTEGER DEFAULT 0, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("gameId") REFERENCES "Game" ("id"), FOREIGN KEY ("scheduleId") REFERENCES "DrawSchedule" ("id"));`,
+          `CREATE TABLE IF NOT EXISTS "Result" ("id" TEXT PRIMARY KEY, "gameId" TEXT, "scheduleId" TEXT, "winningNumber" TEXT, "drawDate" DATETIME DEFAULT CURRENT_TIMESTAMP, "isProcessed" INTEGER DEFAULT 0, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "isDirty" INTEGER DEFAULT 1, "deletedAt" DATETIME, FOREIGN KEY ("gameId") REFERENCES "Game" ("id"), FOREIGN KEY ("scheduleId") REFERENCES "DrawSchedule" ("id"));`,
           `CREATE TABLE IF NOT EXISTS "Winner" ("id" TEXT PRIMARY KEY, "ticketId" TEXT, "resultId" TEXT, "prizeAmount" REAL, "isPaid" INTEGER DEFAULT 0, "paidAt" DATETIME, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("ticketId") REFERENCES "Ticket" ("id"), FOREIGN KEY ("resultId") REFERENCES "Result" ("id"));`,
           `CREATE TABLE IF NOT EXISTS "CashSession" ("id" TEXT PRIMARY KEY, "openingAmount" REAL, "closingAmount" REAL, "salesTotal" REAL DEFAULT 0, "prizesTotal" REAL DEFAULT 0, "status" TEXT DEFAULT 'open', "openedAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "closedAt" DATETIME, "notes" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
           `CREATE TABLE IF NOT EXISTS "CashMovement" ("id" TEXT PRIMARY KEY, "cashSessionId" TEXT, "type" TEXT, "amount" REAL, "description" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("cashSessionId") REFERENCES "CashSession" ("id") ON DELETE CASCADE);`,
           `CREATE TABLE IF NOT EXISTS "Setting" ("id" TEXT PRIMARY KEY, "key" TEXT UNIQUE, "value" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
-          `CREATE TABLE IF NOT EXISTS "CancellationLog" ("id" TEXT PRIMARY KEY, "ticketId" TEXT, "ticketNumber" TEXT, "totalAmount" REAL, "reason" TEXT, "itemsJson" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`
+          `CREATE TABLE IF NOT EXISTS "CancellationLog" ("id" TEXT PRIMARY KEY, "ticketId" TEXT, "ticketNumber" TEXT, "totalAmount" REAL, "reason" TEXT, "itemsJson" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
+          `CREATE TABLE IF NOT EXISTS "SyncState" ("tableName" TEXT PRIMARY KEY, "lastSync" DATETIME DEFAULT '1970-01-01T00:00:00.000Z');`
         ]
         await db.executeSet(statements.map(s => ({ statement: s, values: [] })))
         console.log('[DB] Esquema sincronizado con éxito.')
+      } else {
+        // Migración: Añadir columnas a tablas existentes si no las tienen
+        console.log('[DB] Comprobando actualizaciones de esquema (Migraciones)...')
+        try {
+          // Usamos bloques try-catch individuales para que si una columna ya existe, no detenga las demás
+          await db.execute(`ALTER TABLE "Game" ADD COLUMN "isDirty" INTEGER DEFAULT 1;`).catch(() => {});
+          await db.execute(`ALTER TABLE "Game" ADD COLUMN "deletedAt" DATETIME;`).catch(() => {});
+
+          await db.execute(`ALTER TABLE "DrawSchedule" ADD COLUMN "isDirty" INTEGER DEFAULT 1;`).catch(() => {});
+          await db.execute(`ALTER TABLE "DrawSchedule" ADD COLUMN "deletedAt" DATETIME;`).catch(() => {});
+
+          await db.execute(`ALTER TABLE "Result" ADD COLUMN "isDirty" INTEGER DEFAULT 1;`).catch(() => {});
+          await db.execute(`ALTER TABLE "Result" ADD COLUMN "deletedAt" DATETIME;`).catch(() => {});
+
+          await db.execute(`CREATE TABLE IF NOT EXISTS "SyncState" ("tableName" TEXT PRIMARY KEY, "lastSync" DATETIME DEFAULT '1970-01-01T00:00:00.000Z');`).catch(() => {});
+        } catch (migErr) {
+          console.warn('[DB] Alguna migración general falló:', migErr);
+        }
       }
     } catch (e) {
       console.error('[DB] Error en ensureSchema:', e)

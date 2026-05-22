@@ -9,6 +9,8 @@ export interface Game {
   createdAt: Date
   updatedAt: Date
   schedules?: DrawSchedule[]
+  isDirty?: boolean
+  deletedAt?: Date | null
 }
 
 export interface DrawSchedule {
@@ -20,6 +22,8 @@ export interface DrawSchedule {
   createdAt: Date
   updatedAt: Date
   game?: Game
+  isDirty?: boolean
+  deletedAt?: Date | null
 }
 
 export interface Ticket {
@@ -60,6 +64,8 @@ export interface Result {
   game?: Game
   schedule?: DrawSchedule
   winners?: Winner[]
+  isDirty?: boolean
+  deletedAt?: Date | null
 }
 
 export interface Winner {

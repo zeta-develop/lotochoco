@@ -9,7 +9,7 @@ export async function getGames(): Promise<Game[]> {
   for (const game of games) {
     game.isActive = Boolean(game.isActive)
     game.schedules = await query<DrawSchedule>(
-      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 ORDER BY "time" ASC',
+      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 AND ("deletedAt" IS NULL) ORDER BY "time" ASC',
       [game.id]
     )
     for (const s of game.schedules) s.isActive = Boolean(s.isActive)
@@ -19,12 +19,12 @@ export async function getGames(): Promise<Game[]> {
 }
 
 export async function getActiveGames(): Promise<Game[]> {
-  const games = await query<Game>('SELECT * FROM "Game" WHERE "isActive" = 1 ORDER BY "name" ASC')
+  const games = await query<Game>('SELECT * FROM "Game" WHERE "isActive" = 1 AND ("deletedAt" IS NULL) ORDER BY "name" ASC')
   
   for (const game of games) {
     game.isActive = true
     game.schedules = await query<DrawSchedule>(
-      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 ORDER BY "time" ASC',
+      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 AND ("deletedAt" IS NULL) ORDER BY "time" ASC',
       [game.id]
     )
     for (const s of game.schedules) s.isActive = true
@@ -34,13 +34,13 @@ export async function getActiveGames(): Promise<Game[]> {
 }
 
 export async function getGameById(id: string): Promise<Game | null> {
-  const games = await query<Game>('SELECT * FROM Game WHERE id = ?', [id])
+  const games = await query<Game>('SELECT * FROM Game WHERE id = ? AND ("deletedAt" IS NULL)', [id])
   if (games.length === 0) return null
   
   const game = games[0]
   game.isActive = Boolean(game.isActive)
   game.schedules = await query<DrawSchedule>(
-    'SELECT * FROM DrawSchedule WHERE gameId = ? ORDER BY time ASC',
+    'SELECT * FROM DrawSchedule WHERE gameId = ? AND ("deletedAt" IS NULL) ORDER BY time ASC',
     [game.id]
   )
   for (const s of game.schedules) s.isActive = Boolean(s.isActive)
@@ -57,14 +57,14 @@ export async function createGame(data: {
   const gameId = generateId()
   
   await execute(
-    'INSERT INTO Game (id, name, digitCount, multiplier, isActive) VALUES (?, ?, ?, ?, 1)',
+    'INSERT INTO Game (id, name, digitCount, multiplier, isActive, isDirty) VALUES (?, ?, ?, ?, 1, 1)',
     [gameId, data.name, data.digitCount, data.multiplier]
   )
   
   if (data.schedules) {
     for (const s of data.schedules) {
       await execute(
-        'INSERT INTO DrawSchedule (id, gameId, name, time, isActive) VALUES (?, ?, ?, ?, 1)',
+        'INSERT INTO DrawSchedule (id, gameId, name, time, isActive, isDirty) VALUES (?, ?, ?, ?, 1, 1)',
         [generateId(), gameId, s.name, s.time]
       )
     }
@@ -95,24 +95,24 @@ export async function updateGame(
   
   if (fields.length > 0) {
     values.push(id)
-    await execute(`UPDATE Game SET ${fields.join(', ')}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`, values)
+    await execute(`UPDATE Game SET ${fields.join(', ')}, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?`, values)
   }
 
   if (data.schedules !== undefined) {
-    const existing = await query<DrawSchedule>('SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1', [id])
+    const existing = await query<DrawSchedule>('SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1 AND ("deletedAt" IS NULL)', [id])
     const newIds = data.schedules.map(s => s.id).filter(Boolean) as string[]
     
     for (const ex of existing) {
       if (!newIds.includes(ex.id)) {
-        await execute('UPDATE DrawSchedule SET isActive = 0 WHERE id = ?', [ex.id])
+        await execute('UPDATE DrawSchedule SET isActive = 0, isDirty = 1, deletedAt = CURRENT_TIMESTAMP WHERE id = ?', [ex.id])
       }
     }
 
     for (const s of data.schedules) {
       if (s.id) {
-        await execute('UPDATE DrawSchedule SET name = ?, time = ? WHERE id = ?', [s.name, s.time, s.id])
+        await execute('UPDATE DrawSchedule SET name = ?, time = ?, isDirty = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [s.name, s.time, s.id])
       } else {
-        await execute('INSERT INTO DrawSchedule (id, gameId, name, time, isActive) VALUES (?, ?, ?, ?, 1)', [generateId(), id, s.name, s.time])
+        await execute('INSERT INTO DrawSchedule (id, gameId, name, time, isActive, isDirty) VALUES (?, ?, ?, ?, 1, 1)', [generateId(), id, s.name, s.time])
       }
     }
   }
@@ -123,7 +123,11 @@ export async function updateGame(
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  await execute('DELETE FROM Game WHERE id = ?', [id]);
+  // Soft delete instead of physical delete to allow syncing deletions
+  await execute('UPDATE Game SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  // También marcamos los schedules
+  await execute('UPDATE DrawSchedule SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP WHERE gameId = ?', [id]);
+
   dbEvents.emit('games:changed');
 }
 

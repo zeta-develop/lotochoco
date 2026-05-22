@@ -13,7 +13,7 @@ export async function createResult(data: {
   const drawDate = data.drawDate || new Date();
 
   await execute(
-    'INSERT INTO "Result" (id, gameId, scheduleId, winningNumber, drawDate, isProcessed) VALUES (?, ?, ?, ?, ?, 0)',
+    'INSERT INTO "Result" (id, gameId, scheduleId, winningNumber, drawDate, isProcessed, isDirty) VALUES (?, ?, ?, ?, ?, 0, 1)',
     [
       id,
       data.gameId,
@@ -97,7 +97,7 @@ export async function processResult(resultId: string): Promise<{
   }
 
   await execute(
-    'UPDATE "Result" SET isProcessed = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
+    'UPDATE "Result" SET isProcessed = 1, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?',
     [resultId],
   );
 
@@ -120,7 +120,7 @@ export async function getTodayResults(): Promise<Result[]> {
     console.log(`Buscando resultados entre ${startOfDay} y ${endOfDay}`);
 
     const results = await query<Result>(
-      'SELECT * FROM "Result" WHERE "drawDate" >= ? AND "drawDate" <= ? ORDER BY "drawDate" DESC',
+      'SELECT * FROM "Result" WHERE "drawDate" >= ? AND "drawDate" <= ? AND ("deletedAt" IS NULL) ORDER BY "drawDate" DESC',
       [startOfDay, endOfDay],
     );
 
