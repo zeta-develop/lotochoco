@@ -7,3 +7,8 @@ Date: Fri May 22 16:18:02 UTC 2026
 Title: Implementación de Variables en Workflow de CI
 Aprendizaje: La estrategia de acotar los secretos únicamente al entorno de ejecución de `pnpm build` en GitHub Actions es la más segura y óptima, pues evita que variables expuestas afecten a plugins nativos, compresión y pasos posteriores de Capacitor y Android.
 Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en .github/workflows/android-apk.yml y actualizamos la versión minor en package.json de acuerdo a SemVer.
+
+### $(date +%Y-%m-%d)
+- **Title:** Bloquear build si faltan credenciales de Supabase
+- **Aprendizaje:** Si las variables de Supabase no están correctamente inyectadas desde los secretos de GitHub (por error de nombre o por usar variables en lugar de secretos), Next.js compilaba usando los fallbacks, lo que resultaba en un APK inútil que apuntaba a `placeholder-url.supabase.co`.
+- **Acción:** Se ha modificado `lib/supabase/client.ts` para que elimine el fallback e introduzca un `throw new Error()` en caso de que falten `NEXT_PUBLIC_SUPABASE_URL` o `NEXT_PUBLIC_SUPABASE_ANON_KEY`. De esta forma, el proceso de compilación `pnpm build` en GitHub Actions fallará de manera explícita y preventiva.
