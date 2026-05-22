@@ -86,7 +86,12 @@ export const useWinners = () => {
     load()
   }, [refresh])
 
-  return { winners, isLoading, refresh }
+  const markAsPaid = async (winnerId: string) => {
+    const { markWinnerAsPaid } = await import('@/services/results')
+    await markWinnerAsPaid(winnerId)
+  }
+
+  return { winners, isLoading, refresh, markAsPaid }
 }
 
 export const usePendingWinners = () => {
