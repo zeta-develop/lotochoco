@@ -33,7 +33,7 @@ import type { Game, DrawSchedule } from '@/lib/types'
 export function ResultsManager() {
   const { games } = useGames()
   const { results: todayResults, refresh: refreshToday } = useTodayResults()
-  const { createResult } = useResults()
+  const { addResult } = useResults()
   
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
@@ -66,21 +66,11 @@ export function ResultsManager() {
 
     setIsSubmitting(true)
     try {
-      const response = await createResult({
+      await addResult({
         gameId: selectedGame.id,
         scheduleId: selectedSchedule.id,
         winningNumber: winningNumber.padStart(selectedGame.digitCount, '0'),
-        autoProcess: true
       })
-
-      const winnersCount = response.isProcessed?.winnersCount || 0
-      const totalPrizes = response.isProcessed?.totalPrizes || 0
-
-      toast.success(
-        winnersCount > 0 
-          ? `Resultado registrado. ${winnersCount} ganador(es), total: ${totalPrizes}`
-          : 'Resultado registrado. Sin ganadores.'
-      )
       
       setShowCreateDialog(false)
       setSelectedGame(null)
