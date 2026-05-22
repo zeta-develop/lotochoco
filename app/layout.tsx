@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { SWRProvider } from '@/components/providers/swr-provider'
 import { Toaster } from '@/components/ui/sonner';
 import { Updater } from '@/components/pos/updater';
+import { AuthProvider } from '@/components/auth/auth-provider';
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -40,21 +41,23 @@ export default function RootLayout({
   return (
     <html lang="es" className="bg-background">
       <body className="font-sans antialiased min-h-screen">
-        <SWRProvider>
-          <Updater />
-          {children}
-          <Toaster 
-            position="bottom-center" 
-            richColors 
-            expand={false}
-            toastOptions={{
-              duration: 2500,
-              style: {
-                marginBottom: 'env(safe-area-inset-bottom, 20px)',
-              }
-            }}
-          />
-        </SWRProvider>
+        <AuthProvider>
+          <SWRProvider>
+            <Updater />
+            {children}
+            <Toaster
+              position="bottom-center"
+              richColors
+              expand={false}
+              toastOptions={{
+                duration: 2500,
+                style: {
+                  marginBottom: 'env(safe-area-inset-bottom, 20px)',
+                }
+              }}
+            />
+          </SWRProvider>
+        </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

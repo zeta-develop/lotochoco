@@ -11,6 +11,8 @@ import { Reports } from "@/components/pos/reports";
 import { CashRegister } from "@/components/pos/cash-register";
 import { LuckyPyramid } from "@/components/pos/lucky-pyramid";
 import { Settings } from "@/components/pos/settings";
+import { useAuthStore } from "@/store/auth-store";
+import { LoginScreen } from "@/components/auth/login-screen";
 
 type ActiveModule =
   | "dashboard"
@@ -26,6 +28,7 @@ type ActiveModule =
 export default function HomePage() {
   const [activeModule, setActiveModule] = useState<ActiveModule>("dashboard");
   const [isLoaded, setIsLoaded] = useState(false);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
     const initializeTheme = async () => {
@@ -82,6 +85,10 @@ export default function HomePage() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
   }
 
   return (
