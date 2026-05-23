@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import db from "@/lib/db";
 import { printerService as printService } from "@/services/printer";
 import { exportBackup as backupService } from "@/services/backup";
+import { SyncManager } from "@/services/sync/sync-manager";
 
 export function Settings() {
   const { settings, updateSettings, isLoading } = useSettings();
@@ -44,6 +45,8 @@ export function Settings() {
   const [activeTab, setActiveTab] = useState("general");
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingPrinter, setIsTestingPrinter] = useState(false);
+  const [isScanningBluetooth, setIsScanningBluetooth] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Local state for form fields to avoid constant DB writes
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -67,10 +70,12 @@ export function Settings() {
 
   const loadDbStatus = async () => {
     try {
-      // In a real app, we would query the actual DB info
-      // For now, we simulate it based on our tables
+      const tables = await db.query(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+      );
+
       setDbStatus({
-        tables: 10,
+        tables: tables.values?.length ?? 0,
         size: '~2.5 MB',
         lastBackup: new Date().toLocaleString()
       });
@@ -138,6 +143,61 @@ export function Settings() {
       });
     } finally {
       setIsTestingPrinter(false);
+    }
+  };
+
+  const handleSearchBluetoothPrinter = async () => {
+    try {
+      setIsScanningBluetooth(true);
+
+      const device = await printService.scanBluetoothPrinter();
+
+      if (!device) {
+        toast.info("Búsqueda cancelada", {
+          description: "No se seleccionó ningún dispositivo Bluetooth.",
+        });
+        return;
+      }
+
+      const nextSettings = {
+        bluetoothDeviceId: device.id,
+        bluetoothDeviceName: device.name,
+        printerType: 'bluetooth',
+      };
+
+      await updateSettings(nextSettings);
+      setFormData((prev) => ({
+        ...prev,
+        ...nextSettings,
+      }));
+
+      toast.success("Impresora Bluetooth seleccionada", {
+        description: `${device.name} quedó guardada para impresión directa.`,
+      });
+    } catch (error) {
+      console.error("Error buscando impresora Bluetooth:", error);
+      toast.error("No se pudo buscar la impresora", {
+        description: error instanceof Error ? error.message : "Verifica que el Bluetooth esté encendido.",
+      });
+    } finally {
+      setIsScanningBluetooth(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    try {
+      setIsSyncing(true);
+      await SyncManager.syncAll();
+      toast.success("Sincronización ejecutada", {
+        description: "Se inició el proceso de sincronización con Supabase.",
+      });
+    } catch (error) {
+      console.error("Error ejecutando sincronización manual:", error);
+      toast.error("Error de sincronización", {
+        description: "No se pudo ejecutar la sincronización manual.",
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -328,7 +388,13 @@ export function Settings() {
                         value={formData.bluetoothDeviceName || 'Ningún dispositivo seleccionado'}
                         className="bg-muted"
                       />
-                      <Button variant="outline">Buscar</Button>
+                      <Button variant="outline" onClick={handleSearchBluetoothPrinter} disabled={isScanningBluetooth}>
+                        {isScanningBluetooth ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
+                        ) : (
+                          'Buscar'
+                        )}
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -486,7 +552,10 @@ export function Settings() {
                       Pendientes de sincronizar: 0 registros
                     </p>
                   </div>
-                  <Button variant="secondary" size="sm">
+                  <Button variant="secondary" size="sm" onClick={handleSyncNow} disabled={isSyncing}>
+                    {isSyncing ? (
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-current" />
+                    ) : null}
                     Sincronizar Ahora
                   </Button>
                 </div>
