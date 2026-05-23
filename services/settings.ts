@@ -37,10 +37,10 @@ export async function getAllSettings(): Promise<Record<string, string>> {
 export async function updateSetting(key: SettingKey, value: string): Promise<void> {
   const id = generateId()
   await execute(
-    `INSERT OR REPLACE INTO "Setting" ("id", "key", "value", "updatedAt") 
+    `INSERT OR REPLACE INTO "Setting" ("id", "key", "value", "updatedAt", "isDirty")
      VALUES (
        COALESCE((SELECT "id" FROM "Setting" WHERE "key" = ?), ?),
-       ?, ?, CURRENT_TIMESTAMP
+       ?, ?, CURRENT_TIMESTAMP, 1
      )`,
     [key, id, key, value]
   )

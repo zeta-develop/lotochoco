@@ -33,14 +33,14 @@ export async function createTicket(items: CartItem[]): Promise<Ticket> {
 
   // 1. Crear el Ticket
   await execute(
-    'INSERT INTO Ticket (id, ticketNumber, totalAmount, status, client, createdAt, updatedAt) VALUES (?, ?, ?, "active", ?, ?, ?)',
+    'INSERT INTO Ticket (id, ticketNumber, totalAmount, status, client, createdAt, updatedAt, isDirty) VALUES (?, ?, ?, "active", ?, ?, ?, 1)',
     [ticketId, ticketNumber, totalAmount, client, now, now]
   )
 
   // 2. Crear los items
   for (const item of items) {
     await execute(
-      'INSERT INTO TicketItem (id, ticketId, gameId, number, amount, schedule, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO TicketItem (id, ticketId, gameId, number, amount, schedule, createdAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
       [generateId(), ticketId, item.gameId, item.number, item.amount, item.schedule, now]
     )
   }
@@ -49,9 +49,9 @@ export async function createTicket(items: CartItem[]): Promise<Ticket> {
   const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
   if (openSessions.length > 0) {
     const sessionId = openSessions[0].id
-    await execute('UPDATE CashSession SET salesTotal = salesTotal + ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [totalAmount, sessionId])
+    await execute('UPDATE CashSession SET salesTotal = salesTotal + ?, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?', [totalAmount, sessionId])
     await execute(
-      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "sale", ?, ?, ?)',
+      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt, isDirty) VALUES (?, ?, "sale", ?, ?, ?, 1)',
       [generateId(), sessionId, totalAmount, `Venta ticket ${ticketNumber}`, now]
     )
   }
@@ -182,20 +182,20 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<{ 
   }
 
   const now = new Date().toISOString()
-  await execute('UPDATE Ticket SET status = "cancelled", cancelReason = ?, cancelledAt = ?, updatedAt = ? WHERE id = ?', 
+  await execute('UPDATE Ticket SET status = "cancelled", cancelReason = ?, cancelledAt = ?, updatedAt = ?, isDirty = 1 WHERE id = ?',
     [reason, now, now, ticketId])
 
   await execute(
-    'INSERT INTO CancellationLog (id, ticketId, ticketNumber, totalAmount, reason, itemsJson, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO CancellationLog (id, ticketId, ticketNumber, totalAmount, reason, itemsJson, createdAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
     [generateId(), ticket.id, ticket.ticketNumber, ticket.totalAmount, reason, JSON.stringify(ticket.items), now]
   )
 
   const openSessions = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
   if (openSessions.length > 0) {
     const sessionId = openSessions[0].id
-    await execute('UPDATE CashSession SET salesTotal = salesTotal - ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ticket.totalAmount, sessionId])
+    await execute('UPDATE CashSession SET salesTotal = salesTotal - ?, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?', [ticket.totalAmount, sessionId])
     await execute(
-      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, "expense", ?, ?, ?)',
+      'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt, isDirty) VALUES (?, ?, "expense", ?, ?, ?, 1)',
       [generateId(), sessionId, -ticket.totalAmount, `Cancelación ticket ${ticket.ticketNumber}`, now]
     )
   }

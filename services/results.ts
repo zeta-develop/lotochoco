@@ -91,7 +91,7 @@ export async function processResult(resultId: string): Promise<{
     totalPrizes += prizeAmount;
 
     await execute(
-      'INSERT INTO "Winner" (id, ticketId, resultId, prizeAmount, isPaid) VALUES (?, ?, ?, ?, 0)',
+      'INSERT INTO "Winner" (id, ticketId, resultId, prizeAmount, isPaid, isDirty) VALUES (?, ?, ?, ?, 0, 1)',
       [generateId(), item.ticketId, result.id, prizeAmount],
     );
   }
@@ -199,7 +199,7 @@ export async function getWinners(options?: {
 
 export async function markWinnerAsPaid(winnerId: string): Promise<void> {
   await execute(
-    "UPDATE Winner SET isPaid = 1, paidAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?",
+    "UPDATE Winner SET isPaid = 1, paidAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?",
     [winnerId],
   );
 
@@ -214,7 +214,7 @@ export async function markWinnerAsPaid(winnerId: string): Promise<void> {
       ])
     )[0];
     await execute(
-      "UPDATE CashSession SET prizesTotal = prizesTotal + ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE CashSession SET prizesTotal = prizesTotal + ?, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?",
       [winner.prizeAmount, session[0].id],
     );
   }

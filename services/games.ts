@@ -104,7 +104,7 @@ export async function updateGame(
     
     for (const ex of existing) {
       if (!newIds.includes(ex.id)) {
-        await execute('UPDATE DrawSchedule SET isActive = 0, isDirty = 1, deletedAt = CURRENT_TIMESTAMP WHERE id = ?', [ex.id])
+        await execute('UPDATE DrawSchedule SET isActive = 0, isDirty = 1, deletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ex.id])
       }
     }
 
@@ -124,9 +124,9 @@ export async function updateGame(
 
 export async function deleteGame(id: string): Promise<void> {
   // Soft delete instead of physical delete to allow syncing deletions
-  await execute('UPDATE Game SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+  await execute('UPDATE Game SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [id]);
   // También marcamos los schedules
-  await execute('UPDATE DrawSchedule SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP WHERE gameId = ?', [id]);
+  await execute('UPDATE DrawSchedule SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE gameId = ?', [id]);
 
   dbEvents.emit('games:changed');
 }

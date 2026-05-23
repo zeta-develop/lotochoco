@@ -44,7 +44,15 @@ function buildUpsertSql(tableName: string, columns: string[], conflictTarget: st
 
 async function getLastSync(tableName: string): Promise<Date> {
   const rows = await query<{ lastSync: string }>('SELECT lastSync FROM SyncState WHERE tableName = ?', [tableName]);
-  return new Date(rows[0]?.lastSync ?? DEFAULT_SYNC_DATE);
+  const row = rows?.[0];
+  const lastSync = row?.lastSync ?? DEFAULT_SYNC_DATE;
+
+  // Garantizar inicialización
+  if (!row) {
+    await execute('INSERT OR IGNORE INTO SyncState(tableName, lastSync) VALUES (?, ?)', [tableName, DEFAULT_SYNC_DATE]);
+  }
+
+  return new Date(lastSync);
 }
 
 async function setLastSync(tableName: string, lastSync: Date): Promise<void> {
@@ -70,18 +78,23 @@ async function fetchChangedLocalRows(config: SyncTableConfig, sinceIso: string):
   );
 }
 
-async function fetchChangedRemoteRows(config: SyncTableConfig, sinceIso: string): Promise<Row[]> {
-  const { data, error } = await supabase
-    .from(config.remoteTable)
-    .select('*')
-    .gt(config.remoteTimestampColumn, sinceIso)
-    .order(config.remoteTimestampColumn, { ascending: true });
+async function fetchChangedRemoteRows(config: SyncTableConfig, sinceIso: string, retries = 3): Promise<Row[]> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const { data, error } = await supabase
+        .from(config.remoteTable)
+        .select('*')
+        .gt(config.remoteTimestampColumn, sinceIso)
+        .order(config.remoteTimestampColumn, { ascending: true });
 
-  if (error) {
-    throw error;
+      if (error) throw error;
+      return (data ?? []) as Row[];
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise(res => setTimeout(res, 1000 * attempt));
+    }
   }
-
-  return (data ?? []) as Row[];
+  return [];
 }
 
 export async function getPendingSyncCount(configs: SyncTableConfig[]): Promise<number> {
@@ -105,7 +118,10 @@ export async function syncTable(config: SyncTableConfig, companyId: string): Pro
 
   const remoteRows = await fetchChangedRemoteRows(config, lastSyncIso);
 
-  for (const remoteRow of remoteRows) {
+
+  try {
+    await execute('BEGIN TRANSACTION');
+    for (const remoteRow of remoteRows) {
     const remoteTimestamp = toDate(remoteRow[config.remoteTimestampColumn]);
     remoteTimestampByKey.set(config.rowKey(remoteRow), remoteTimestamp);
     latestSync.value = maxDate(latestSync.value, remoteTimestamp);
@@ -119,6 +135,11 @@ export async function syncTable(config: SyncTableConfig, companyId: string): Pro
 
     const localValues = config.toLocalValues(remoteRow);
     await execute(localUpsertSql, localValues);
+    }
+    await execute('COMMIT');
+  } catch (e) {
+    await execute('ROLLBACK');
+    throw e;
   }
 
   const localRows = await fetchChangedLocalRows(config, lastSyncIso);
@@ -142,9 +163,13 @@ export async function syncTable(config: SyncTableConfig, companyId: string): Pro
       return payload;
     });
 
-    const { error } = await supabase
-      .from(config.remoteTable)
-      .upsert(payloads, { onConflict: config.conflictTarget });
+    let error = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const result = await supabase.from(config.remoteTable).upsert(payloads, { onConflict: config.conflictTarget });
+      error = result.error;
+      if (!error) break;
+      if (attempt < 3) await new Promise(res => setTimeout(res, 1000 * attempt));
+    }
 
     if (error) {
       throw error;
@@ -240,7 +265,7 @@ const ticketConfig: SyncTableConfig = {
   localTimestampColumn: 'updatedAt',
   remoteTimestampColumn: 'updated_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'ticketNumber', 'client', 'totalAmount', 'status', 'cancelReason', 'cancelledAt', 'createdAt', 'updatedAt'],
+  localColumns: ['id', 'ticketNumber', 'client', 'totalAmount', 'status', 'cancelReason', 'cancelledAt', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   toRemote: (row, companyId) => ({
     id: row.id,
@@ -253,6 +278,7 @@ const ticketConfig: SyncTableConfig = {
     cancelled_at: row.cancelledAt ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -264,6 +290,8 @@ const ticketConfig: SyncTableConfig = {
     row.cancelled_at ?? null,
     row.created_at,
     row.updated_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -274,7 +302,7 @@ const ticketItemConfig: SyncTableConfig = {
   localTimestampColumn: 'createdAt',
   remoteTimestampColumn: 'created_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'ticketId', 'gameId', 'number', 'amount', 'schedule', 'createdAt'],
+  localColumns: ['id', 'ticketId', 'gameId', 'number', 'amount', 'schedule', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   canApplyRemoteRow: async (row) => {
     const ticketExists = await existsLocal('Ticket', row.ticket_id);
@@ -291,6 +319,7 @@ const ticketItemConfig: SyncTableConfig = {
     schedule: row.schedule,
     created_at: row.createdAt,
     updated_at: row.createdAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -300,6 +329,9 @@ const ticketItemConfig: SyncTableConfig = {
     row.amount,
     row.schedule,
     row.created_at,
+    row.updated_at ?? row.created_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -356,7 +388,7 @@ const winnerConfig: SyncTableConfig = {
   localTimestampColumn: 'updatedAt',
   remoteTimestampColumn: 'updated_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'ticketId', 'resultId', 'prizeAmount', 'isPaid', 'paidAt', 'createdAt', 'updatedAt'],
+  localColumns: ['id', 'ticketId', 'resultId', 'prizeAmount', 'isPaid', 'paidAt', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   canApplyRemoteRow: async (row) => {
     const ticketExists = await existsLocal('Ticket', row.ticket_id);
@@ -373,6 +405,7 @@ const winnerConfig: SyncTableConfig = {
     paid_at: row.paidAt ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -383,6 +416,8 @@ const winnerConfig: SyncTableConfig = {
     row.paid_at ?? null,
     row.created_at,
     row.updated_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -393,7 +428,7 @@ const cashSessionConfig: SyncTableConfig = {
   localTimestampColumn: 'updatedAt',
   remoteTimestampColumn: 'updated_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'openingAmount', 'closingAmount', 'salesTotal', 'prizesTotal', 'status', 'openedAt', 'closedAt', 'notes', 'createdAt', 'updatedAt'],
+  localColumns: ['id', 'openingAmount', 'closingAmount', 'salesTotal', 'prizesTotal', 'status', 'openedAt', 'closedAt', 'notes', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   toRemote: (row, companyId) => ({
     id: row.id,
@@ -408,6 +443,7 @@ const cashSessionConfig: SyncTableConfig = {
     notes: row.notes ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -421,6 +457,8 @@ const cashSessionConfig: SyncTableConfig = {
     row.notes ?? null,
     row.created_at,
     row.updated_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -431,7 +469,7 @@ const cashMovementConfig: SyncTableConfig = {
   localTimestampColumn: 'createdAt',
   remoteTimestampColumn: 'created_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'cashSessionId', 'type', 'amount', 'description', 'createdAt'],
+  localColumns: ['id', 'cashSessionId', 'type', 'amount', 'description', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   canApplyRemoteRow: async (row) => existsLocal('CashSession', row.cash_session_id),
   toRemote: (row, companyId) => ({
@@ -443,6 +481,7 @@ const cashMovementConfig: SyncTableConfig = {
     description: row.description,
     created_at: row.createdAt,
     updated_at: row.createdAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -451,6 +490,9 @@ const cashMovementConfig: SyncTableConfig = {
     row.amount,
     row.description,
     row.created_at,
+    row.updated_at ?? row.created_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -461,7 +503,7 @@ const settingConfig: SyncTableConfig = {
   localTimestampColumn: 'updatedAt',
   remoteTimestampColumn: 'updated_at',
   conflictTarget: 'key',
-  localColumns: ['id', 'key', 'value', 'createdAt', 'updatedAt'],
+  localColumns: ['id', 'key', 'value', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.key,
   toRemote: (row, companyId) => ({
     id: row.id,
@@ -470,6 +512,7 @@ const settingConfig: SyncTableConfig = {
     value: row.value,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -477,6 +520,8 @@ const settingConfig: SyncTableConfig = {
     row.value,
     row.created_at,
     row.updated_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -487,7 +532,7 @@ const cancellationLogConfig: SyncTableConfig = {
   localTimestampColumn: 'createdAt',
   remoteTimestampColumn: 'created_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'ticketId', 'ticketNumber', 'totalAmount', 'reason', 'itemsJson', 'createdAt'],
+  localColumns: ['id', 'ticketId', 'ticketNumber', 'totalAmount', 'reason', 'itemsJson', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   canApplyRemoteRow: async (row) => existsLocal('Ticket', row.ticket_id),
   toRemote: (row, companyId) => ({
@@ -500,6 +545,7 @@ const cancellationLogConfig: SyncTableConfig = {
     items_json: row.itemsJson,
     created_at: row.createdAt,
     updated_at: row.createdAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -509,6 +555,9 @@ const cancellationLogConfig: SyncTableConfig = {
     row.reason,
     row.items_json,
     row.created_at,
+    row.updated_at ?? row.created_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
@@ -519,7 +568,7 @@ const appErrorLogConfig: SyncTableConfig = {
   localTimestampColumn: 'createdAt',
   remoteTimestampColumn: 'created_at',
   conflictTarget: 'id',
-  localColumns: ['id', 'severity', 'source', 'message', 'stack', 'details', 'url', 'userAgent', 'platform', 'createdAt'],
+  localColumns: ['id', 'severity', 'source', 'message', 'stack', 'details', 'url', 'userAgent', 'platform', 'createdAt', 'updatedAt', 'isDirty', 'deletedAt'],
   rowKey: (row) => row.id,
   toRemote: (row, companyId) => ({
     id: row.id,
@@ -534,6 +583,7 @@ const appErrorLogConfig: SyncTableConfig = {
     platform: row.platform ?? null,
     created_at: row.createdAt,
     updated_at: row.createdAt,
+    deleted_at: row.deletedAt ?? null,
   }),
   toLocalValues: (row) => [
     row.id,
@@ -546,6 +596,9 @@ const appErrorLogConfig: SyncTableConfig = {
     row.user_agent ?? null,
     row.platform ?? null,
     row.created_at,
+    row.updated_at ?? row.created_at,
+    0,
+    row.deleted_at ?? null,
   ],
 };
 
