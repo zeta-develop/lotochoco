@@ -212,7 +212,6 @@ const drawScheduleConfig: SyncTableConfig = {
   canApplyRemoteRow: async (row) => existsLocal('Game', row.game_id),
   toRemote: (row, companyId) => ({
     id: row.id,
-    company_id: companyId,
     game_id: row.gameId,
     name: row.name,
     time: row.time,
@@ -327,7 +326,6 @@ const resultConfig: SyncTableConfig = {
   },
   toRemote: (row, companyId) => ({
     id: row.id,
-    company_id: companyId,
     game_id: row.gameId,
     schedule_id: row.scheduleId,
     winning_number: row.winningNumber,

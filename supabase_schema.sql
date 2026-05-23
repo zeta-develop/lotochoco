@@ -362,11 +362,6 @@ CREATE TRIGGER trigger_set_games_company
   BEFORE INSERT ON public.games
   FOR EACH ROW EXECUTE FUNCTION set_default_company_id();
 
-DROP TRIGGER IF EXISTS trigger_set_draw_schedules_company ON public.draw_schedules;
-CREATE TRIGGER trigger_set_draw_schedules_company
-  BEFORE INSERT ON public.draw_schedules
-  FOR EACH ROW EXECUTE FUNCTION set_default_company_id();
-
 DROP TRIGGER IF EXISTS trigger_set_tickets_company ON public.tickets;
 CREATE TRIGGER trigger_set_tickets_company
   BEFORE INSERT ON public.tickets
@@ -375,11 +370,6 @@ CREATE TRIGGER trigger_set_tickets_company
 DROP TRIGGER IF EXISTS trigger_set_ticket_items_company ON public.ticket_items;
 CREATE TRIGGER trigger_set_ticket_items_company
   BEFORE INSERT ON public.ticket_items
-  FOR EACH ROW EXECUTE FUNCTION set_default_company_id();
-
-DROP TRIGGER IF EXISTS trigger_set_results_company ON public.results;
-CREATE TRIGGER trigger_set_results_company
-  BEFORE INSERT ON public.results
   FOR EACH ROW EXECUTE FUNCTION set_default_company_id();
 
 DROP TRIGGER IF EXISTS trigger_set_winners_company ON public.winners;
