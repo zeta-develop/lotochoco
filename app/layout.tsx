@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { Updater } from '@/components/pos/updater';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { SyncProvider } from '@/components/providers/sync-provider';
+import { ErrorLoggerProvider } from '@/components/providers/error-logger-provider';
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -42,25 +43,27 @@ export default function RootLayout({
   return (
     <html lang="es" className="bg-background">
       <body className="font-sans antialiased min-h-screen">
-        <AuthProvider>
-          <SWRProvider>
-            <SyncProvider>
-              <Updater />
-              {children}
-              <Toaster
-                position="bottom-center"
-                richColors
-                expand={false}
-                toastOptions={{
-                  duration: 2500,
-                  style: {
-                    marginBottom: 'env(safe-area-inset-bottom, 20px)',
-                  }
-                }}
-              />
-            </SyncProvider>
-          </SWRProvider>
-        </AuthProvider>
+        <ErrorLoggerProvider>
+          <AuthProvider>
+            <SWRProvider>
+              <SyncProvider>
+                <Updater />
+                {children}
+                <Toaster
+                  position="bottom-center"
+                  richColors
+                  expand={false}
+                  toastOptions={{
+                    duration: 2500,
+                    style: {
+                      marginBottom: 'env(safe-area-inset-bottom, 20px)',
+                    }
+                  }}
+                />
+              </SyncProvider>
+            </SWRProvider>
+          </AuthProvider>
+        </ErrorLoggerProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

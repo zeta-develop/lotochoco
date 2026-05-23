@@ -1,6 +1,18 @@
 import { supabase } from '@/lib/supabase/client';
+import { getSetting } from '@/services/settings';
 
-function deriveCompanyName(email?: string | null): string {
+async function deriveCompanyName(email?: string | null): Promise<string> {
+  try {
+    const businessName = await getSetting('businessName');
+    const trimmedBusinessName = businessName.trim();
+
+    if (trimmedBusinessName) {
+      return trimmedBusinessName;
+    }
+  } catch {
+    // Si falla la lectura local, usamos el fallback por email.
+  }
+
   if (!email) return 'Mi empresa';
 
   const [localPart] = email.split('@');
@@ -32,7 +44,7 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     return membership.company_id;
   }
 
-  const companyName = deriveCompanyName(session.user.email);
+  const companyName = await deriveCompanyName(session.user.email);
   const { data: company, error: companyError } = await supabase
     .from('companies')
     .insert({ name: companyName })

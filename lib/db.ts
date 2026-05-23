@@ -99,6 +99,7 @@ class DatabaseManager {
           `CREATE TABLE IF NOT EXISTS "CashMovement" ("id" TEXT PRIMARY KEY, "cashSessionId" TEXT, "type" TEXT, "amount" REAL, "description" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("cashSessionId") REFERENCES "CashSession" ("id") ON DELETE CASCADE);`,
           `CREATE TABLE IF NOT EXISTS "Setting" ("id" TEXT PRIMARY KEY, "key" TEXT UNIQUE, "value" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
           `CREATE TABLE IF NOT EXISTS "CancellationLog" ("id" TEXT PRIMARY KEY, "ticketId" TEXT, "ticketNumber" TEXT, "totalAmount" REAL, "reason" TEXT, "itemsJson" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
+          `CREATE TABLE IF NOT EXISTS "AppErrorLog" ("id" TEXT PRIMARY KEY, "severity" TEXT DEFAULT 'error', "source" TEXT, "message" TEXT, "stack" TEXT, "details" TEXT, "url" TEXT, "userAgent" TEXT, "platform" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`,
           `CREATE TABLE IF NOT EXISTS "SyncState" ("tableName" TEXT PRIMARY KEY, "lastSync" DATETIME DEFAULT '1970-01-01T00:00:00.000Z');`
         ]
         await db.executeSet(statements.map(s => ({ statement: s, values: [] })))
@@ -117,6 +118,7 @@ class DatabaseManager {
           await db.execute(`ALTER TABLE "Result" ADD COLUMN "isDirty" INTEGER DEFAULT 1;`).catch(() => {});
           await db.execute(`ALTER TABLE "Result" ADD COLUMN "deletedAt" DATETIME;`).catch(() => {});
 
+          await db.execute(`CREATE TABLE IF NOT EXISTS "AppErrorLog" ("id" TEXT PRIMARY KEY, "severity" TEXT DEFAULT 'error', "source" TEXT, "message" TEXT, "stack" TEXT, "details" TEXT, "url" TEXT, "userAgent" TEXT, "platform" TEXT, "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP);`).catch(() => {});
           await db.execute(`CREATE TABLE IF NOT EXISTS "SyncState" ("tableName" TEXT PRIMARY KEY, "lastSync" DATETIME DEFAULT '1970-01-01T00:00:00.000Z');`).catch(() => {});
         } catch (migErr) {
           console.warn('[DB] Alguna migración general falló:', migErr);
