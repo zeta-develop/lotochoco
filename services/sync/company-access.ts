@@ -63,17 +63,5 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     throw companyError;
   }
 
-  const { error: linkError } = await supabase
-    .from('company_users')
-    .insert({
-      company_id: company!.id,
-      user_id: userId,
-      role: 'owner',
-    });
-
-  if (linkError) {
-    throw linkError;
-  }
-
   return company!.id;
 }
