@@ -233,6 +233,10 @@ CREATE POLICY "Users can view their own companies" ON public.companies
   FOR SELECT USING (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 DROP POLICY IF EXISTS "Users can create their own companies" ON public.companies;
+DROP POLICY IF EXISTS "Users can update their own companies" ON public.companies;
+CREATE POLICY "Users can update their own companies" ON public.companies
+  FOR UPDATE USING (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+
 CREATE POLICY "Users can create their own companies" ON public.companies
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
@@ -241,6 +245,10 @@ CREATE POLICY "Users can view their own memberships" ON public.company_users
   FOR SELECT USING (user_id = auth.uid());
 
 DROP POLICY IF EXISTS "Users can create their own memberships" ON public.company_users;
+DROP POLICY IF EXISTS "Users can update their own memberships" ON public.company_users;
+CREATE POLICY "Users can update their own memberships" ON public.company_users
+  FOR UPDATE USING (user_id = auth.uid());
+
 CREATE POLICY "Users can create their own memberships" ON public.company_users
   FOR INSERT WITH CHECK (user_id = auth.uid());
 

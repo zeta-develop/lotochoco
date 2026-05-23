@@ -174,6 +174,16 @@ export async function syncTable(config: SyncTableConfig, companyId: string): Pro
     if (error) {
       throw error;
     }
+
+    // Limpiar isDirty en los registros locales después de un push exitoso
+    try {
+      const ids = rowsToPush.map((row) => `'${row.id}'`).join(', ');
+      if (ids.length > 0) {
+        await execute(`UPDATE ${quoteIdentifier(config.localTable)} SET isDirty = 0 WHERE id IN (${ids})`);
+      }
+    } catch (cleanError) {
+      console.warn(`[Sync] Failed to clean isDirty for table ${config.tableName}:`, cleanError);
+    }
   }
 
   await setLastSync(config.tableName, latestSync.value);

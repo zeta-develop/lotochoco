@@ -49,7 +49,15 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     .from('companies')
     .insert({ name: companyName })
     .select('id')
-    .single();
+    .maybeSingle();
+
+  if (companyError && companyError.code === '42501') {
+     console.warn('[Sync] RLS falló al insertar compañía. Es posible que ya exista una compañía o no tenga permisos.', companyError);
+     // Intenta recuperar si ya existe una por algún motivo
+     const { data: existingCompany } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+     if (existingCompany?.id) return existingCompany.id;
+     throw companyError;
+  }
 
   if (companyError) {
     throw companyError;
@@ -58,7 +66,7 @@ export async function ensureCompanyAccess(): Promise<string | null> {
   const { error: linkError } = await supabase
     .from('company_users')
     .insert({
-      company_id: company.id,
+      company_id: company!.id,
       user_id: userId,
       role: 'owner',
     });
@@ -67,5 +75,5 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     throw linkError;
   }
 
-  return company.id;
+  return company!.id;
 }
