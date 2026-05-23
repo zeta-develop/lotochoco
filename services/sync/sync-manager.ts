@@ -52,8 +52,19 @@ export class SyncManager {
       const results: SyncTableResult[] = [];
 
       for (const config of SYNC_TABLES) {
-        const tableResult = await syncTable(config, companyId);
-        results.push(tableResult);
+        try {
+          const tableResult = await syncTable(config, companyId);
+          results.push(tableResult);
+        } catch (tableError) {
+          console.error(`[Sync] Error sincronizando tabla ${config.tableName}:`, tableError);
+          results.push({
+            tableName: config.tableName,
+            pulled: 0,
+            pushed: 0,
+            skipped: 0,
+            latestSync: new Date(0),
+          });
+        }
       }
 
       console.log('[Sync] Ciclo de sincronización completado.');
