@@ -3,27 +3,33 @@ import { syncResults } from './result-sync';
 import { ensureCompanyAccess } from './company-access';
 import { supabase } from '@/lib/supabase/client';
 
+export type SyncResult = {
+  success: boolean;
+  reason?: 'offline' | 'busy' | 'no-session' | 'no-company' | 'error';
+  error?: unknown;
+};
+
 export class SyncManager {
   private static isSyncing = false;
   private static syncInterval: ReturnType<typeof setInterval> | null = null;
 
-  static async syncAll() {
+  static async syncAll(): Promise<SyncResult> {
     // Si no hay red, abortamos silenciosamente (Offline First)
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('[Sync] Dispositivo offline, sincronización pospuesta.');
-      return;
+      return { success: false, reason: 'offline' };
     }
 
     if (this.isSyncing) {
       console.log('[Sync] Sincronización en progreso, saltando ciclo.');
-      return;
+      return { success: false, reason: 'busy' };
     }
 
     // Comprobar si hay sesión activa (solo sincronizar si estamos logueados)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       console.log('[Sync] No hay sesión activa, sincronización omitida.');
-      return;
+      return { success: false, reason: 'no-session' };
     }
 
     this.isSyncing = true;
@@ -33,7 +39,7 @@ export class SyncManager {
       const companyId = await ensureCompanyAccess();
       if (!companyId) {
         console.log('[Sync] No se pudo resolver una compañía para el usuario actual.');
-        return;
+        return { success: false, reason: 'no-company' };
       }
 
       // Fase 9: Implementación Gradual (Solo Game y Result)
@@ -41,9 +47,11 @@ export class SyncManager {
       await syncResults();
 
       console.log('[Sync] Ciclo de sincronización completado.');
+      return { success: true };
     } catch (error) {
       console.error('[Sync] Error durante la sincronización global:', error);
       // Falla silenciosamente en UI, permite que los componentes sigan usando SQLite
+      return { success: false, reason: 'error', error };
     } finally {
       this.isSyncing = false;
     }

@@ -37,7 +37,7 @@ import { toast } from "sonner";
 import db from "@/lib/db";
 import { printerService as printService } from "@/services/printer";
 import { exportBackup as backupService } from "@/services/backup";
-import { SyncManager } from "@/services/sync/sync-manager";
+import { SyncManager, type SyncResult } from "@/services/sync/sync-manager";
 
 export function Settings() {
   const { settings, updateSettings, isLoading } = useSettings();
@@ -75,7 +75,7 @@ export function Settings() {
       );
 
       setDbStatus({
-        tables: tables.values?.length ?? 0,
+        tables: tables.length,
         size: '~2.5 MB',
         lastBackup: new Date().toLocaleString()
       });
@@ -187,9 +187,26 @@ export function Settings() {
   const handleSyncNow = async () => {
     try {
       setIsSyncing(true);
-      await SyncManager.syncAll();
-      toast.success("Sincronización ejecutada", {
-        description: "Se inició el proceso de sincronización con Supabase.",
+      const result = await SyncManager.syncAll();
+      await loadDbStatus();
+
+      if (result.success) {
+        toast.success("Sincronización ejecutada", {
+          description: "Se completó el proceso de sincronización con Supabase.",
+        });
+        return;
+      }
+
+      const reasonMessages: Record<NonNullable<SyncResult['reason']>, string> = {
+        offline: "No hay conexión a internet. La sincronización quedará pendiente.",
+        busy: "Ya hay una sincronización en curso.",
+        "no-session": "No hay una sesión activa para sincronizar.",
+        "no-company": "No se pudo resolver la compañía del usuario actual.",
+        error: "Ocurrió un error durante la sincronización.",
+      };
+
+      toast.error("Sincronización no completada", {
+        description: reasonMessages[result.reason ?? 'error'],
       });
     } catch (error) {
       console.error("Error ejecutando sincronización manual:", error);
