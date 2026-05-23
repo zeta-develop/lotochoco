@@ -55,7 +55,8 @@ export function Settings() {
   const [dbStatus, setDbStatus] = useState({
     tables: 0,
     size: '0 KB',
-    lastBackup: 'Nunca'
+    lastBackup: 'Nunca',
+    pendingSync: 0
   });
 
   useEffect(() => {
@@ -73,11 +74,13 @@ export function Settings() {
       const tables = await db.query(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
       );
+      const pendingSync = await SyncManager.getPendingCount();
 
       setDbStatus({
         tables: tables.length,
         size: '~2.5 MB',
-        lastBackup: new Date().toLocaleString()
+        lastBackup: new Date().toLocaleString(),
+        pendingSync
       });
     } catch (error) {
       console.error("Error loading DB status:", error);
@@ -566,7 +569,7 @@ export function Settings() {
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium">Estado</p>
                     <p className="text-xs text-muted-foreground">
-                      Pendientes de sincronizar: 0 registros
+                      Pendientes de sincronizar: {dbStatus.pendingSync} registros
                     </p>
                   </div>
                   <Button variant="secondary" size="sm" onClick={handleSyncNow} disabled={isSyncing}>

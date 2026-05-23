@@ -1,12 +1,12 @@
-import { syncGames } from './game-sync';
-import { syncResults } from './result-sync';
-import { ensureCompanyAccess } from './company-access';
 import { supabase } from '@/lib/supabase/client';
+import { ensureCompanyAccess } from './company-access';
+import { SYNC_TABLES, getPendingSyncCount, syncTable, type SyncTableResult } from './sync-config';
 
 export type SyncResult = {
   success: boolean;
   reason?: 'offline' | 'busy' | 'no-session' | 'no-company' | 'error';
   error?: unknown;
+  results?: SyncTableResult[];
 };
 
 export class SyncManager {
@@ -14,7 +14,6 @@ export class SyncManager {
   private static syncInterval: ReturnType<typeof setInterval> | null = null;
 
   static async syncAll(): Promise<SyncResult> {
-    // Si no hay red, abortamos silenciosamente (Offline First)
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('[Sync] Dispositivo offline, sincronización pospuesta.');
       return { success: false, reason: 'offline' };
@@ -25,7 +24,6 @@ export class SyncManager {
       return { success: false, reason: 'busy' };
     }
 
-    // Comprobar si hay sesión activa (solo sincronizar si estamos logueados)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       console.log('[Sync] No hay sesión activa, sincronización omitida.');
@@ -42,33 +40,36 @@ export class SyncManager {
         return { success: false, reason: 'no-company' };
       }
 
-      // Fase 9: Implementación Gradual (Solo Game y Result)
-      await syncGames(companyId);
-      await syncResults();
+      const results: SyncTableResult[] = [];
+
+      for (const config of SYNC_TABLES) {
+        const tableResult = await syncTable(config, companyId);
+        results.push(tableResult);
+      }
 
       console.log('[Sync] Ciclo de sincronización completado.');
-      return { success: true };
+      return { success: true, results };
     } catch (error) {
       console.error('[Sync] Error durante la sincronización global:', error);
-      // Falla silenciosamente en UI, permite que los componentes sigan usando SQLite
       return { success: false, reason: 'error', error };
     } finally {
       this.isSyncing = false;
     }
   }
 
+  static async getPendingCount(): Promise<number> {
+    return getPendingSyncCount(SYNC_TABLES);
+  }
+
   static startBackgroundSync(intervalMs = 60000) {
     if (this.syncInterval) return;
 
-    // Sincronizar al iniciar
     this.syncAll();
 
-    // Configurar ciclo recurrente
     this.syncInterval = setInterval(() => {
       this.syncAll();
     }, intervalMs);
 
-    // Si la plataforma soporta eventos de online, suscribirse
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
         console.log('[Sync] Red recuperada, forzando sincronización.');
