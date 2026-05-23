@@ -56,7 +56,14 @@ export class SyncManager {
           const tableResult = await syncTable(config, companyId);
           results.push(tableResult);
         } catch (tableError) {
-          console.error(`[Sync] Error sincronizando tabla ${config.tableName}:`, tableError);
+          const tableErrorNormalized = {
+            message: tableError instanceof Error ? tableError.message : String(tableError),
+            stack: tableError instanceof Error ? tableError.stack : undefined,
+            cause: (tableError as any)?.cause,
+            code: (tableError as any)?.code,
+            details: (tableError as any)?.details || tableError
+          };
+          console.error(`[Sync] Error sincronizando tabla ${config.tableName}:`, JSON.stringify(tableErrorNormalized, null, 2));
           results.push({
             tableName: config.tableName,
             pulled: 0,

@@ -31,3 +31,8 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ## 2024-05-23 - Solución Error 42501 RLS y Ciclo Sincronización
 - **Aprendizaje:** La sincronización de Supabase con `upsert()` fallaba constantemente por un error 42501 (RLS Policy Violation) en la tabla `companies`. Se determinó que el script de migración SQL no contenía políticas para `UPDATE` tanto en `companies` como en `company_users`. Además, los registros locales nunca avanzaban su estado (isDirty) y se bloqueaban en 1970 porque el motor genérico no estaba reseteando la bandera tras un PUSH exitoso.
 - **Acción:** Se añadieron las políticas `UPDATE` a `supabase_schema.sql`. En el motor de sincronización (`services/sync/sync-config.ts`), se implementó explícitamente el update `isDirty = 0` hacia SQLite post-push y se manejaron de forma aislada los errores dentro de cada tabla iterada en `services/sync/sync-manager.ts`. Se recomienda aplicar esto ante futuras tablas nuevas que se integren al ecosistema.
+
+### 2024-05-23
+- **Title:** Corrección Sincronización Inicial - RLS y Trigger Companies
+- **Aprendizaje:** El ciclo de sincronización fallaba (error 42501) al crear una compañía porque la consulta .select() en el insert fallaba dado que el usuario aún no era miembro de dicha compañía. Además, al insertar la compañía se intentaba agregar el usuario a company_users *después* del retorno de la compañía.
+- **Acción:** Se agregó `WITH CHECK` a las políticas RLS. Además, se implementó un trigger AFTER INSERT en `companies` (`set_company_owner_membership`) para insertar inmediatamente al usuario que crea la compañía como "owner" en `company_users`. Esto garantiza que la consulta `.select()` funcione, eliminando el 42501 en el primer inicio de sesión.

@@ -235,7 +235,7 @@ CREATE POLICY "Users can view their own companies" ON public.companies
 DROP POLICY IF EXISTS "Users can create their own companies" ON public.companies;
 DROP POLICY IF EXISTS "Users can update their own companies" ON public.companies;
 CREATE POLICY "Users can update their own companies" ON public.companies
-  FOR UPDATE USING (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 CREATE POLICY "Users can create their own companies" ON public.companies
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
@@ -247,7 +247,7 @@ CREATE POLICY "Users can view their own memberships" ON public.company_users
 DROP POLICY IF EXISTS "Users can create their own memberships" ON public.company_users;
 DROP POLICY IF EXISTS "Users can update their own memberships" ON public.company_users;
 CREATE POLICY "Users can update their own memberships" ON public.company_users
-  FOR UPDATE USING (user_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can create their own memberships" ON public.company_users
   FOR INSERT WITH CHECK (user_id = auth.uid());
@@ -259,7 +259,7 @@ CREATE POLICY "Users can view games of their company" ON public.games
 
 DROP POLICY IF EXISTS "Users can insert/update games of their company" ON public.games;
 CREATE POLICY "Users can insert/update games of their company" ON public.games
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas DrawSchedules
 DROP POLICY IF EXISTS "Users can view schedules of their company games" ON public.draw_schedules;
@@ -268,7 +268,7 @@ CREATE POLICY "Users can view schedules of their company games" ON public.draw_s
 
 DROP POLICY IF EXISTS "Users can insert/update schedules" ON public.draw_schedules;
 CREATE POLICY "Users can insert/update schedules" ON public.draw_schedules
-  FOR ALL USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
+  FOR ALL USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()))) WITH CHECK (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
 
 -- Políticas Results (Temporalmente laxas atadas a game_id para validación local)
 DROP POLICY IF EXISTS "Users can view results" ON public.results;
@@ -277,7 +277,7 @@ CREATE POLICY "Users can view results" ON public.results
 
 DROP POLICY IF EXISTS "Users can insert/update results" ON public.results;
 CREATE POLICY "Users can insert/update results" ON public.results
-  FOR ALL USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
+  FOR ALL USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()))) WITH CHECK (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
 
 -- Políticas Tickets
 DROP POLICY IF EXISTS "Users can view tickets of their company" ON public.tickets;
@@ -286,7 +286,7 @@ CREATE POLICY "Users can view tickets of their company" ON public.tickets
 
 DROP POLICY IF EXISTS "Users can insert/update tickets of their company" ON public.tickets;
 CREATE POLICY "Users can insert/update tickets of their company" ON public.tickets
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas TicketItems
 DROP POLICY IF EXISTS "Users can view ticket items of their company" ON public.ticket_items;
@@ -295,7 +295,7 @@ CREATE POLICY "Users can view ticket items of their company" ON public.ticket_it
 
 DROP POLICY IF EXISTS "Users can insert/update ticket items of their company" ON public.ticket_items;
 CREATE POLICY "Users can insert/update ticket items of their company" ON public.ticket_items
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas Winners
 DROP POLICY IF EXISTS "Users can view winners of their company" ON public.winners;
@@ -304,7 +304,7 @@ CREATE POLICY "Users can view winners of their company" ON public.winners
 
 DROP POLICY IF EXISTS "Users can insert/update winners of their company" ON public.winners;
 CREATE POLICY "Users can insert/update winners of their company" ON public.winners
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas CashSessions
 DROP POLICY IF EXISTS "Users can view cash sessions of their company" ON public.cash_sessions;
@@ -313,7 +313,7 @@ CREATE POLICY "Users can view cash sessions of their company" ON public.cash_ses
 
 DROP POLICY IF EXISTS "Users can insert/update cash sessions of their company" ON public.cash_sessions;
 CREATE POLICY "Users can insert/update cash sessions of their company" ON public.cash_sessions
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas CashMovements
 DROP POLICY IF EXISTS "Users can view cash movements of their company" ON public.cash_movements;
@@ -322,7 +322,7 @@ CREATE POLICY "Users can view cash movements of their company" ON public.cash_mo
 
 DROP POLICY IF EXISTS "Users can insert/update cash movements of their company" ON public.cash_movements;
 CREATE POLICY "Users can insert/update cash movements of their company" ON public.cash_movements
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas Settings
 DROP POLICY IF EXISTS "Users can view settings of their company" ON public.settings;
@@ -331,7 +331,7 @@ CREATE POLICY "Users can view settings of their company" ON public.settings
 
 DROP POLICY IF EXISTS "Users can insert/update settings of their company" ON public.settings;
 CREATE POLICY "Users can insert/update settings of their company" ON public.settings
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas CancellationLogs
 DROP POLICY IF EXISTS "Users can view cancellation logs of their company" ON public.cancellation_logs;
@@ -340,7 +340,7 @@ CREATE POLICY "Users can view cancellation logs of their company" ON public.canc
 
 DROP POLICY IF EXISTS "Users can insert/update cancellation logs of their company" ON public.cancellation_logs;
 CREATE POLICY "Users can insert/update cancellation logs of their company" ON public.cancellation_logs
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas AppErrorLogs
 DROP POLICY IF EXISTS "Users can view app error logs of their company" ON public.app_error_logs;
@@ -349,7 +349,7 @@ CREATE POLICY "Users can view app error logs of their company" ON public.app_err
 
 DROP POLICY IF EXISTS "Users can insert/update app error logs of their company" ON public.app_error_logs;
 CREATE POLICY "Users can insert/update app error logs of their company" ON public.app_error_logs
-  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())) WITH CHECK (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- ==========================================
 -- 5. FUNCTION TRIGGER (Company Default)
@@ -409,3 +409,23 @@ DROP TRIGGER IF EXISTS trigger_set_app_error_logs_company ON public.app_error_lo
 CREATE TRIGGER trigger_set_app_error_logs_company
   BEFORE INSERT ON public.app_error_logs
   FOR EACH ROW EXECUTE FUNCTION set_default_company_id();
+
+-- ==========================================
+-- 6. FUNCTION TRIGGER (Company Owner)
+-- ==========================================
+-- Insert the user into company_users automatically when a company is created
+CREATE OR REPLACE FUNCTION set_company_owner_membership()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    INSERT INTO public.company_users (company_id, user_id, role)
+    VALUES (NEW.id, auth.uid(), 'owner');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trigger_set_company_owner ON public.companies;
+CREATE TRIGGER trigger_set_company_owner
+  AFTER INSERT ON public.companies
+  FOR EACH ROW EXECUTE FUNCTION set_company_owner_membership();
