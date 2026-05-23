@@ -3,7 +3,7 @@ import { query, execute } from '@/lib/db';
 import type { Game, DrawSchedule } from '@/lib/types';
 import { dbEvents } from '@/lib/events';
 
-export async function syncGames() {
+export async function syncGames(companyId?: string | null) {
   console.log('[Sync] Iniciando sincronización de Games...');
 
   // 1. Obtener el Watermark local para Games
@@ -68,6 +68,7 @@ export async function syncGames() {
     if (session) {
       const payload = dirtyLocalGames.map(g => ({
         id: g.id,
+        company_id: companyId,
         name: g.name,
         is_active: Boolean(g.isActive) ? 1 : 0,
         digit_count: g.digitCount,

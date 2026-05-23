@@ -12,6 +12,8 @@ El sistema ahora soporta una arquitectura **Offline-First**. Para que la sincron
 6. Pega el contenido en el editor SQL.
 7. Haz clic en **Run** (Ejecutar) en la parte inferior derecha.
 
+> **Importante:** la app ahora puede crear automáticamente una compañía y su membresía al iniciar sesión. Si ya tenías el esquema antiguo, vuelve a ejecutar el SQL actualizado para aplicar las nuevas políticas de `companies` y `company_users`.
+
 > **Nota:** Si la ejecución es exitosa, verás el mensaje *Success. No rows returned*.
 
 ## Verificación

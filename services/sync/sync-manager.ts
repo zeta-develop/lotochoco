@@ -1,5 +1,6 @@
 import { syncGames } from './game-sync';
 import { syncResults } from './result-sync';
+import { ensureCompanyAccess } from './company-access';
 import { supabase } from '@/lib/supabase/client';
 
 export class SyncManager {
@@ -29,8 +30,14 @@ export class SyncManager {
     console.log('[Sync] Iniciando ciclo de sincronización global...');
 
     try {
+      const companyId = await ensureCompanyAccess();
+      if (!companyId) {
+        console.log('[Sync] No se pudo resolver una compañía para el usuario actual.');
+        return;
+      }
+
       // Fase 9: Implementación Gradual (Solo Game y Result)
-      await syncGames();
+      await syncGames(companyId);
       await syncResults();
 
       console.log('[Sync] Ciclo de sincronización completado.');

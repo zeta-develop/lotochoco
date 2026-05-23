@@ -89,27 +89,46 @@ ALTER TABLE public.draw_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.results ENABLE ROW LEVEL SECURITY;
 
 -- Políticas Companies (Aislar a los usuarios a sus empresas)
+DROP POLICY IF EXISTS "Users can view their own companies" ON public.companies;
 CREATE POLICY "Users can view their own companies" ON public.companies
   FOR SELECT USING (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can create their own companies" ON public.companies;
+CREATE POLICY "Users can create their own companies" ON public.companies
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Users can view their own memberships" ON public.company_users;
+CREATE POLICY "Users can view their own memberships" ON public.company_users
+  FOR SELECT USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can create their own memberships" ON public.company_users;
+CREATE POLICY "Users can create their own memberships" ON public.company_users
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
 -- Políticas Games
+DROP POLICY IF EXISTS "Users can view games of their company" ON public.games;
 CREATE POLICY "Users can view games of their company" ON public.games
   FOR SELECT USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can insert/update games of their company" ON public.games;
 CREATE POLICY "Users can insert/update games of their company" ON public.games
   FOR ALL USING (company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
 
 -- Políticas DrawSchedules
+DROP POLICY IF EXISTS "Users can view schedules of their company games" ON public.draw_schedules;
 CREATE POLICY "Users can view schedules of their company games" ON public.draw_schedules
   FOR SELECT USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
 
+DROP POLICY IF EXISTS "Users can insert/update schedules" ON public.draw_schedules;
 CREATE POLICY "Users can insert/update schedules" ON public.draw_schedules
   FOR ALL USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
 
 -- Políticas Results (Temporalmente laxas atadas a game_id para validación local)
+DROP POLICY IF EXISTS "Users can view results" ON public.results;
 CREATE POLICY "Users can view results" ON public.results
   FOR SELECT USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
 
+DROP POLICY IF EXISTS "Users can insert/update results" ON public.results;
 CREATE POLICY "Users can insert/update results" ON public.results
   FOR ALL USING (game_id IN (SELECT id FROM public.games WHERE company_id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid())));
 
@@ -127,6 +146,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS trigger_set_games_company ON public.games;
 CREATE TRIGGER trigger_set_games_company
   BEFORE INSERT ON public.games
   FOR EACH ROW EXECUTE FUNCTION set_default_company_id();
