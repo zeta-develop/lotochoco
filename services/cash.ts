@@ -12,7 +12,7 @@ export async function openCashSession(openingAmount: number): Promise<CashSessio
   const now = new Date().toISOString()
   
   await execute(
-    'INSERT INTO CashSession (id, openingAmount, status, salesTotal, prizesTotal, openedAt, createdAt, updatedAt) VALUES (?, ?, "open", 0, 0, ?, ?, ?)',
+    'INSERT INTO CashSession (id, openingAmount, status, salesTotal, prizesTotal, openedAt, createdAt, updatedAt, isDirty) VALUES (?, ?, "open", 0, 0, ?, ?, ?, 1)',
     [id, openingAmount, now, now, now]
   )
 
@@ -43,7 +43,7 @@ export async function closeCashSession(sessionId: string, notes?: string): Promi
   const now = new Date().toISOString()
   
   await execute(
-    'UPDATE CashSession SET status = "closed", closingAmount = ?, closedAt = ?, notes = ?, updatedAt = ? WHERE id = ?',
+    'UPDATE CashSession SET status = "closed", closingAmount = ?, closedAt = ?, notes = ?, updatedAt = ?, isDirty = 1 WHERE id = ?',
     [summary.balance, now, notes, now, sessionId]
   )
 
@@ -62,7 +62,7 @@ export async function addCashMovement(data: {
   const now = new Date().toISOString()
   
   await execute(
-    'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, 1)',
     [id, data.cashSessionId, data.type, data.amount, data.description, now]
   )
 

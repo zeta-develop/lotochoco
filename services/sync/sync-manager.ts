@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { ensureCompanyAccess } from './company-access';
+import { recordAppError } from '@/services/error-logger';
 import { SYNC_TABLES, getPendingSyncCount, syncTable, type SyncTableResult } from './sync-config';
 
 export type SyncResult = {
@@ -11,6 +12,8 @@ export type SyncResult = {
 
 export class SyncManager {
   private static isSyncing = false;
+  private static syncMutexTimeout: ReturnType<typeof setTimeout> | null = null;
+  private static readonly SYNC_TIMEOUT_MS = 60000; // 1 minuto timeout
   private static syncInterval: ReturnType<typeof setInterval> | null = null;
 
   static async syncAll(): Promise<SyncResult> {
@@ -31,6 +34,12 @@ export class SyncManager {
     }
 
     this.isSyncing = true;
+    if (this.syncMutexTimeout) clearTimeout(this.syncMutexTimeout);
+    this.syncMutexTimeout = setTimeout(() => {
+      console.warn('[Sync] Timeout alcanzado, forzando liberación del mutex de sincronización.');
+      this.isSyncing = false;
+      if (this.syncMutexTimeout) clearTimeout(this.syncMutexTimeout);
+    }, this.SYNC_TIMEOUT_MS);
     console.log('[Sync] Iniciando ciclo de sincronización global...');
 
     try {
@@ -50,10 +59,29 @@ export class SyncManager {
       console.log('[Sync] Ciclo de sincronización completado.');
       return { success: true, results };
     } catch (error) {
-      console.error('[Sync] Error durante la sincronización global:', error);
+      const normalizedError = {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: (error as any)?.cause,
+        code: (error as any)?.code,
+        details: error
+      };
+
+      console.error(
+        '[SYNC ERROR]',
+        JSON.stringify(normalizedError, null, 2)
+      );
+
+      await recordAppError(normalizedError, {
+        source: 'sync',
+        severity: 'error',
+        details: JSON.stringify(normalizedError, null, 2)
+      });
+
       return { success: false, reason: 'error', error };
     } finally {
       this.isSyncing = false;
+      if (this.syncMutexTimeout) clearTimeout(this.syncMutexTimeout);
     }
   }
 

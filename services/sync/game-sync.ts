@@ -2,13 +2,18 @@ import { supabase } from '@/lib/supabase/client';
 import { query, execute } from '@/lib/db';
 import type { Game, DrawSchedule } from '@/lib/types';
 import { dbEvents } from '@/lib/events';
+import { recordAppError } from '@/services/error-logger';
 
 export async function syncGames(companyId?: string | null) {
   console.log('[Sync] Iniciando sincronización de Games...');
 
   // 1. Obtener el Watermark local para Games
-  const syncStateRows = await query('SELECT lastSync FROM SyncState WHERE tableName = ?', ['Game']);
-  const lastSyncStr = syncStateRows.length > 0 ? syncStateRows[0].lastSync : '1970-01-01T00:00:00.000Z';
+  const syncStateRows = await query<{ lastSync: string }>('SELECT lastSync FROM SyncState WHERE tableName = ?', ['Game']);
+  const row = syncStateRows?.[0];
+  const lastSyncStr = row?.lastSync ?? '1970-01-01T00:00:00.000Z';
+  if (!row) {
+    await execute('INSERT OR IGNORE INTO SyncState(tableName, lastSync) VALUES (?, ?)', ['Game', '1970-01-01T00:00:00.000Z']);
+  }
   const lastSyncDate = new Date(lastSyncStr);
 
   // === PULL (Descarga) ===
@@ -19,7 +24,9 @@ export async function syncGames(companyId?: string | null) {
     .order('updated_at', { ascending: true });
 
   if (pullError) {
-    console.error('[Sync] Error en Pull de Games:', pullError);
+    const normalizedError = { message: pullError instanceof Error ? pullError.message : String(pullError), stack: pullError instanceof Error ? pullError.stack : undefined, cause: (pullError as any)?.cause, code: (pullError as any)?.code, details: pullError };
+    console.error('[SYNC ERROR]', JSON.stringify(normalizedError, null, 2));
+    await recordAppError(normalizedError, { source: 'sync', severity: 'error', details: JSON.stringify(normalizedError, null, 2) });
     throw pullError;
   }
 
@@ -81,7 +88,9 @@ export async function syncGames(companyId?: string | null) {
       const { error: pushError } = await supabase.from('games').upsert(payload);
 
       if (pushError) {
-        console.error('[Sync] Error en Push de Games:', pushError);
+        const normalizedError = { message: pushError instanceof Error ? pushError.message : String(pushError), stack: pushError instanceof Error ? pushError.stack : undefined, cause: (pushError as any)?.cause, code: (pushError as any)?.code, details: pushError };
+        console.error('[SYNC ERROR]', JSON.stringify(normalizedError, null, 2));
+        await recordAppError(normalizedError, { source: 'sync', severity: 'error', details: JSON.stringify(normalizedError, null, 2) });
       } else {
         // Marcar locales como limpios
         const ids = dirtyLocalGames.map(g => `'${g.id}'`).join(',');
@@ -102,8 +111,12 @@ export async function syncGames(companyId?: string | null) {
   // SINCRONIZACIÓN DE DRAW SCHEDULES
   // ==========================================
   console.log('[Sync] Iniciando sincronización de DrawSchedules...');
-  const syncStateSched = await query('SELECT lastSync FROM SyncState WHERE tableName = ?', ['DrawSchedule']);
-  const lastSyncSchedStr = syncStateSched.length > 0 ? syncStateSched[0].lastSync : '1970-01-01T00:00:00.000Z';
+  const syncStateSched = await query<{ lastSync: string }>('SELECT lastSync FROM SyncState WHERE tableName = ?', ['DrawSchedule']);
+  const rowSched = syncStateSched?.[0];
+  const lastSyncSchedStr = rowSched?.lastSync ?? '1970-01-01T00:00:00.000Z';
+  if (!rowSched) {
+    await execute('INSERT OR IGNORE INTO SyncState(tableName, lastSync) VALUES (?, ?)', ['DrawSchedule', '1970-01-01T00:00:00.000Z']);
+  }
   const lastSyncSchedDate = new Date(lastSyncSchedStr);
 
   // === PULL (Descarga) ===
@@ -114,7 +127,9 @@ export async function syncGames(companyId?: string | null) {
     .order('updated_at', { ascending: true });
 
   if (pullSchedError) {
-    console.error('[Sync] Error en Pull de DrawSchedules:', pullSchedError);
+    const normalizedError = { message: pullSchedError instanceof Error ? pullSchedError.message : String(pullSchedError), stack: pullSchedError instanceof Error ? pullSchedError.stack : undefined, cause: (pullSchedError as any)?.cause, code: (pullSchedError as any)?.code, details: pullSchedError };
+    console.error('[SYNC ERROR]', JSON.stringify(normalizedError, null, 2));
+    await recordAppError(normalizedError, { source: 'sync', severity: 'error', details: JSON.stringify(normalizedError, null, 2) });
     throw pullSchedError;
   }
 
@@ -176,7 +191,9 @@ export async function syncGames(companyId?: string | null) {
       const { error: pushError } = await supabase.from('draw_schedules').upsert(payload);
 
       if (pushError) {
-        console.error('[Sync] Error en Push de DrawSchedules:', pushError);
+        const normalizedError = { message: pushError instanceof Error ? pushError.message : String(pushError), stack: pushError instanceof Error ? pushError.stack : undefined, cause: (pushError as any)?.cause, code: (pushError as any)?.code, details: pushError };
+        console.error('[SYNC ERROR]', JSON.stringify(normalizedError, null, 2));
+        await recordAppError(normalizedError, { source: 'sync', severity: 'error', details: JSON.stringify(normalizedError, null, 2) });
       } else {
         const ids = dirtyLocalSchedules.map(s => `'${s.id}'`).join(',');
         await execute(`UPDATE DrawSchedule SET isDirty = 0 WHERE id IN (${ids})`);

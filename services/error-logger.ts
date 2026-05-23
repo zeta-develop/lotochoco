@@ -47,7 +47,7 @@ export async function recordAppError(error: unknown, context: AppErrorContext): 
     const userAgent = context.userAgent ?? (typeof navigator !== 'undefined' ? navigator.userAgent : undefined);
 
     await execute(
-      'INSERT INTO "AppErrorLog" (id, severity, source, message, stack, details, url, userAgent, platform) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO "AppErrorLog" (id, severity, source, message, stack, details, url, userAgent, platform, isDirty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
       [
         createId(),
         context.severity ?? 'error',
