@@ -5,6 +5,14 @@
 
 -- 0. LIMPIEZA TOTAL (DROP TABLES)
 -- El orden es crítico debido a las claves foráneas. CASCADE elimina políticas y dependencias.
+
+-- Borrado explícito de políticas que suelen causar bloqueos circulares
+DROP POLICY IF EXISTS "Users can view their own companies" ON public.companies;
+DROP POLICY IF EXISTS "Users can update their own companies" ON public.companies;
+DROP POLICY IF EXISTS "Users can view their own memberships" ON public.company_users;
+DROP POLICY IF EXISTS "Users can create their own memberships" ON public.company_users;
+DROP POLICY IF EXISTS "Users can update their own memberships" ON public.company_users;
+
 DROP TABLE IF EXISTS public.app_error_logs CASCADE;
 DROP TABLE IF EXISTS public.cancellation_logs CASCADE;
 DROP TABLE IF EXISTS public.settings CASCADE;
