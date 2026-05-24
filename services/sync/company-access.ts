@@ -22,13 +22,15 @@ async function deriveCompanyName(email?: string | null): Promise<string> {
 }
 
 export async function ensureCompanyAccess(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
+  // Usar getUser() en lugar de getSession() para validar el token con el servidor
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (!session?.user) {
+  if (authError || !user) {
+    console.warn('[Sync] No hay sesión válida o el token expiró:', authError?.message);
     return null;
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
   const { data: membership, error: membershipError } = await supabase
     .from('company_users')
@@ -44,7 +46,7 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     return membership.company_id;
   }
 
-  const companyName = await deriveCompanyName(session.user.email);
+  const companyName = await deriveCompanyName(user.email);
   const { data: company, error: companyError } = await supabase
     .from('companies')
     .insert({ name: companyName })

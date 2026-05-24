@@ -28,6 +28,17 @@ function normalizeError(error: unknown): { message: string; stack?: string } {
     };
   }
 
+  // Manejar errores de Supabase/Postgrest que a menudo vienen como objetos con propiedad message
+  if (typeof error === 'object' && error !== null) {
+    const errObj = error as Record<string, any>;
+    if (errObj.message) {
+      return {
+        message: errObj.message,
+        stack: errObj.details || errObj.hint || undefined
+      };
+    }
+  }
+
   if (typeof error === 'string') {
     return { message: error };
   }
