@@ -4,32 +4,24 @@
 -- ==============================================================================
 
 -- 0. LIMPIEZA TOTAL (DROP TABLES)
--- El orden es crítico debido a las claves foráneas
-DROP TRIGGER IF EXISTS trigger_set_company_owner ON public.companies;
-DROP TRIGGER IF EXISTS trigger_set_app_error_logs_company ON public.app_error_logs;
-DROP TRIGGER IF EXISTS trigger_set_cancellation_logs_company ON public.cancellation_logs;
-DROP TRIGGER IF EXISTS trigger_set_settings_company ON public.settings;
-DROP TRIGGER IF EXISTS trigger_set_cash_movements_company ON public.cash_movements;
-DROP TRIGGER IF EXISTS trigger_set_cash_sessions_company ON public.cash_sessions;
-DROP TRIGGER IF EXISTS trigger_set_winners_company ON public.winners;
-DROP TRIGGER IF EXISTS trigger_set_ticket_items_company ON public.ticket_items;
-DROP TRIGGER IF EXISTS trigger_set_tickets_company ON public.tickets;
-DROP TRIGGER IF EXISTS trigger_set_results_company ON public.results;
-DROP TRIGGER IF EXISTS trigger_set_games_company ON public.games;
+-- El orden es crítico debido a las claves foráneas. CASCADE elimina políticas y dependencias.
+DROP TABLE IF EXISTS public.app_error_logs CASCADE;
+DROP TABLE IF EXISTS public.cancellation_logs CASCADE;
+DROP TABLE IF EXISTS public.settings CASCADE;
+DROP TABLE IF EXISTS public.cash_movements CASCADE;
+DROP TABLE IF EXISTS public.cash_sessions CASCADE;
+DROP TABLE IF EXISTS public.winners CASCADE;
+DROP TABLE IF EXISTS public.ticket_items CASCADE;
+DROP TABLE IF EXISTS public.tickets CASCADE;
+DROP TABLE IF EXISTS public.results CASCADE;
+DROP TABLE IF EXISTS public.draw_schedules CASCADE;
+DROP TABLE IF EXISTS public.games CASCADE;
+DROP TABLE IF EXISTS public.company_users CASCADE;
+DROP TABLE IF EXISTS public.companies CASCADE;
 
-DROP TABLE IF EXISTS public.app_error_logs;
-DROP TABLE IF EXISTS public.cancellation_logs;
-DROP TABLE IF EXISTS public.settings;
-DROP TABLE IF EXISTS public.cash_movements;
-DROP TABLE IF EXISTS public.cash_sessions;
-DROP TABLE IF EXISTS public.winners;
-DROP TABLE IF EXISTS public.ticket_items;
-DROP TABLE IF EXISTS public.tickets;
-DROP TABLE IF EXISTS public.results;
-DROP TABLE IF EXISTS public.draw_schedules;
-DROP TABLE IF EXISTS public.games;
-DROP TABLE IF EXISTS public.company_users;
-DROP TABLE IF EXISTS public.companies;
+-- Limpiar funciones y triggers antiguos si existen
+DROP FUNCTION IF EXISTS set_default_company_id() CASCADE;
+DROP FUNCTION IF EXISTS set_company_owner_membership() CASCADE;
 
 -- Habilitar extensión UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
