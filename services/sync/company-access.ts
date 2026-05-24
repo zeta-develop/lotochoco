@@ -32,22 +32,7 @@ export async function ensureCompanyAccess(): Promise<string | null> {
 
   const userId = user.id;
 
-  const { data: membership, error: membershipError } = await supabase
-    .from('company_users')
-    .select('company_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (membershipError) {
-    throw membershipError;
-  }
-
-  if (membership?.company_id) {
-    return membership.company_id;
-  }
-
-  // Paso 2: Intentar recuperar la membresía (ya sea la recién creada por el trigger o una existente)
-  // Usamos .limit(1).maybeSingle() pero de forma más robusta para evitar PGRST116
+  // Intento 1: Recuperar membresía existente
   const { data: membership, error: membershipError } = await supabase
     .from('company_users')
     .select('company_id')
@@ -63,20 +48,24 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     return membership.company_id;
   }
 
-  // Si llegamos aquí, intentamos crear la compañía (Paso 3)
+  // Si no hay membresía, intentamos crear la compañía
   const companyName = await deriveCompanyName(user.email);
   
   await supabase
     .from('companies')
     .insert({ name: companyName });
 
-  // Paso 4: Reintento final de recuperar la membresía después del insert
-  const { data: retryMembership } = await supabase
+  // Reintento final de recuperar la membresía después del insert (que activa el trigger)
+  const { data: retryMembership, error: retryError } = await supabase
     .from('company_users')
     .select('company_id')
     .eq('user_id', userId)
     .limit(1)
     .maybeSingle();
+
+  if (retryError) {
+    throw retryError;
+  }
 
   if (retryMembership?.company_id) {
     return retryMembership.company_id;
