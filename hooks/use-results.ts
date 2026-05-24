@@ -82,58 +82,63 @@ export const useTodayResults = () => {
 }
 
 export const useWinners = () => {
-  const { isLoading, refresh } = useResults()
   const [winners, setWinners] = useState<Winner[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
+  const refresh = useCallback(async () => {
+    setIsLoading(true)
+    try {
       const { getWinners } = await import('@/services/results')
       const data = await getWinners()
       setWinners(data)
+    } catch (error) {
+      console.error('Error al cargar ganadores:', error)
+    } finally {
+      setIsLoading(false)
     }
-    load()
+  }, [])
+
+  useEffect(() => {
+    refresh()
   }, [refresh])
 
   const markAsPaid = async (winnerId: string) => {
     const { markWinnerAsPaid } = await import('@/services/results')
     await markWinnerAsPaid(winnerId)
+    await refresh()
   }
 
-
   useEffect(() => {
-    const load = async () => {
-      const { getWinners } = await import('@/services/results')
-      const data = await getWinners()
-      setWinners(data)
-    }
-    return dbEvents.on('winners:changed', load)
-  }, [])
+    return dbEvents.on('winners:changed', refresh)
+  }, [refresh])
 
   return { winners, isLoading, refresh, markAsPaid }
 }
 
 export const usePendingWinners = () => {
-  const { isLoading, refresh } = useResults()
   const [winners, setWinners] = useState<Winner[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
+  const refresh = useCallback(async () => {
+    setIsLoading(true)
+    try {
       const { getWinners } = await import('@/services/results')
       const data = await getWinners({ isPaid: false })
       setWinners(data)
+    } catch (error) {
+      console.error('Error al cargar ganadores pendientes:', error)
+    } finally {
+      setIsLoading(false)
     }
-    load()
+  }, [])
+
+  useEffect(() => {
+    refresh()
   }, [refresh])
 
-
   useEffect(() => {
-    const load = async () => {
-      const { getWinners } = await import('@/services/results')
-      const data = await getWinners({ isPaid: false })
-      setWinners(data)
-    }
-    return dbEvents.on('winners:changed', load)
-  }, [])
+    return dbEvents.on('winners:changed', refresh)
+  }, [refresh])
 
   return { winners, isLoading, refresh }
 }
