@@ -56,8 +56,12 @@ export class SyncManager {
           const tableResult = await syncTable(config, companyId);
           results.push(tableResult);
         } catch (tableError) {
+          const tableErrorMsg = tableError instanceof Error ? tableError.message : 
+                               (typeof tableError === 'object' && tableError !== null && 'message' in tableError) ? (tableError as any).message :
+                               String(tableError);
+
           const tableErrorNormalized = {
-            message: tableError instanceof Error ? tableError.message : String(tableError),
+            message: tableErrorMsg,
             stack: tableError instanceof Error ? tableError.stack : undefined,
             cause: (tableError as any)?.cause,
             code: (tableError as any)?.code,
@@ -77,23 +81,26 @@ export class SyncManager {
       console.log('[Sync] Ciclo de sincronización completado.');
       return { success: true, results };
     } catch (error) {
-      const normalizedError = {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        cause: (error as any)?.cause,
+      // Extraer información útil para el log de consola, pero pasar el error original al logger
+      const errorMsg = error instanceof Error ? error.message : 
+                      (typeof error === 'object' && error !== null && 'message' in error) ? (error as any).message :
+                      String(error);
+      
+      const normalizedLog = {
+        message: errorMsg,
         code: (error as any)?.code,
-        details: error
+        details: (error as any)?.details || error
       };
 
       console.error(
         '[SYNC ERROR]',
-        JSON.stringify(normalizedError, null, 2)
+        JSON.stringify(normalizedLog, null, 2)
       );
 
-      await recordAppError(normalizedError, {
+      await recordAppError(error, {
         source: 'sync',
         severity: 'error',
-        details: JSON.stringify(normalizedError, null, 2)
+        details: JSON.stringify(normalizedLog, null, 2)
       });
 
       return { success: false, reason: 'error', error };
