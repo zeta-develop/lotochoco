@@ -46,33 +46,41 @@ export async function ensureCompanyAccess(): Promise<string | null> {
     return membership.company_id;
   }
 
-  const companyName = await deriveCompanyName(user.email);
-  
-  // Paso 1: Intentar insertar la compañía. 
-  // No usamos .select() aquí para evitar el error de RLS inmediato si la política de lectura fuera muy estricta
-  const { error: insertError } = await supabase
-    .from('companies')
-    .insert({ name: companyName });
-
-  if (insertError && insertError.code !== '42501') {
-    throw insertError;
-  }
-
-  // Paso 2: Intentar recuperar la compañía (ya sea la recién creada o una existente)
-  // Con la política de SELECT relajada (auth.uid() IS NOT NULL), esto debería funcionar
-  const { data: company, error: companyError } = await supabase
-    .from('companies')
-    .select('id')
+  // Paso 2: Intentar recuperar la membresía (ya sea la recién creada por el trigger o una existente)
+  // Usamos .limit(1).maybeSingle() pero de forma más robusta para evitar PGRST116
+  const { data: membership, error: membershipError } = await supabase
+    .from('company_users')
+    .select('company_id')
+    .eq('user_id', userId)
     .limit(1)
     .maybeSingle();
 
-  if (companyError) {
-    throw companyError;
+  if (membershipError) {
+    throw membershipError;
   }
 
-  if (!company) {
-    throw new Error('No se pudo crear ni recuperar la compañía del usuario.');
+  if (membership?.company_id) {
+    return membership.company_id;
   }
 
-  return company.id;
+  // Si llegamos aquí, intentamos crear la compañía (Paso 3)
+  const companyName = await deriveCompanyName(user.email);
+  
+  await supabase
+    .from('companies')
+    .insert({ name: companyName });
+
+  // Paso 4: Reintento final de recuperar la membresía después del insert
+  const { data: retryMembership } = await supabase
+    .from('company_users')
+    .select('company_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (retryMembership?.company_id) {
+    return retryMembership.company_id;
+  }
+
+  throw new Error('No se pudo establecer el acceso a la compañía después de varios intentos.');
 }
