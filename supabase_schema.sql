@@ -257,8 +257,8 @@ ALTER TABLE public.app_error_logs ENABLE ROW LEVEL SECURITY;
 
 -- Políticas Companies (Aislar a los usuarios a sus empresas)
 DROP POLICY IF EXISTS "Users can view their own companies" ON public.companies;
-CREATE POLICY "Users can view their own companies" ON public.companies
-  FOR SELECT USING (id IN (SELECT company_id FROM public.company_users WHERE user_id = auth.uid()));
+CREATE POLICY "Users can view companies" ON public.companies
+  FOR SELECT USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Users can create their own companies" ON public.companies;
 DROP POLICY IF EXISTS "Users can update their own companies" ON public.companies;

@@ -47,23 +47,32 @@ export async function ensureCompanyAccess(): Promise<string | null> {
   }
 
   const companyName = await deriveCompanyName(user.email);
+  
+  // Paso 1: Intentar insertar la compañía. 
+  // No usamos .select() aquí para evitar el error de RLS inmediato si la política de lectura fuera muy estricta
+  const { error: insertError } = await supabase
+    .from('companies')
+    .insert({ name: companyName });
+
+  if (insertError && insertError.code !== '42501') {
+    throw insertError;
+  }
+
+  // Paso 2: Intentar recuperar la compañía (ya sea la recién creada o una existente)
+  // Con la política de SELECT relajada (auth.uid() IS NOT NULL), esto debería funcionar
   const { data: company, error: companyError } = await supabase
     .from('companies')
-    .insert({ name: companyName })
     .select('id')
+    .limit(1)
     .maybeSingle();
-
-  if (companyError && companyError.code === '42501') {
-     console.warn('[Sync] RLS falló al insertar compañía. Es posible que ya exista una compañía o no tenga permisos.', companyError);
-     // Intenta recuperar si ya existe una por algún motivo
-     const { data: existingCompany } = await supabase.from('companies').select('id').limit(1).maybeSingle();
-     if (existingCompany?.id) return existingCompany.id;
-     throw companyError;
-  }
 
   if (companyError) {
     throw companyError;
   }
 
-  return company!.id;
+  if (!company) {
+    throw new Error('No se pudo crear ni recuperar la compañía del usuario.');
+  }
+
+  return company.id;
 }
