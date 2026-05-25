@@ -1,182 +1,129 @@
 import { dbEvents } from '@/lib/events'
 import type { Game, DrawSchedule } from '@/lib/types'
 import { generateId } from '@/lib/utils'
+import { supabase } from '@/lib/supabase/client'
+
+function mapGame(row: any): Game {
+  return {
+    id: row.id,
+    name: row.name,
+    isActive: row.is_active === 1 || row.is_active === true,
+    digitCount: row.digit_count,
+    multiplier: row.multiplier,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+    schedules: row.draw_schedules ? row.draw_schedules.map(mapSchedule) : undefined
+  }
+}
+
+function mapSchedule(row: any): DrawSchedule {
+  return {
+    id: row.id,
+    gameId: row.game_id,
+    name: row.name,
+    time: row.time,
+    isActive: row.is_active === 1 || row.is_active === true,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null
+  }
+}
 
 export async function getGames(): Promise<Game[]> {
-  const games = await query<Game>('SELECT * FROM "Game" ORDER BY "name" ASC')
-  
-  for (const game of games) {
-    game.isActive = Boolean(game.isActive)
-    game.schedules = await query<DrawSchedule>(
-      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 AND ("deletedAt" IS NULL) ORDER BY "time" ASC',
-      [game.id]
-    )
-    for (const s of game.schedules) s.isActive = Boolean(s.isActive)
-  }
-  
-  return games
+  const { data: games, error } = await supabase.from('games').select(`*, draw_schedules (*)`).order('name', { ascending: true })
+  if (error) { console.error('Error fetching games:', error); return [] }
+  return (games || []).map(mapGame)
 }
 
 export async function getActiveGames(): Promise<Game[]> {
-  const games = await query<Game>('SELECT * FROM "Game" WHERE "isActive" = 1 AND ("deletedAt" IS NULL) ORDER BY "name" ASC')
-  
-  for (const game of games) {
-    game.isActive = true
-    game.schedules = await query<DrawSchedule>(
-      'SELECT * FROM "DrawSchedule" WHERE "gameId" = ? AND "isActive" = 1 AND ("deletedAt" IS NULL) ORDER BY "time" ASC',
-      [game.id]
-    )
-    for (const s of game.schedules) s.isActive = true
-  }
-  
-  return games
+  const { data: games, error } = await supabase.from('games').select(`*, draw_schedules (*)`).eq('is_active', 1).is('deleted_at', null).order('name', { ascending: true })
+  if (error) { console.error('Error fetching active games:', error); return [] }
+  return (games || []).map((g: any) => {
+    const game = mapGame(g)
+    if (game.schedules) {
+      game.schedules = game.schedules.filter((s: DrawSchedule) => s.isActive && !s.deletedAt)
+      game.schedules.sort((a: DrawSchedule, b: DrawSchedule) => a.time.localeCompare(b.time))
+    }
+    return game
+  })
 }
 
 export async function getGameById(id: string): Promise<Game | null> {
-  const games = await query<Game>('SELECT * FROM Game WHERE id = ? AND ("deletedAt" IS NULL)', [id])
-  if (games.length === 0) return null
-  
-  const game = games[0]
-  game.isActive = Boolean(game.isActive)
-  game.schedules = await query<DrawSchedule>(
-    'SELECT * FROM DrawSchedule WHERE gameId = ? AND ("deletedAt" IS NULL) ORDER BY time ASC',
-    [game.id]
-  )
-  for (const s of game.schedules) s.isActive = Boolean(s.isActive)
-  
-  return game
+  const { data: game, error } = await supabase.from('games').select(`*, draw_schedules (*)`).eq('id', id).is('deleted_at', null).single()
+  if (error || !game) return null
+  const mappedGame = mapGame(game);
+  if (mappedGame.schedules) {
+      mappedGame.schedules = mappedGame.schedules.filter((s: DrawSchedule) => !s.deletedAt);
+      mappedGame.schedules.sort((a: DrawSchedule, b: DrawSchedule) => a.time.localeCompare(b.time));
+  }
+  return mappedGame
 }
 
-export async function createGame(data: {
-  name: string
-  digitCount: number
-  multiplier: number
-  schedules?: { name: string; time: string }[]
-}): Promise<Game> {
+export async function createGame(data: { name: string; digitCount: number; multiplier: number; schedules?: { name: string; time: string }[] }): Promise<Game> {
   const gameId = generateId()
-  
-  await execute(
-    'INSERT INTO Game (id, name, digitCount, multiplier, isActive, isDirty) VALUES (?, ?, ?, ?, 1, 1)',
-    [gameId, data.name, data.digitCount, data.multiplier]
-  )
-  
-  if (data.schedules) {
-    for (const s of data.schedules) {
-      await execute(
-        'INSERT INTO DrawSchedule (id, gameId, name, time, isActive, isDirty) VALUES (?, ?, ?, ?, 1, 1)',
-        [generateId(), gameId, s.name, s.time]
-      )
-    }
+  const { error: gameError } = await supabase.from('games').insert({ id: gameId, name: data.name, digit_count: data.digitCount, multiplier: data.multiplier, is_active: 1 })
+  if (gameError) throw gameError
+  if (data.schedules && data.schedules.length > 0) {
+    const schedulesToInsert = data.schedules.map((s: any) => ({ id: generateId(), game_id: gameId, name: s.name, time: s.time, is_active: 1 }))
+    const { error: scheduleError } = await supabase.from('draw_schedules').insert(schedulesToInsert)
+    if (scheduleError) throw scheduleError
   }
-  
   const game = await getGameById(gameId);
   dbEvents.emit('games:changed');
   return game!;
 }
 
-export async function updateGame(
-  id: string,
-  data: Partial<{
-    name: string
-    digitCount: number
-    multiplier: number
-    isActive: boolean
-    schedules: { id?: string; name: string; time: string }[]
-  }>
-): Promise<Game> {
-  const fields: string[] = []
-  const values: any[] = []
-  
-  if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name) }
-  if (data.digitCount !== undefined) { fields.push('digitCount = ?'); values.push(data.digitCount) }
-  if (data.multiplier !== undefined) { fields.push('multiplier = ?'); values.push(data.multiplier) }
-  if (data.isActive !== undefined) { fields.push('isActive = ?'); values.push(data.isActive ? 1 : 0) }
-  
-  if (fields.length > 0) {
-    values.push(id)
-    await execute(`UPDATE Game SET ${fields.join(', ')}, updatedAt = CURRENT_TIMESTAMP, isDirty = 1 WHERE id = ?`, values)
+export async function updateGame(id: string, data: Partial<{ name: string; digitCount: number; multiplier: number; isActive: boolean; schedules: { id?: string; name: string; time: string }[] }>): Promise<Game> {
+  const updates: any = { updated_at: new Date().toISOString() }
+  if (data.name !== undefined) updates.name = data.name
+  if (data.digitCount !== undefined) updates.digit_count = data.digitCount
+  if (data.multiplier !== undefined) updates.multiplier = data.multiplier
+  if (data.isActive !== undefined) updates.is_active = data.isActive ? 1 : 0
+  if (Object.keys(updates).length > 1) {
+    const { error } = await supabase.from('games').update(updates).eq('id', id)
+    if (error) throw error
   }
-
   if (data.schedules !== undefined) {
-    const existing = await query<DrawSchedule>('SELECT * FROM DrawSchedule WHERE gameId = ? AND isActive = 1 AND ("deletedAt" IS NULL)', [id])
-    const newIds = data.schedules.map(s => s.id).filter(Boolean) as string[]
-    
-    for (const ex of existing) {
-      if (!newIds.includes(ex.id)) {
-        await execute('UPDATE DrawSchedule SET isActive = 0, isDirty = 1, deletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [ex.id])
+    const { data: existing } = await supabase.from('draw_schedules').select('*').eq('game_id', id).eq('is_active', 1).is('deleted_at', null)
+    const newIds = data.schedules.map((s: any) => s.id).filter(Boolean) as string[]
+    if (existing) {
+      for (const ex of existing) {
+        if (!newIds.includes(ex.id)) {
+          await supabase.from('draw_schedules').update({ is_active: 0, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', ex.id)
+        }
       }
     }
-
     for (const s of data.schedules) {
       if (s.id) {
-        await execute('UPDATE DrawSchedule SET name = ?, time = ?, isDirty = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [s.name, s.time, s.id])
+        await supabase.from('draw_schedules').update({ name: s.name, time: s.time, updated_at: new Date().toISOString() }).eq('id', s.id)
       } else {
-        await execute('INSERT INTO DrawSchedule (id, gameId, name, time, isActive, isDirty) VALUES (?, ?, ?, ?, 1, 1)', [generateId(), id, s.name, s.time])
+        await supabase.from('draw_schedules').insert({ id: generateId(), game_id: id, name: s.name, time: s.time, is_active: 1 })
       }
     }
   }
-  
   const game = await getGameById(id);
   dbEvents.emit('games:changed');
   return game!;
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  // Soft delete instead of physical delete to allow syncing deletions
-  await execute('UPDATE Game SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?', [id]);
-  // También marcamos los schedules
-  await execute('UPDATE DrawSchedule SET isDirty = 1, deletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE gameId = ?', [id]);
-
+  const now = new Date().toISOString()
+  await supabase.from('games').update({ deleted_at: now, updated_at: now }).eq('id', id)
+  await supabase.from('draw_schedules').update({ deleted_at: now, updated_at: now }).eq('game_id', id)
   dbEvents.emit('games:changed');
 }
 
-// Seed default games
 export async function seedDefaultGames(): Promise<void> {
-  const results = await query('SELECT COUNT(*) as count FROM Game')
-  if (results[0].count === 0) {
+  const { count } = await supabase.from('games').select('*', { count: 'exact', head: true })
+  if (count === 0) {
     const defaultGames = [
-      {
-        name: 'Tica',
-        digitCount: 2,
-        multiplier: 70,
-        schedules: [
-          { name: 'Mañana', time: '11:00' },
-          { name: 'Tarde', time: '15:00' },
-          { name: 'Noche', time: '21:00' }
-        ]
-      },
-      {
-        name: 'Nica',
-        digitCount: 2,
-        multiplier: 70,
-        schedules: [
-          { name: 'Mañana', time: '11:00' },
-          { name: 'Tarde', time: '15:00' },
-          { name: 'Noche', time: '21:00' }
-        ]
-      },
-      {
-        name: 'Fechas',
-        digitCount: 2,
-        multiplier: 60,
-        schedules: [
-          { name: 'Única', time: '20:00' }
-        ]
-      },
-      {
-        name: 'Tres Monazos',
-        digitCount: 3,
-        multiplier: 500,
-        schedules: [
-          { name: 'Mañana', time: '11:00' },
-          { name: 'Noche', time: '21:00' }
-        ]
-      }
+      { name: 'Tica', digitCount: 2, multiplier: 70, schedules: [{ name: 'Mañana', time: '11:00' }, { name: 'Tarde', time: '15:00' }, { name: 'Noche', time: '21:00' }] },
+      { name: 'Nica', digitCount: 2, multiplier: 70, schedules: [{ name: 'Mañana', time: '11:00' }, { name: 'Tarde', time: '15:00' }, { name: 'Noche', time: '21:00' }] },
+      { name: 'Fechas', digitCount: 2, multiplier: 60, schedules: [{ name: 'Única', time: '20:00' }] },
+      { name: 'Tres Monazos', digitCount: 3, multiplier: 500, schedules: [{ name: 'Mañana', time: '11:00' }, { name: 'Noche', time: '21:00' }] }
     ]
-
-    for (const gameData of defaultGames) {
-      await createGame(gameData)
-    }
+    for (const gameData of defaultGames) { await createGame(gameData) }
   }
 }
 

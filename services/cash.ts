@@ -1,166 +1,114 @@
 import { dbEvents } from '@/lib/events'
 import type { CashSession, CashMovement } from '@/lib/types'
 import { generateId } from '@/lib/utils'
+import { supabase } from '@/lib/supabase/client'
+
+function mapSession(row: any): CashSession {
+  return {
+    id: row.id,
+    openingAmount: row.opening_amount,
+    closingAmount: row.closing_amount,
+    salesTotal: row.sales_total,
+    prizesTotal: row.prizes_total,
+    status: row.status,
+    openedAt: new Date(row.opened_at),
+    closedAt: row.closed_at ? new Date(row.closed_at) : undefined,
+    notes: row.notes,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    movements: row.cash_movements ? row.cash_movements.map(mapMovement) : undefined
+  }
+}
+
+function mapMovement(row: any): CashMovement {
+  return {
+    id: row.id,
+    cashSessionId: row.cash_session_id,
+    type: row.type,
+    amount: row.amount,
+    description: row.description,
+    createdAt: new Date(row.created_at)
+  }
+}
 
 export async function openCashSession(openingAmount: number): Promise<CashSession> {
-  // Check if there's already an open session
-  const existing = await query('SELECT id FROM CashSession WHERE status = "open" LIMIT 1')
-  if (existing.length > 0) throw new Error('Ya existe una sesión de caja abierta')
-
+  const { count } = await supabase.from('cash_sessions').select('*', { count: 'exact', head: true }).eq('status', 'open')
+  if (count && count > 0) throw new Error('Ya existe una sesión de caja abierta')
   const id = generateId()
   const now = new Date().toISOString()
-  
-  await execute(
-    'INSERT INTO CashSession (id, openingAmount, status, salesTotal, prizesTotal, openedAt, createdAt, updatedAt, isDirty) VALUES (?, ?, "open", 0, 0, ?, ?, ?, 1)',
-    [id, openingAmount, now, now, now]
-  )
-
+  const { error } = await supabase.from('cash_sessions').insert({ id, opening_amount: openingAmount, status: 'open', sales_total: 0, prizes_total: 0, opened_at: now, created_at: now, updated_at: now })
+  if (error) throw error
   const retSession = await getCashSessionById(id);
   dbEvents.emit('cash:changed');
   return retSession!;
 }
 
 export async function getCurrentSession(): Promise<CashSession | null> {
-  const sessions = await query<CashSession>('SELECT * FROM CashSession WHERE status = "open" LIMIT 1')
-  if (sessions.length === 0) return null
-  
-  const session = sessions[0]
-  session.movements = await query<CashMovement>(
-    'SELECT * FROM CashMovement WHERE cashSessionId = ? ORDER BY createdAt DESC',
-    [session.id]
-  )
-  
-  return session
+  const { data: session, error } = await supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('status', 'open').limit(1).single()
+  if (error || !session) return null
+  const mapped = mapSession(session)
+  if (mapped.movements) { mapped.movements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) }
+  return mapped
 }
 
 export async function closeCashSession(sessionId: string, notes?: string): Promise<CashSession> {
   const session = await getCashSessionById(sessionId)
   if (!session) throw new Error('Sesión no encontrada')
-  if (session.status === 'closed') throw new Error('Esta sesión ya está cerrada')
-
+  if (session.status === 'closed') throw new Error('La sesión ya está cerrada')
   const summary = await getCashSummary(sessionId)
   const now = new Date().toISOString()
-  
-  await execute(
-    'UPDATE CashSession SET status = "closed", closingAmount = ?, closedAt = ?, notes = ?, updatedAt = ?, isDirty = 1 WHERE id = ?',
-    [summary.balance, now, notes, now, sessionId]
-  )
-
+  const { error } = await supabase.from('cash_sessions').update({ status: 'closed', closing_amount: summary.balance, closed_at: now, notes: notes || null, updated_at: now }).eq('id', sessionId)
+  if (error) throw error
   const retSession = await getCashSessionById(sessionId);
   dbEvents.emit('cash:changed');
   return retSession!;
 }
 
-export async function addCashMovement(data: {
-  cashSessionId: string
-  type: 'income' | 'expense'
-  amount: number
-  description: string
-}): Promise<CashMovement> {
+export async function addCashMovement(data: { cashSessionId: string; type: 'income' | 'expense' | 'sale' | 'prize_payment'; amount: number; description: string }): Promise<CashMovement> {
   const id = generateId()
   const now = new Date().toISOString()
-  
-  await execute(
-    'INSERT INTO CashMovement (id, cashSessionId, type, amount, description, createdAt, isDirty) VALUES (?, ?, ?, ?, ?, ?, 1)',
-    [id, data.cashSessionId, data.type, data.amount, data.description, now]
-  )
-
-  const results = await query<CashMovement>('SELECT * FROM CashMovement WHERE id = ?', [id])
-  return results[0]
+  const { error } = await supabase.from('cash_movements').insert({ id, cash_session_id: data.cashSessionId, type: data.type, amount: data.amount, description: data.description, created_at: now })
+  if (error) throw error
+  const { data: movement } = await supabase.from('cash_movements').select('*').eq('id', id).single()
+  dbEvents.emit('cash:changed');
+  return mapMovement(movement)
 }
 
-export async function getCashSessions(options?: {
-  startDate?: Date
-  endDate?: Date
-  limit?: number
-}): Promise<CashSession[]> {
-  let sql = 'SELECT * FROM CashSession'
-  const params = []
-  const where = []
-
-  if (options?.startDate) {
-    where.push('openedAt >= ?')
-    params.push(options.startDate.toISOString())
-  }
-  if (options?.endDate) {
-    where.push('openedAt <= ?')
-    params.push(options.endDate.toISOString())
-  }
-
-  if (where.length > 0) sql += ' WHERE ' + where.join(' AND ')
-  sql += ' ORDER BY openedAt DESC'
-  if (options?.limit) {
-    sql += ' LIMIT ?'
-    params.push(options.limit)
-  }
-
-  const sessions = await query<CashSession>(sql, params)
-
-  if (sessions.length > 0) {
-    const sessionIds = sessions.map(s => s.id)
-    const placeholders = sessionIds.map(() => '?').join(', ')
-    const movements = await query<CashMovement>(
-      `SELECT * FROM CashMovement WHERE cashSessionId IN (${placeholders})`,
-      sessionIds
-    )
-
-    const movementsBySessionId = movements.reduce((acc, m) => {
-      if (!acc[m.cashSessionId]) acc[m.cashSessionId] = []
-      acc[m.cashSessionId].push(m)
-      return acc
-    }, {} as Record<string, CashMovement[]>)
-
-    for (const s of sessions) {
-      s.movements = movementsBySessionId[s.id] || []
-    }
-  }
-
-  return sessions
+export async function getCashSessions(options?: { startDate?: Date; endDate?: Date; limit?: number }): Promise<CashSession[]> {
+  let query = supabase.from('cash_sessions').select(`*, cash_movements (*)`).order('opened_at', { ascending: false })
+  if (options?.startDate) { query = query.gte('opened_at', options.startDate.toISOString()) }
+  if (options?.endDate) { query = query.lte('opened_at', options.endDate.toISOString()) }
+  if (options?.limit) { query = query.limit(options.limit) }
+  const { data: sessions, error } = await query
+  if (error || !sessions) return []
+  return sessions.map((s: any) => {
+      const mapped = mapSession(s)
+      if (mapped.movements) { mapped.movements.sort((a: CashMovement, b: CashMovement) => b.createdAt.getTime() - a.createdAt.getTime()) }
+      return mapped
+  })
 }
 
 export async function getCashSessionById(id: string): Promise<CashSession | null> {
-  const sessions = await query<CashSession>('SELECT * FROM CashSession WHERE id = ?', [id])
-  if (sessions.length === 0) return null
-  
-  const session = sessions[0]
-  session.movements = await query<CashMovement>(
-    'SELECT * FROM CashMovement WHERE cashSessionId = ? ORDER BY createdAt DESC',
-    [session.id]
-  )
-  
-  return session
+  const { data: session, error } = await supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('id', id).single()
+  if (error || !session) return null
+  const mapped = mapSession(session)
+  if (mapped.movements) { mapped.movements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) }
+  return mapped
 }
 
-export async function getCashSummary(sessionId?: string): Promise<{
-  openingAmount: number
-  salesTotal: number
-  prizesTotal: number
-  incomeTotal: number
-  expenseTotal: number
-  balance: number
-}> {
-  const session = sessionId ? await getCashSessionById(sessionId) : await getCurrentSession()
-
-  if (!session) {
-    return { openingAmount: 0, salesTotal: 0, prizesTotal: 0, incomeTotal: 0, expenseTotal: 0, balance: 0 }
+export async function getCashSummary(sessionId?: string): Promise<{ openingAmount: number; salesTotal: number; prizesTotal: number; incomes: number; expenses: number; balance: number }> {
+  let session = null
+  if (sessionId) { session = await getCashSessionById(sessionId) } else { session = await getCurrentSession() }
+  if (!session) { return { openingAmount: 0, salesTotal: 0, prizesTotal: 0, incomes: 0, expenses: 0, balance: 0 } }
+  let incomes = 0
+  let expenses = 0
+  if (session.movements) {
+    for (const m of session.movements) {
+      if (m.type === 'income') incomes += m.amount
+      else if (m.type === 'expense') expenses += m.amount
+    }
   }
-
-  const incomeTotal = session.movements
-    ?.filter(m => m.type === 'income')
-    .reduce((sum, m) => sum + m.amount, 0) || 0
-
-  const expenseTotal = session.movements
-    ?.filter(m => m.type === 'expense' && m.amount > 0)
-    .reduce((sum, m) => sum + m.amount, 0) || 0
-
-  const balance = session.openingAmount + session.salesTotal - session.prizesTotal + incomeTotal - expenseTotal
-
-  return {
-    openingAmount: session.openingAmount,
-    salesTotal: session.salesTotal,
-    prizesTotal: session.prizesTotal,
-    incomeTotal,
-    expenseTotal,
-    balance
-  }
+  return { openingAmount: session.openingAmount, salesTotal: session.salesTotal, prizesTotal: session.prizesTotal, incomes, expenses, balance: session.openingAmount + session.salesTotal + incomes - session.prizesTotal - expenses }
 }
+
+export const cashService = { openSession: openCashSession, closeSession: closeCashSession, getCurrentSession, getSessionById: getCashSessionById, getSessions: getCashSessions, addMovement: addCashMovement, getSummary: getCashSummary }

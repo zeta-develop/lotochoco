@@ -5,7 +5,7 @@ import { dbEvents } from '@/lib/events'
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { Ticket, CartItem } from '@/lib/types'
-import { ticketService } from '@/services/tickets'
+import { ticketsService } from '@/services/tickets'
 import { toast } from 'sonner'
 
 function parseLocalDate(value?: string) {
@@ -42,13 +42,13 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
     setIsLoading(true)
     try {
       if (options?.startDate || options?.endDate) {
-        const { tickets: fetchedTickets } = await ticketService.getTickets({
+        const { tickets: fetchedTickets } = await ticketsService.getTickets({
           startDate: parsedStartDate,
           endDate: parsedEndDate
         })
         setTickets(fetchedTickets)
       } else {
-        const data = await ticketService.getTodayTickets()
+        const data = await ticketsService.getTodayTickets()
         setTickets(data)
       }
     } catch (error) {
@@ -66,7 +66,7 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
   const createTicket = async (items: CartItem[]) => {
     setIsSubmitting(true)
     try {
-      const ticket = await ticketService.create(items)
+      const ticket = await ticketsService.create(items)
       toast.success(`Ticket ${ticket.ticketNumber} creado`)
       await refresh()
       return ticket
@@ -81,7 +81,7 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
 
   const cancelTicket = async (id: string, reason: string) => {
     try {
-      const result = await ticketService.cancelTicket(id, reason)
+      const result = await ticketsService.cancelTicket(id, reason)
       if (result.success) {
         toast.success(result.message)
         await refresh()
@@ -98,7 +98,7 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
 
   const getTicketByNumber = async (ticketNumber: string) => {
     try {
-      return await ticketService.getByNumber(ticketNumber)
+      return await ticketsService.getByNumber(ticketNumber)
     } catch (error) {
       console.error('Error al buscar ticket:', error)
       return null
