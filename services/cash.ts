@@ -96,10 +96,10 @@ export async function getCashSessionById(id: string): Promise<CashSession | null
   return mapped
 }
 
-export async function getCashSummary(sessionId?: string): Promise<{ openingAmount: number; salesTotal: number; prizesTotal: number; incomes: number; expenses: number; balance: number }> {
+export async function getCashSummary(sessionId?: string): Promise<{ openingAmount: number; salesTotal: number; prizesTotal: number; incomeTotal: number; expenseTotal: number; balance: number }> {
   let session = null
   if (sessionId) { session = await getCashSessionById(sessionId) } else { session = await getCurrentSession() }
-  if (!session) { return { openingAmount: 0, salesTotal: 0, prizesTotal: 0, incomes: 0, expenses: 0, balance: 0 } }
+  if (!session) { return { openingAmount: 0, salesTotal: 0, prizesTotal: 0, incomeTotal: 0, expenseTotal: 0, balance: 0 } }
   let incomes = 0
   let expenses = 0
   if (session.movements) {
@@ -108,7 +108,7 @@ export async function getCashSummary(sessionId?: string): Promise<{ openingAmoun
       else if (m.type === 'expense') expenses += m.amount
     }
   }
-  return { openingAmount: session.openingAmount, salesTotal: session.salesTotal, prizesTotal: session.prizesTotal, incomes, expenses, balance: session.openingAmount + session.salesTotal + incomes - session.prizesTotal - expenses }
+  return { openingAmount: session.openingAmount, salesTotal: session.salesTotal, prizesTotal: session.prizesTotal, incomeTotal: incomes, expenseTotal: expenses, balance: session.openingAmount + session.salesTotal + incomes - session.prizesTotal - expenses }
 }
 
 export const cashService = { openSession: openCashSession, closeSession: closeCashSession, getCurrentSession, getSessionById: getCashSessionById, getSessions: getCashSessions, addMovement: addCashMovement, getSummary: getCashSummary }
