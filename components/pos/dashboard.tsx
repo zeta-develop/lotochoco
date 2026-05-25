@@ -37,7 +37,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const stats = [
     {
       title: 'Ventas del Día',
-      value: `${currency}${report.totalSales.toLocaleString()}`,
+      value: `${currency}${(report?.totalSales || 0).toLocaleString()}`,
       icon: DollarSign,
       gradient: 'from-green-500/10 to-green-600/5',
       titleColor: 'text-green-600',
@@ -53,7 +53,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     },
     {
       title: 'Premios Pendientes',
-      value: `${currency}${report.pendingPrizes.toLocaleString()}`,
+      value: `${currency}${(report?.pendingPrizes || 0).toLocaleString()}`,
       icon: Trophy,
       gradient: 'from-orange-500/10 to-orange-600/5',
       titleColor: 'text-orange-600',
@@ -61,7 +61,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     },
     {
       title: 'Ganancia Neta',
-      value: `${currency}${report.netProfit.toLocaleString()}`,
+      value: `${currency}${(report?.netProfit || 0).toLocaleString()}`,
       icon: TrendingUp,
       gradient: report.netProfit >= 0 ? 'from-green-500/10 to-green-600/5' : 'from-red-500/10 to-red-600/5',
       titleColor: report.netProfit >= 0 ? 'text-green-600' : 'text-red-600',
@@ -177,7 +177,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       </div>
                     </div>
                     <div className="text-xl font-black text-orange-600 dark:text-orange-400">
-                      {currency}{winner.prizeAmount.toLocaleString()}
+                      {currency}{(winner.prizeAmount || 0).toLocaleString()}
                     </div>
                   </div>
                 ))}
@@ -200,31 +200,31 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div className="rounded-2xl bg-muted/50 p-4 border border-muted-foreground/5 shadow-sm text-center">
               <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Apertura</div>
               <div className="text-lg font-black">
-                {currency}{summary.openingAmount.toLocaleString()}
+                {currency}{(summary.openingAmount || 0).toLocaleString()}
               </div>
             </div>
             <div className="rounded-2xl bg-green-500/10 p-4 border border-green-500/20 shadow-sm text-center">
               <div className="text-[10px] font-black uppercase tracking-widest text-green-600 dark:text-green-400 mb-1">Ventas</div>
               <div className="text-lg font-black text-green-700 dark:text-green-400">
-                +{currency}{summary.salesTotal.toLocaleString()}
+                +{currency}{(summary.salesTotal || 0).toLocaleString()}
               </div>
             </div>
             <div className="rounded-2xl bg-red-500/10 p-4 border border-red-500/20 shadow-sm text-center">
               <div className="text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 mb-1">Premios</div>
               <div className="text-lg font-black text-red-700 dark:text-red-400">
-                -{currency}{summary.prizesTotal.toLocaleString()}
+                -{currency}{(summary.prizesTotal || 0).toLocaleString()}
               </div>
             </div>
             <div className="rounded-2xl bg-blue-500/10 p-4 border border-blue-500/20 shadow-sm text-center">
               <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1">Entradas</div>
               <div className="text-lg font-black text-blue-700 dark:text-blue-400">
-                +{currency}{summary.incomeTotal.toLocaleString()}
+                +{currency}{(summary.incomeTotal || 0).toLocaleString()}
               </div>
             </div>
             <div className="rounded-2xl bg-orange-500/10 p-4 border border-orange-500/20 shadow-sm text-center">
               <div className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400 mb-1">Salidas</div>
               <div className="text-lg font-black text-orange-700 dark:text-orange-400">
-                -{currency}{summary.expenseTotal.toLocaleString()}
+                -{currency}{(summary.expenseTotal || 0).toLocaleString()}
               </div>
             </div>
             <div className={cn(
@@ -236,7 +236,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 "text-xl font-black",
                 summary.balance >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
               )}>
-                {currency}{summary.balance.toLocaleString()}
+                {currency}{(summary.balance || 0).toLocaleString()}
               </div>
             </div>
           </div>

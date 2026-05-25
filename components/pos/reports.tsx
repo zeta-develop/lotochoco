@@ -245,10 +245,10 @@ export function Reports({ onModuleChange }: ReportsProps) {
               <CardContent className="p-4 relative">
                 <div className="absolute right-[-10px] top-[-10px] opacity-10"><DollarSign size={60} className="text-green-600" /></div>
                 <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Ventas Brutas</p>
-                <h3 className="text-2xl font-black text-green-700">{currency}{salesReport.totalSales.toLocaleString()}</h3>
+                <h3 className="text-2xl font-black text-green-700">{currency}{(salesReport?.totalSales || 0).toLocaleString()}</h3>
                 <div className="flex items-center mt-2 text-[9px] text-green-600/70 font-black uppercase italic">
                   <ArrowUpRight size={10} className="mr-1" />
-                  {salesReport.totalTickets} Boletos
+                  {(salesReport?.totalTickets || 0)} Boletos
                 </div>
               </CardContent>
             </Card>
@@ -257,22 +257,22 @@ export function Reports({ onModuleChange }: ReportsProps) {
               <CardContent className="p-4 relative">
                 <div className="absolute right-[-10px] top-[-10px] opacity-10"><Trophy size={60} className="text-orange-600" /></div>
                 <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">Premios Totales</p>
-                <h3 className="text-2xl font-black text-orange-700">{currency}{salesReport.totalPrizes.toLocaleString()}</h3>
+                <h3 className="text-2xl font-black text-orange-700">{currency}{(salesReport?.totalPrizes || 0).toLocaleString()}</h3>
                 <div className="flex items-center mt-2 text-[9px] text-orange-600/70 font-black uppercase italic">
                   <Badge variant="outline" className="h-4 text-[8px] border-orange-200 text-orange-600 bg-orange-50/50 rounded-full">
-                    PEND: {currency}{salesReport.pendingPrizes.toLocaleString()}
+                    PEND: {currency}{(salesReport?.pendingPrizes || 0).toLocaleString()}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className={cn("overflow-hidden border-none shadow-sm", salesReport.netProfit >= 0 ? "bg-gradient-to-br from-blue-500/10 to-blue-600/5" : "bg-gradient-to-br from-red-500/10 to-red-600/5")}>
+            <Card className={cn("overflow-hidden border-none shadow-sm", (salesReport?.netProfit || 0) >= 0 ? "bg-gradient-to-br from-blue-500/10 to-blue-600/5" : "bg-gradient-to-br from-red-500/10 to-red-600/5")}>
               <CardContent className="p-4 relative">
-                <div className="absolute right-[-10px] top-[-10px] opacity-10"><TrendingUp size={60} className={salesReport.netProfit >= 0 ? "text-blue-600" : "text-red-600"} /></div>
-                <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1", salesReport.netProfit >= 0 ? "text-blue-600" : "text-red-600")}>Balance Neto</p>
-                <h3 className={cn("text-2xl font-black", salesReport.netProfit >= 0 ? "text-blue-700" : "text-red-700")}>{currency}{salesReport.netProfit.toLocaleString()}</h3>
+                <div className="absolute right-[-10px] top-[-10px] opacity-10"><TrendingUp size={60} className={(salesReport?.netProfit || 0) >= 0 ? "text-blue-600" : "text-red-600"} /></div>
+                <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1", (salesReport?.netProfit || 0) >= 0 ? "text-blue-600" : "text-red-600")}>Balance Neto</p>
+                <h3 className={cn("text-2xl font-black", (salesReport?.netProfit || 0) >= 0 ? "text-blue-700" : "text-red-700")}>{currency}{(salesReport?.netProfit || 0).toLocaleString()}</h3>
                 <div className="flex items-center mt-2 text-[9px] font-black uppercase italic">
-                  {salesReport.netProfit >= 0 ? <ArrowUpRight size={10} className="mr-1 text-blue-600" /> : <ArrowDownRight size={10} className="mr-1 text-red-600" />}
+                  {(salesReport?.netProfit || 0) >= 0 ? <ArrowUpRight size={10} className="mr-1 text-blue-600" /> : <ArrowDownRight size={10} className="mr-1 text-red-600" />}
                   Rentabilidad
                 </div>
               </CardContent>
@@ -283,7 +283,7 @@ export function Reports({ onModuleChange }: ReportsProps) {
                 <div className="absolute right-[-10px] top-[-10px] opacity-10"><Gamepad2 size={60} className="text-purple-600" /></div>
                 <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Efectividad %</p>
                 <h3 className="text-2xl font-black text-purple-700">
-                  {salesReport.totalSales > 0 ? ((salesReport.netProfit / salesReport.totalSales) * 100).toFixed(1) : 0}%
+                  {(salesReport?.totalSales || 0) > 0 ? (((salesReport?.netProfit || 0) / (salesReport?.totalSales || 1)) * 100).toFixed(1) : 0}%
                 </h3>
                 <div className="flex items-center mt-2 text-[9px] text-purple-600/70 font-black uppercase italic">
                   Margen operativo
@@ -328,7 +328,7 @@ export function Reports({ onModuleChange }: ReportsProps) {
                     />
                     <Tooltip 
                       contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: 'bold' }}
-                      formatter={(val: number) => [`${currency}${val.toLocaleString()}`, 'Ventas']}
+                      formatter={(val: number) => [`${currency}${(val || 0).toLocaleString()}`, 'Ventas']}
                       labelFormatter={(label) => format(new Date(label), 'PPPP', { locale: es }).toUpperCase()}
                     />
                     <Area 
@@ -387,12 +387,12 @@ export function Reports({ onModuleChange }: ReportsProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-black text-foreground">{currency}{game.totalAmount.toLocaleString()}</div>
-                        <div className="text-[9px] text-orange-600 font-black">-{currency}{game.prizesAmount.toLocaleString()}</div>
+                        <div className="text-sm font-black text-foreground">{currency}{(game.totalAmount || 0).toLocaleString()}</div>
+                        <div className="text-[9px] text-orange-600 font-black">-{currency}{(game.prizesAmount || 0).toLocaleString()}</div>
                       </div>
                     </div>
                     <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                      <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${(game.totalAmount / (salesReport.totalSales || 1)) * 100}%` }} />
+                      <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${(game.totalAmount / (salesReport?.totalSales || 1)) * 100}%` }} />
                     </div>
                   </div>
                 ))}

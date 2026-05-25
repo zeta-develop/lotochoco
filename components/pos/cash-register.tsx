@@ -197,7 +197,7 @@ export function CashRegister() {
               <CardContent className="py-4">
                 <div className="text-sm text-muted-foreground">Apertura</div>
                 <div className="text-xl font-semibold">
-                  {currency}{summary.openingAmount.toLocaleString()}
+                  {currency}{(summary.openingAmount || 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -206,7 +206,7 @@ export function CashRegister() {
               <CardContent className="py-4">
                 <div className="text-sm text-green-600">Ventas</div>
                 <div className="text-xl font-semibold text-green-600">
-                  +{currency}{summary.salesTotal.toLocaleString()}
+                  +{currency}{(summary.salesTotal || 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -215,7 +215,7 @@ export function CashRegister() {
               <CardContent className="py-4">
                 <div className="text-sm text-red-600">Premios</div>
                 <div className="text-xl font-semibold text-red-600">
-                  -{currency}{summary.prizesTotal.toLocaleString()}
+                  -{currency}{(summary.prizesTotal || 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -224,7 +224,7 @@ export function CashRegister() {
               <CardContent className="py-4">
                 <div className="text-sm text-blue-600">Entradas</div>
                 <div className="text-xl font-semibold text-blue-600">
-                  +{currency}{summary.incomeTotal.toLocaleString()}
+                  +{currency}{(summary.incomeTotal || 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -233,7 +233,7 @@ export function CashRegister() {
               <CardContent className="py-4">
                 <div className="text-sm text-orange-600">Salidas</div>
                 <div className="text-xl font-semibold text-orange-600">
-                  -{currency}{summary.expenseTotal.toLocaleString()}
+                  -{currency}{(summary.expenseTotal || 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -248,7 +248,7 @@ export function CashRegister() {
                   "text-xl font-bold",
                   summary.balance >= 0 ? "text-green-600" : "text-red-600"
                 )}>
-                  {currency}{summary.balance.toLocaleString()}
+                  {currency}{(summary.balance || 0).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -383,7 +383,7 @@ export function CashRegister() {
                       "text-sm",
                       session.salesTotal - session.prizesTotal >= 0 ? "text-green-600" : "text-red-600"
                     )}>
-                      Ganancia: {currency}{(session.salesTotal - session.prizesTotal).toLocaleString()}
+                      Ganancia: {currency}{((session.salesTotal || 0) - (session.prizesTotal || 0)).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -439,7 +439,7 @@ export function CashRegister() {
             <div className="rounded-lg bg-muted p-4 space-y-2">
               <div className="flex justify-between">
                 <span>Balance actual:</span>
-                <span className="font-bold">{currency}{summary.balance.toLocaleString()}</span>
+                <span className="font-bold">{currency}{(summary.balance || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>Ganancia:</span>
@@ -447,7 +447,7 @@ export function CashRegister() {
                   "font-bold",
                   summary.salesTotal - summary.prizesTotal >= 0 ? "text-green-600" : "text-red-600"
                 )}>
-                  {currency}{(summary.salesTotal - summary.prizesTotal).toLocaleString()}
+                  {currency}{((summary.salesTotal || 0) - (summary.prizesTotal || 0)).toLocaleString()}
                 </span>
               </div>
             </div>
