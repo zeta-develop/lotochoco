@@ -175,7 +175,7 @@ export function POSSale() {
   const handleShare = async () => {
     if (!lastTicket) return
     toast.info('Generando PDF...')
-    const result = await printerService.shareTicketPDF(
+    const result = await printerService.printTicket(
       lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
       settings
     )
@@ -456,6 +456,7 @@ export function POSSale() {
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-md p-0 overflow-hidden text-center">
+          <DialogTitle className="sr-only">Venta Exitosa</DialogTitle>
           <div className="bg-green-500/10 p-8 border-b border-green-500/10 flex flex-col items-center justify-center gap-4">
             <div className="h-16 w-16 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/30">
               <Check className="h-8 w-8" />

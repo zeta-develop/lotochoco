@@ -129,7 +129,7 @@ export function Reports({ onModuleChange }: ReportsProps) {
 
   const handleSendTicketImage = async (ticket: TicketWithDetails) => {
     toast.info('Generando PDF...')
-    const result = await printerService.shareTicketPDF(ticket as any, settings as any)
+    const result = await printerService.printTicket(ticket as any, settings as any)
     if (!result.success) toast.error("Error al anular ticket")
   }
 
@@ -586,6 +586,7 @@ export function Reports({ onModuleChange }: ReportsProps) {
       {/* Ticket Details Dialog */}
       <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
         <DialogContent className="max-w-lg rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+          <DialogTitle className="sr-only">Detalles del ticket</DialogTitle>
           {selectedTicket && (
             <div className="animate-in zoom-in-95 duration-200">
               <div className="bg-primary p-6 text-white">
