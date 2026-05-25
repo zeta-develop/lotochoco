@@ -1,152 +1,69 @@
 import type { SalesReport } from '@/lib/types'
+import { supabase } from '@/lib/supabase/client'
 
-export async function getSalesReport(options?: {
-  startDate?: Date
-  endDate?: Date
-}): Promise<SalesReport> {
-  const params = []
-  let whereStr = " WHERE status = 'active'"
-  
-  if (options?.startDate) {
-    whereStr += " AND createdAt >= ?"
-    params.push(options.startDate.toISOString())
+export async function getSalesReport(options?: { startDate?: Date; endDate?: Date }): Promise<SalesReport> {
+  let ticketsQuery = supabase.from('tickets').select('total_amount').eq('status', 'active')
+  if (options?.startDate) ticketsQuery = ticketsQuery.gte('created_at', options.startDate.toISOString())
+  if (options?.endDate) ticketsQuery = ticketsQuery.lte('created_at', options.endDate.toISOString())
+  const { data: tickets } = await ticketsQuery
+  const totalSales = tickets ? tickets.reduce((sum, t) => sum + (t.total_amount || 0), 0) : 0
+  const totalTickets = tickets ? tickets.length : 0
+  let winnersQuery = supabase.from('winners').select('prize_amount, is_paid')
+  if (options?.startDate) winnersQuery = winnersQuery.gte('created_at', options.startDate.toISOString())
+  if (options?.endDate) winnersQuery = winnersQuery.lte('created_at', options.endDate.toISOString())
+  const { data: winners } = await winnersQuery
+  let totalPrizes = 0; let totalPaid = 0;
+  if (winners) {
+      for (const w of winners) {
+          totalPrizes += (w.prize_amount || 0)
+          if (w.is_paid === 1 || w.is_paid === true) { totalPaid += (w.prize_amount || 0) }
+      }
   }
-  if (options?.endDate) {
-    whereStr += " AND createdAt <= ?"
-    params.push(options.endDate.toISOString())
-  }
-
-  // Ventas totales
-  const salesResult = await query(`SELECT SUM(totalAmount) as totalSales, COUNT(*) as totalTickets FROM Ticket ${whereStr}`, params)
-  
-  // Premios totales
-  let prizeWhereStr = ""
-  const prizeParams = []
-  if (options?.startDate || options?.endDate) {
-    prizeWhereStr = " WHERE createdAt >= ? AND createdAt <= ?"
-    prizeParams.push(options?.startDate?.toISOString() || '1970-01-01T00:00:00.000Z')
-    prizeParams.push(options?.endDate?.toISOString() || new Date().toISOString())
-  }
-
-  const prizesResult = await query(`SELECT SUM(prizeAmount) as totalPrizes FROM Winner ${prizeWhereStr}`, prizeParams)
-  
-  // Premios pagados
-  let paidWhereStr = prizeWhereStr ? prizeWhereStr + " AND isPaid = 1" : " WHERE isPaid = 1"
-  const paidResult = await query(`SELECT SUM(prizeAmount) as totalPaid FROM Winner ${paidWhereStr}`, prizeParams)
-
-  const totalSales = salesResult[0]?.totalSales || 0
-  const totalTickets = salesResult[0]?.totalTickets || 0
-  const totalPrizes = prizesResult[0]?.totalPrizes || 0
-  const totalPaid = paidResult[0]?.totalPaid || 0
   const pendingPrizes = totalPrizes - totalPaid
   const netProfit = totalSales - totalPrizes
-
-  return {
-    totalSales,
-    totalTickets,
-    totalPrizes,
-    totalPaid,
-    pendingPrizes,
-    netProfit
-  }
+  return { totalSales, totalTickets, totalPrizes, totalPaid, pendingPrizes, netProfit }
 }
 
-export async function getDailyReport(date: Date): Promise<SalesReport> {
-  const startDate = new Date(date)
-  startDate.setHours(0, 0, 0, 0)
-  const endDate = new Date(date)
-  endDate.setHours(23, 59, 59, 999)
-  return getSalesReport({ startDate, endDate })
+export async function getHotColdNumbers(options?: { gameId?: string; limit?: number }): Promise<{ number: string; frequency: number; type: 'hot' | 'cold' }[]> {
+  let query = supabase.from('results').select('winning_number')
+  if (options?.gameId) { query = query.eq('game_id', options.gameId) }
+  const { data: results } = await query
+  if (!results || results.length === 0) return []
+  const freqs: Record<string, number> = {}
+  for (const r of results) { if (!r.winning_number) continue; freqs[r.winning_number] = (freqs[r.winning_number] || 0) + 1 }
+  const sorted = Object.entries(freqs).map(([num, count]) => ({ number: num, frequency: count })).sort((a, b) => b.frequency - a.frequency)
+  const limit = options?.limit || 5
+  const hot = sorted.slice(0, limit).map(n => ({ ...n, type: 'hot' as const }))
+  const cold = sorted.slice(-limit).reverse().map(n => ({ ...n, type: 'cold' as const }))
+  return [...hot, ...cold]
 }
 
-export async function getWeeklyReport(): Promise<{
-  days: { date: string; sales: number; prizes: number }[]
-  totals: SalesReport
-}> {
-  const today = new Date()
-  const weekAgo = new Date(today)
-  weekAgo.setDate(weekAgo.getDate() - 7)
-  const days = []
-
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(date.getDate() - i)
-    const report = await getDailyReport(date)
-    days.push({
-      date: date.toISOString().split('T')[0],
-      sales: report.totalSales,
-      prizes: report.totalPrizes
-    })
+export async function getGameStats(options?: { startDate?: Date; endDate?: Date }): Promise<any[]> {
+  let ticketsQuery = supabase.from('ticket_items').select(`amount, game_id, games (name)`)
+  if (options?.startDate) ticketsQuery = ticketsQuery.gte('created_at', options.startDate.toISOString())
+  if (options?.endDate) ticketsQuery = ticketsQuery.lte('created_at', options.endDate.toISOString())
+  const { data: items } = await ticketsQuery
+  const statsMap: Record<string, any> = {}
+  if (items) {
+      for (const item of items) {
+          const gameId = item.game_id
+          if (!gameId) continue
+          if (!statsMap[gameId]) { statsMap[gameId] = { gameId, gameName: item.games?.name || 'Desconocido', totalSales: 0, totalPrizes: 0, netProfit: 0 } }
+          statsMap[gameId].totalSales += (item.amount || 0)
+      }
   }
-
-  const totals = await getSalesReport({ startDate: weekAgo, endDate: today })
-  return { days, totals }
+  let winnersQuery = supabase.from('winners').select(`prize_amount, results (game_id)`)
+  if (options?.startDate) winnersQuery = winnersQuery.gte('created_at', options.startDate.toISOString())
+  if (options?.endDate) winnersQuery = winnersQuery.lte('created_at', options.endDate.toISOString())
+  const { data: winners } = await winnersQuery
+  if (winners) {
+      for (const w of winners) {
+          const gameId = w.results?.game_id
+          if (!gameId || !statsMap[gameId]) continue
+          statsMap[gameId].totalPrizes += (w.prize_amount || 0)
+      }
+  }
+  return Object.values(statsMap).map(stat => ({ ...stat, netProfit: stat.totalSales - stat.totalPrizes }))
 }
 
-export async function getGameReport(options?: {
-  startDate?: Date
-  endDate?: Date
-}): Promise<any[]> {
-  const params = []
-  let whereStr = " WHERE t.status = 'active'"
-  
-  if (options?.startDate) {
-    whereStr += " AND t.createdAt >= ?"
-    params.push(options.startDate.toISOString())
-  }
-  if (options?.endDate) {
-    whereStr += " AND t.createdAt <= ?"
-    params.push(options.endDate.toISOString())
-  }
-
-  const sql = `
-    SELECT 
-      g.id as gameId, 
-      g.name as gameName, 
-      COUNT(ti.id) as ticketCount, 
-      SUM(ti.amount) as totalAmount
-    FROM Game g
-    LEFT JOIN TicketItem ti ON g.id = ti.gameId
-    LEFT JOIN Ticket t ON ti.ticketId = t.id
-    ${whereStr}
-    GROUP BY g.id
-  `
-  
-  const games = await query(sql, params)
-  
-  for (const g of games) {
-    const prizes = await query(
-      "SELECT SUM(prizeAmount) as prizesAmount FROM Winner w JOIN Result r ON w.resultId = r.id WHERE r.gameId = ?",
-      [g.gameId]
-    )
-    g.prizesAmount = prizes[0]?.prizesAmount || 0
-  }
-
-  return games
-}
-
-export async function getNumberFrequency(options?: {
-  gameId?: string
-  limit?: number
-}): Promise<{ number: string; frequency: number }[]> {
-  let sql = "SELECT number, COUNT(*) as frequency FROM TicketItem"
-  const params = []
-  if (options?.gameId) {
-    sql += " WHERE gameId = ?"
-    params.push(options.gameId)
-  }
-  sql += " GROUP BY number ORDER BY frequency DESC"
-  if (options?.limit) {
-    sql += " LIMIT ?"
-    params.push(options.limit)
-  }
-  return await query(sql, params)
-}
-
-export const reportService = {
-  getSalesReport,
-  getDailyReport,
-  getWeeklyReport,
-  getGameReport,
-  getNumberFrequency
-}
+export const reportsService = { getSales: getSalesReport, getHotColdNumbers, getGameStats }

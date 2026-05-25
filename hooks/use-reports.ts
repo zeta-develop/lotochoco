@@ -5,7 +5,7 @@ import { dbEvents } from '@/lib/events'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { SalesReport } from '@/lib/types'
-import { getSalesReport, getDailyReport, getWeeklyReport, getGameReport } from '@/services/reports'
+import { reportsService } from '@/services/reports'
 
 function parseLocalDate(value?: string) {
   if (!value) return undefined
@@ -49,7 +49,7 @@ export function useSalesReport(options?: {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const data = await getSalesReport({
+      const data = await reportsService.getSales({
         startDate: parsedStartDate,
         endDate: parsedEndDate,
       })
@@ -99,7 +99,7 @@ export function useDailyReport(date?: string) {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const data = await getDailyReport(date ? parseLocalDate(date) || new Date() : new Date())
+      const data = await reportsService.getSales(date ? parseLocalDate(date) || new Date() : new Date())
       setReport(data)
     } catch (error) {
       setError(error instanceof Error ? error : new Error('Error al cargar reporte diario'))
@@ -147,7 +147,7 @@ export function useWeeklyReport() {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const data = await getWeeklyReport()
+      const data = await reportsService.getSales()
       setDays(data.days)
       setTotals(data.totals)
     } catch (error) {
@@ -213,7 +213,7 @@ export function useGameReport(options?: {
   const refresh = useCallback(async () => {
     try {
       setError(null)
-      const data = await getGameReport({
+      const data = await reportsService.getGameStats({
         startDate: parsedStartDate,
         endDate: parsedEndDate,
       })

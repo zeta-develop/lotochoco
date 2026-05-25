@@ -4,7 +4,7 @@ import { dbEvents } from '@/lib/events'
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Result } from '@/lib/types'
-import { getTodayResults, createResult, processResult } from '@/services/results'
+import { resultsService } from '@/services/results'
 import { toast } from 'sonner'
 
 export function useResults() {
@@ -15,7 +15,7 @@ export function useResults() {
   const refresh = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await getTodayResults()
+      const data = await resultsService.getAll()
       setResults(data)
     } catch (error) {
       console.error('Error al cargar resultados:', error)
@@ -37,12 +37,12 @@ export function useResults() {
   }) => {
     setIsSubmitting(true)
     try {
-      const result = await createResult(data)
+      const result = await resultsService.add(data)
       toast.success('Resultado guardado correctamente')
       
       // Proceso automático de ganadores
       toast.info('Buscando ganadores...')
-      const processing = await processResult(result.id)
+      const processing = await resultsService.process(result.id)
       
       if (processing.winnersCount > 0) {
         toast.success(`¡Se encontraron ${processing.winnersCount} ganadores!`)

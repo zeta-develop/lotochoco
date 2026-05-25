@@ -1,6 +1,7 @@
 import { dbEvents } from '@/lib/events'
-import type { Setting, SettingKey } from '@/lib/types'
+import type { SettingKey } from '@/lib/types'
 import { generateId } from '@/lib/utils'
+import { supabase } from '@/lib/supabase/client'
 
 const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   businessName: 'Loteria La Fortuna',
@@ -17,51 +18,32 @@ const DEFAULT_SETTINGS: Record<SettingKey, string> = {
 }
 
 export async function getSetting(key: SettingKey): Promise<string> {
-  const results = await query<Setting>('SELECT "value" FROM "Setting" WHERE "key" = ?', [key])
-  return results[0]?.value ?? DEFAULT_SETTINGS[key]
+  const { data, error } = await supabase.from('settings').select('value').eq('key', key).single()
+  if (error || !data) return DEFAULT_SETTINGS[key]
+  return data.value
 }
 
 export async function getAllSettings(): Promise<Record<string, string>> {
-  const settings = await query<Setting>('SELECT "key", "value" FROM "Setting"')
-  
+  const { data: settings, error } = await supabase.from('settings').select('key, value')
   const result: Record<string, string> = { ...DEFAULT_SETTINGS }
-  
-  for (const setting of settings) {
-    result[setting.key as SettingKey] = setting.value
-  }
-  
+  if (!error && settings) { for (const setting of settings) { result[setting.key] = setting.value } }
   return result
 }
 
 export async function updateSetting(key: SettingKey, value: string): Promise<void> {
-  const id = generateId()
-  await execute(
-    `INSERT OR REPLACE INTO "Setting" ("id", "key", "value", "updatedAt", "isDirty")
-     VALUES (
-       COALESCE((SELECT "id" FROM "Setting" WHERE "key" = ?), ?),
-       ?, ?, CURRENT_TIMESTAMP, 1
-     )`,
-    [key, id, key, value]
-  )
+  const { data: existing } = await supabase.from('settings').select('id').eq('key', key).single()
+  const id = existing?.id || generateId()
+  const { error } = await supabase.from('settings').upsert({ id, key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  if (error) { console.error(`Error updating setting ${key}:`, error) }
 }
 
-export async function updateSettings(
-  settings: Partial<Record<SettingKey, string>>
-): Promise<void> {
-  for (const [key, value] of Object.entries(settings)) {
-    await updateSetting(key as SettingKey, value as string)
-  }
+export async function updateSettings(settings: Partial<Record<SettingKey, string>>): Promise<void> {
+  for (const [key, value] of Object.entries(settings)) { await updateSetting(key as SettingKey, value as string) }
 }
 
 export async function initializeSettings(): Promise<void> {
-  const results = await query('SELECT COUNT(*) as count FROM Setting')
-  const count = results[0]?.count || 0
-  
-  if (count === 0) {
-    for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-      await updateSetting(key as SettingKey, value as string)
-    }
-  }
+  const { count, error } = await supabase.from('settings').select('*', { count: 'exact', head: true })
+  if (!error && count === 0) { for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) { await updateSetting(key as SettingKey, value as string) } }
 }
 
 export const settingsService = {
@@ -69,34 +51,13 @@ export const settingsService = {
   get: getSetting,
   update: async (settings: Record<string, string | number | boolean>) => {
     const normalized: Partial<Record<SettingKey, string>> = {}
-
     for (const [key, value] of Object.entries(settings)) {
-      if (key === 'printerIp') {
-        normalized.printerAddress = String(value)
-        continue
-      }
-
-      if (key === 'darkMode') {
-        normalized.darkMode = String(value)
-        continue
-      }
-
-      if (
-        key === 'businessName' ||
-        key === 'currency' ||
-        key === 'ticketMessage' ||
-        key === 'printerType' ||
-        key === 'printerAddress' ||
-        key === 'bluetoothDeviceId' ||
-        key === 'bluetoothDeviceName' ||
-        key === 'ticketFontSize' ||
-        key === 'ticketFontType' ||
-        key === 'ticketDensity'
-      ) {
+      if (key === 'printerIp') { normalized.printerAddress = String(value); continue }
+      if (key === 'darkMode') { normalized.darkMode = String(value); continue }
+      if (['businessName','currency','ticketMessage','printerType','printerAddress','bluetoothDeviceId','bluetoothDeviceName','ticketFontSize','ticketFontType','ticketDensity'].includes(key)) {
         normalized[key as SettingKey] = String(value)
       }
     }
-
     await updateSettings(normalized)
     dbEvents.emit('settings:changed')
     return getAllSettings()
