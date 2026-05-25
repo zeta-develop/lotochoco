@@ -36,7 +36,7 @@ import {
   Banknote
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 
 export function POSSale() {
@@ -175,11 +175,11 @@ export function POSSale() {
   const handleShare = async () => {
     if (!lastTicket) return
     toast.info('Generando PDF...')
-    const result = await printerService.printTicket(
+    const result = await printerService.shareTicketPDF(
       lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
       settings
     )
-    if (!result.success) toast.error("Error al anular ticket")
+    if (!result.success) toast.error("Error al compartir ticket")
   }
 
   const currency = settings.currency || 'C$'

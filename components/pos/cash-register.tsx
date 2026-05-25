@@ -30,7 +30,7 @@ import {
   TrendingUp,
   TrendingDown
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'

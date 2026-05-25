@@ -55,9 +55,12 @@ import {
 import { format, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
-import { generateTicketImageUrl, printerService } from '@/services/printer'
+import { printerService } from '@/services/printer'
 import type { Ticket as TicketType, TicketItem, Game } from '@/lib/types'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 import { usePOSStore } from '@/store/pos-store'
 import type { Module } from '@/components/pos/main-layout'
 
@@ -126,8 +129,8 @@ export function Reports({ onModuleChange }: ReportsProps) {
 
   const handleSendTicketImage = async (ticket: TicketWithDetails) => {
     toast.info('Generando PDF...')
-    const result = await printerService.printTicket(ticket as any, settings as any)
-    if (!result.success) toast.error("Error al anular ticket")
+    const result = await printerService.shareTicketPDF(ticket as any, settings as any)
+    if (!result.success) toast.error("Error al compartir ticket")
   }
 
   const handleRepeatTicket = (ticket: TicketWithDetails) => {

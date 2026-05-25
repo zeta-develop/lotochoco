@@ -5,7 +5,7 @@ import { signInWithGoogle } from "@/lib/supabase/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from '@/components/ui/use-toast';
 
 export function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);

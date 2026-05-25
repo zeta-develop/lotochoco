@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select'
 import { useGames } from '@/hooks/use-games'
 import { Plus, Edit, Trash2, Clock, Gamepad2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
 import type { Game } from '@/lib/types'
 
 export function GamesManager() {
