@@ -375,7 +375,7 @@ export function POSSale() {
                           {currency}{item.amount.toFixed(2)}
                         </div>
                         <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
-                          Gana: {currency}{(item.amount * item.multiplier).toLocaleString()}
+                          Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
                         </div>
                       </div>
                     </div>

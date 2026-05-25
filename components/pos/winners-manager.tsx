@@ -56,7 +56,7 @@ export function WinnersManager() {
                 Premios Pendientes
               </div>
               <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                {currency}{totalPending.toLocaleString()}
+                {currency}{(totalPending || 0).toLocaleString()}
               </div>
               <div className="text-sm text-muted-foreground">
                 {pendingWinners.length} boleto(s)
@@ -75,7 +75,7 @@ export function WinnersManager() {
                 Premios Pagados
               </div>
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {currency}{totalPaid.toLocaleString()}
+                {currency}{(totalPaid || 0).toLocaleString()}
               </div>
               <div className="text-sm text-muted-foreground">
                 {paidWinners.length} boleto(s)
@@ -139,7 +139,7 @@ export function WinnersManager() {
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold text-orange-500">
-                          {currency}{winner.prizeAmount.toLocaleString()}
+                          {currency}{(winner.prizeAmount || 0).toLocaleString()}
                         </div>
                       </div>
                     </div>
@@ -193,7 +193,7 @@ export function WinnersManager() {
                         </div>
                       </div>
                       <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                        {currency}{winner.prizeAmount.toLocaleString()}
+                        {currency}{(winner.prizeAmount || 0).toLocaleString()}
                       </div>
                     </div>
                   </CardContent>
