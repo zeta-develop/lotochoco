@@ -179,7 +179,7 @@ export function POSSale() {
       lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
       settings
     )
-    if (!result.success) toast.error(result.message)
+    if (!result.success) toast.error("Error al anular ticket")
   }
 
   const currency = settings.currency || 'C$'

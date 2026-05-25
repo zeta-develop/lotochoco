@@ -42,13 +42,16 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
     setIsLoading(true)
     try {
       if (options?.startDate || options?.endDate) {
-        const { tickets: fetchedTickets } = await ticketsService.getTickets({
+        const { tickets: fetchedTickets } = await ticketsService.getAll({
           startDate: parsedStartDate,
           endDate: parsedEndDate
         })
         setTickets(fetchedTickets)
       } else {
-        const data = await ticketsService.getTodayTickets()
+        const { tickets: data } = await ticketsService.getAll({
+          startDate: startOfDay(new Date()),
+          endDate: endOfDay(new Date())
+        })
         setTickets(data)
       }
     } catch (error) {
@@ -81,14 +84,10 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
 
   const cancelTicket = async (id: string, reason: string) => {
     try {
-      const result = await ticketsService.cancelTicket(id, reason)
-      if (result.success) {
-        toast.success(result.message)
-        await refresh()
-      } else {
-        toast.error(result.message)
-      }
-      return result
+      await ticketsService.cancel(id, reason)
+      toast.success('Ticket cancelado exitosamente')
+      await refresh()
+      return true
     } catch (error) {
       console.error('Error al cancelar ticket:', error)
       toast.error('Error al cancelar el ticket')
@@ -98,7 +97,7 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
 
   const getTicketByNumber = async (ticketNumber: string) => {
     try {
-      return await ticketsService.getByNumber(ticketNumber)
+      return await ticketsService.search(ticketNumber)
     } catch (error) {
       console.error('Error al buscar ticket:', error)
       return null

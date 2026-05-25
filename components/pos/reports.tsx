@@ -130,7 +130,7 @@ export function Reports({ onModuleChange }: ReportsProps) {
   const handleSendTicketImage = async (ticket: TicketWithDetails) => {
     toast.info('Generando PDF...')
     const result = await printerService.shareTicketPDF(ticket as any, settings as any)
-    if (!result.success) toast.error(result.message)
+    if (!result.success) toast.error("Error al anular ticket")
   }
 
   const handleRepeatTicket = (ticket: TicketWithDetails) => {
