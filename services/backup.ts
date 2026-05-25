@@ -1,7 +1,6 @@
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { Capacitor } from '@capacitor/core'
-import { getDb, getSqliteConnection } from '@/lib/db'
 
 export async function exportBackup(): Promise<{ success: boolean; message: string }> {
   if (!Capacitor.isNativePlatform()) {

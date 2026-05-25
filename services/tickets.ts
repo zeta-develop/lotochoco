@@ -1,5 +1,4 @@
 import { dbEvents } from '@/lib/events'
-import { query, execute } from '@/lib/db'
 import type { Ticket, TicketItem, CartItem, Game, DrawSchedule } from '@/lib/types'
 import { format } from 'date-fns'
 import { generateId } from '@/lib/utils'

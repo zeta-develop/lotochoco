@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { execute } from '@/lib/db';
 
 export type AppErrorSeverity = 'error' | 'fatal' | 'warning';
 

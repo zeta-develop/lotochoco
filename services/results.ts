@@ -1,5 +1,4 @@
 import { dbEvents } from '@/lib/events'
-import { query, execute } from "@/lib/db";
 import type { Result, Winner, Game, DrawSchedule } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 

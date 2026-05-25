@@ -1,4 +1,3 @@
-import { query } from '@/lib/db'
 import type { SalesReport } from '@/lib/types'
 
 export async function getSalesReport(options?: {
