@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { SWRProvider } from '@/components/providers/swr-provider'
 import { Toaster } from '@/components/ui/sonner';
 import { Updater } from '@/components/pos/updater';
 import { AuthProvider } from '@/components/auth/auth-provider';
@@ -44,8 +43,7 @@ export default function RootLayout({
       <body className="font-sans antialiased min-h-screen">
         <ErrorLoggerProvider>
           <AuthProvider>
-            <SWRProvider>
-                <Updater />
+            <Updater />
                 {children}
                 <Toaster
                   position="bottom-center"
@@ -58,7 +56,7 @@ export default function RootLayout({
                     }
                   }}
                 />
-            </SWRProvider>
+
           </AuthProvider>
         </ErrorLoggerProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

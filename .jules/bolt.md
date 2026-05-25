@@ -36,3 +36,7 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 - **Title:** Corrección Sincronización Inicial - RLS y Trigger Companies
 - **Aprendizaje:** El ciclo de sincronización fallaba (error 42501) al crear una compañía porque la consulta .select() en el insert fallaba dado que el usuario aún no era miembro de dicha compañía. Además, al insertar la compañía se intentaba agregar el usuario a company_users *después* del retorno de la compañía.
 - **Acción:** Se agregó `WITH CHECK` a las políticas RLS. Además, se implementó un trigger AFTER INSERT en `companies` (`set_company_owner_membership`) para insertar inmediatamente al usuario que crea la compañía como "owner" en `company_users`. Esto garantiza que la consulta `.select()` funcione, eliminando el 42501 en el primer inicio de sesión.
+
+### 2024-05-25 - Limpieza de dependencias innecesarias
+**Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
+**Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
