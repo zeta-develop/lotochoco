@@ -5,7 +5,6 @@ import { SWRProvider } from '@/components/providers/swr-provider'
 import { Toaster } from '@/components/ui/sonner';
 import { Updater } from '@/components/pos/updater';
 import { AuthProvider } from '@/components/auth/auth-provider';
-import { SyncProvider } from '@/components/providers/sync-provider';
 import { ErrorLoggerProvider } from '@/components/providers/error-logger-provider';
 import './globals.css'
 
@@ -46,7 +45,6 @@ export default function RootLayout({
         <ErrorLoggerProvider>
           <AuthProvider>
             <SWRProvider>
-              <SyncProvider>
                 <Updater />
                 {children}
                 <Toaster
@@ -60,7 +58,6 @@ export default function RootLayout({
                     }
                   }}
                 />
-              </SyncProvider>
             </SWRProvider>
           </AuthProvider>
         </ErrorLoggerProvider>

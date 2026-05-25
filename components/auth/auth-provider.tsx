@@ -6,7 +6,6 @@ import { useAuthStore } from "@/store/auth-store";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
-import { SyncManager } from "@/services/sync/sync-manager";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setUser, session: currentSession } = useAuthStore();
@@ -20,7 +19,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (event === "SIGNED_IN") {
-          void SyncManager.syncAll();
 
           // Si estamos en un dispositivo nativo, cerrar el navegador si estaba abierto
           if (Capacitor.isNativePlatform()) {
