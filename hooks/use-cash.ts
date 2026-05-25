@@ -5,7 +5,7 @@ import { dbEvents } from '@/lib/events'
 import { useCallback, useEffect, useState } from 'react'
 import type { CashSession } from '@/lib/types'
 import { getCurrentSession, openCashSession, closeCashSession, addCashMovement, getCashSummary } from '@/services/cash'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
 
 export function useCash() {
   const [currentSession, setCurrentSession] = useState<CashSession | null>(null)

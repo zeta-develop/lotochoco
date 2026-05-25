@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import { endOfDay, startOfDay } from 'date-fns'
 import type { Ticket, CartItem } from '@/lib/types'
 import { ticketsService } from '@/services/tickets'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
 
 function parseLocalDate(value?: string) {
   if (!value) return undefined

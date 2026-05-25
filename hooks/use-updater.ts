@@ -6,7 +6,7 @@ import { Dialog } from "@capacitor/dialog";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Capacitor } from "@capacitor/core";
-import { toast } from "sonner";
+import { toast } from '@/components/ui/use-toast';
 import packageJson from "../package.json";
 
 interface Release {

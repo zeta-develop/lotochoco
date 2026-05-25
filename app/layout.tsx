@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui/toaster';
 import { Updater } from '@/components/pos/updater';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { ErrorLoggerProvider } from '@/components/providers/error-logger-provider';
@@ -45,17 +45,7 @@ export default function RootLayout({
           <AuthProvider>
             <Updater />
                 {children}
-                <Toaster
-                  position="bottom-center"
-                  richColors
-                  expand={false}
-                  toastOptions={{
-                    duration: 2500,
-                    style: {
-                      marginBottom: 'env(safe-area-inset-bottom, 20px)',
-                    }
-                  }}
-                />
+                <Toaster />
 
           </AuthProvider>
         </ErrorLoggerProvider>

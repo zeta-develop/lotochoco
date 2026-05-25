@@ -5,7 +5,7 @@ import { dbEvents } from '@/lib/events'
 import { useCallback, useEffect, useState } from 'react'
 import type { Result } from '@/lib/types'
 import { resultsService } from '@/services/results'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/use-toast'
 
 export function useResults() {
   const [results, setResults] = useState<Result[]>([])

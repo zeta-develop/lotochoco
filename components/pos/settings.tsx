@@ -33,7 +33,7 @@ import {
   LogOut,
   UserCircle
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from '@/components/ui/use-toast';
 import { printerService as printService } from "@/services/printer";
 import { exportBackup as backupService } from "@/services/backup";
 
