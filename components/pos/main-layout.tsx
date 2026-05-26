@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { useSettings } from '@/hooks/use-settings'
-import { useCurrentSession } from '@/hooks/use-cash'
+import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
+import { useCurrentSession } from '@/features/cash/hooks/use-cash-manager'
+import { dbEvents } from '@/lib/events'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -17,7 +18,8 @@ import {
   Menu,
   X,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react'
 
 export type Module = 
@@ -51,8 +53,24 @@ const modules = [
 
 export function MainLayout({ children, activeModule, onModuleChange }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { settings } = useSettings()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { settings } = useSettingsManager()
   const { isOpen: isCashOpen } = useCurrentSession()
+
+  const handleGlobalRefresh = async () => {
+    setIsRefreshing(true)
+    // Emitir eventos para que todos los hooks activos refresquen sus datos
+    dbEvents.emit('tickets:changed')
+    dbEvents.emit('results:changed')
+    dbEvents.emit('winners:changed')
+    dbEvents.emit('games:changed')
+    dbEvents.emit('cash:changed')
+    dbEvents.emit('settings:changed')
+    
+    // Pequeña pausa para feedback visual
+    await new Promise(resolve => setTimeout(resolve, 800))
+    setIsRefreshing(false)
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -157,7 +175,16 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
           </h1>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="text-sm text-muted-foreground">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleGlobalRefresh}
+              disabled={isRefreshing}
+              className={cn("text-muted-foreground", isRefreshing && "animate-spin")}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <div className="text-sm text-muted-foreground hidden sm:block">
               {new Date().toLocaleDateString('es-NI', {
                 weekday: 'short',
                 day: 'numeric',
@@ -168,7 +195,12 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4">
+        <main className="flex-1 overflow-auto p-4 relative">
+          {isRefreshing && (
+            <div className="absolute top-0 left-0 right-0 h-1 bg-primary/20 overflow-hidden z-50">
+              <div className="h-full bg-primary animate-pulse w-full" />
+            </div>
+          )}
           {children}
         </main>
       </div>
@@ -177,7 +209,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
 }
 
 function VersionInfo() {
-  const { currentVersion, latestVersion, isUpdateAvailable } = require('@/hooks/use-updater').useUpdater();
+  const { currentVersion, latestVersion, isUpdateAvailable } = require('@/features/updater/hooks/use-updater').useUpdater();
 
   return (
     <div className="flex flex-col gap-1 mt-1">

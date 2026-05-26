@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/pos/main-layout";
-import { Dashboard } from "@/components/pos/dashboard";
-import { POSSale } from "@/components/pos/pos-sale";
-import { GamesManager } from "@/components/pos/games-manager";
-import { ResultsManager } from "@/components/pos/results-manager";
-import { WinnersManager } from "@/components/pos/winners-manager";
-import { Reports } from "@/components/pos/reports";
-import { CashRegister } from "@/components/pos/cash-register";
-import { LuckyPyramid } from "@/components/pos/lucky-pyramid";
-import { Settings } from "@/components/pos/settings";
+import { Dashboard } from "@/features/dashboard/components/Dashboard";
+import { SalesTerminal } from "@/features/sales/components/SalesTerminal";
+import { GamesManager } from "@/features/games/components/GamesManager";
+import { ResultsManager } from "@/features/results/components/ResultsManager";
+import { WinnersManager } from "@/features/winners/components/WinnersManager";
+import { ReportsManager } from "@/features/reports/components/ReportsManager";
+import { CashRegister } from "@/features/cash/components/CashRegister";
+import { LuckyPyramid } from "@/features/pyramid/components/lucky-pyramid";
+import { SettingsManager } from "@/features/settings/components/SettingsManager";
 import { useAuthStore } from "@/store/auth-store";
 import { LoginScreen } from "@/components/auth/login-screen";
 
@@ -31,24 +31,7 @@ export default function HomePage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    const initializeTheme = async () => {
-      try {
-        const { settingsService } = await import("@/services/settings");
-        const darkMode = await settingsService.get("darkMode");
-        
-        if (darkMode === "true") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
-      } catch (error) {
-        console.error("Error al cargar el tema:", error);
-      } finally {
-        setIsLoaded(true);
-      }
-    };
-
-    initializeTheme();
+    setIsLoaded(true);
   }, []);
 
   const renderModule = () => {
@@ -56,7 +39,7 @@ export default function HomePage() {
       case "dashboard":
         return <Dashboard onNavigate={setActiveModule} />;
       case "pos":
-        return <POSSale />;
+        return <SalesTerminal />;
       case "games":
         return <GamesManager />;
       case "results":
@@ -64,13 +47,12 @@ export default function HomePage() {
       case "winners":
         return <WinnersManager />;
       case "reports":
-        return <Reports onModuleChange={setActiveModule} />;
+        return <ReportsManager onModuleChange={setActiveModule} />;
       case "cash":
         return <CashRegister />;
       case "pyramid":
         return <LuckyPyramid />;
-      case "settings":
-        return <Settings />;
+      case 'settings': return <SettingsManager />;
       default:
         return <Dashboard onNavigate={setActiveModule} />;
     }

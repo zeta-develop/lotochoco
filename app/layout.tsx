@@ -2,9 +2,10 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster';
-import { Updater } from '@/components/pos/updater';
+import { Updater } from "@/features/updater/components/updater";
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { ErrorLoggerProvider } from '@/components/providers/error-logger-provider';
+import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -39,16 +40,22 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className="bg-background">
+    <html lang="es" suppressHydrationWarning>
       <body className="font-sans antialiased min-h-screen">
-        <ErrorLoggerProvider>
-          <AuthProvider>
-            <Updater />
-                {children}
-                <Toaster />
-
-          </AuthProvider>
-        </ErrorLoggerProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ErrorLoggerProvider>
+            <AuthProvider>
+              <Updater />
+              {children}
+              <Toaster />
+            </AuthProvider>
+          </ErrorLoggerProvider>
+        </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

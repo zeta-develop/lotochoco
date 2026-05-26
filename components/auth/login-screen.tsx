@@ -17,7 +17,7 @@ export function LoginScreen() {
       // On web it will redirect, on mobile we wait for the deep link
     } catch (error: any) {
       console.error("Login error:", error);
-      toast.error("Error al iniciar sesión", {
+      toast({ variant: "destructive", title: "Error al iniciar sesión",
         description: error.message || "Ha ocurrido un error inesperado",
       });
       setIsLoading(false);
