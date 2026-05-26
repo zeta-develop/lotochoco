@@ -46,6 +46,12 @@ export function useSettingsManager() {
   }, [refresh])
 
   const updateSettings = async (newSettings: Partial<Record<string, string>>) => {
+    // Actualización optimista local: garantiza que la app use inmediatamente
+    // la configuración (ej: ticketTemplate) aunque falle la escritura remota.
+    const current = useSettingsStore.getState().settings
+    const optimisticSettings = { ...current, ...newSettings } as Record<string, string>
+    setSettings(optimisticSettings)
+
     try {
       const remoteUpdates: Partial<Record<string, string>> = {}
       const localUpdates: Partial<Record<string, string>> = {}
@@ -63,10 +69,6 @@ export function useSettingsManager() {
         await settingsService.update(remoteUpdates)
       }
 
-      // 2. Actualizar locales solo en Zustand (persistencia local)
-      const finalSettings = { ...settings, ...newSettings }
-      setSettings(finalSettings as Record<string, string>)
-      
       // Si hubo cambios locales, disparar evento interno para refrescar UI
       if (Object.keys(localUpdates).length > 0) {
         dbEvents.emit('settings:changed')
