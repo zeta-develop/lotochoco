@@ -75,11 +75,3 @@ export function useWinnersManager() {
     markAsPaid
   }
 }
-
-export const usePendingWinners = () => {
-  const { winners, isLoading, refresh } = useWinnersManager()
-  
-  const pendingWinners = winners.filter(w => !w.isPaid)
-
-  return { winners: pendingWinners, isLoading, refresh }
-}

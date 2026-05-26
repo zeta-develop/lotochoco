@@ -4,26 +4,31 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useWinnersManager, usePendingWinners } from '../hooks/use-winners-manager'
+import { useWinnersManager } from '../hooks/use-winners-manager'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { DollarSign, Check, Clock, Trophy } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { useMemo } from 'react'
 
 export function WinnersManager() {
   const { winners: allWinners, isLoading, markAsPaid, refresh } = useWinnersManager()
-  const { winners: pendingWinners, refresh: refreshPending } = usePendingWinners()
   const { settings } = useSettingsManager()
 
   const currency = settings.currency || 'C$'
-  const paidWinners = allWinners.filter(w => w.isPaid)
+
+  // ⚡ Bolt Performance Optimization:
+  // We use useMemo to derive pending and paid winners from allWinners.
+  // Previously, this component used both useWinnersManager() and usePendingWinners() (which wrapped useWinnersManager).
+  // Calling both caused two duplicate database queries, two Supabase realtime subscriptions, and double state management on mount.
+  const pendingWinners = useMemo(() => allWinners.filter(w => !w.isPaid), [allWinners])
+  const paidWinners = useMemo(() => allWinners.filter(w => w.isPaid), [allWinners])
 
   const handleMarkAsPaid = async (winnerId: string) => {
     try {
       await markAsPaid(winnerId)
-      await refreshPending()
       toast({ title: 'Premio marcado como pagado' })
       await refresh()
     } catch (error) {
@@ -31,8 +36,10 @@ export function WinnersManager() {
     }
   }
 
-  const totalPending = pendingWinners.reduce((sum, w) => sum + w.prizeAmount, 0)
-  const totalPaid = paidWinners.reduce((sum, w) => sum + w.prizeAmount, 0)
+  // ⚡ Bolt Performance Optimization:
+  // Memoize the calculated totals to prevent redundant array reductions during re-renders.
+  const totalPending = useMemo(() => pendingWinners.reduce((sum, w) => sum + w.prizeAmount, 0), [pendingWinners])
+  const totalPaid = useMemo(() => paidWinners.reduce((sum, w) => sum + w.prizeAmount, 0), [paidWinners])
 
   if (isLoading) {
     return (
