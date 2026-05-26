@@ -105,6 +105,7 @@ export function GeneralSettingsTab() {
         .replace(/{{game}}/g, 'NICA 3PM')
         .replace(/{{number}}/g, '25')
         .replace(/{{amount}}/g, '100')
+        .replace(/{{prize}}/g, '7000')
     })
 
     return preview.split('\n').map((line, i) => {
@@ -321,7 +322,7 @@ export function GeneralSettingsTab() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {['businessName', 'ticketNumber', 'date', 'currency', 'total', 'ticketMessage'].map(v => (
+              {['businessName', 'ticketNumber', 'date', 'currency', 'total', 'ticketMessage', 'prize'].map(v => (
                 <Button 
                   key={v} 
                   variant="outline" 

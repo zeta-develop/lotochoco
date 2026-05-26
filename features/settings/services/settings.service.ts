@@ -19,7 +19,7 @@ FECHA: {{date}}
 JUEGO      NUM       MONTO
 --------------------------------
 {{#items}}
-{{game}}  {{number}}  {{currency}}{{amount}}
+{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}
 {{/items}}
 --------------------------------
 **TOTAL: {{currency}}{{total}}**

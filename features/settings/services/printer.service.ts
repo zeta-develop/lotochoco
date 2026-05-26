@@ -105,10 +105,14 @@ JUEGO      NUM       MONTO
       const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
       processed = processed.replace(itemsRegex, (match, content) => {
         return (ticket.items || []).map(item => {
+          const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
+          const prizePotential = item.amount * multiplier
+
           return content
             .replace(/{{game}}/g, (item as any).gameName || 'JUEGO')
             .replace(/{{number}}/g, item.number)
             .replace(/{{amount}}/g, item.amount.toFixed(0))
+            .replace(/{{prize}}/g, prizePotential.toFixed(0))
         }).join('\n')
       })
 
@@ -183,10 +187,14 @@ JUEGO      NUM       MONTO
       const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
       processed = processed.replace(itemsRegex, (match, content) => {
         return (ticket.items || []).map(item => {
+          const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
+          const prizePotential = item.amount * multiplier
+
           return content
             .replace(/{{game}}/g, (item as any).gameName || 'JUEGO')
             .replace(/{{number}}/g, item.number)
             .replace(/{{amount}}/g, item.amount.toFixed(0))
+            .replace(/{{prize}}/g, prizePotential.toFixed(0))
         }).join('\n')
       })
 
