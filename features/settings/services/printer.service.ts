@@ -65,13 +65,18 @@ class EscPosBuilder {
 export const printerService = {
   async printTicket(ticket: Ticket, settings: Record<string, string>): Promise<boolean> {
     try {
+      console.log('Iniciando impresión de ticket:', ticket.ticketNumber);
+      
       if (settings.printerType !== 'bluetooth') {
-        console.warn('Solo Bluetooth soportado nativamente por ahora')
+        console.warn('Solo Bluetooth soportado nativamente por ahora. Tipo actual:', settings.printerType)
         return true
       }
 
       const deviceId = settings.bluetoothDeviceId
-      if (!deviceId) throw new Error('No hay impresora configurada')
+      if (!deviceId) {
+        console.error('No hay ID de dispositivo Bluetooth configurado');
+        throw new Error('No hay impresora configurada')
+      }
 
       const template = settings.ticketTemplate || `# {{businessName}}
 RECIBO DE VENTA
@@ -93,23 +98,35 @@ JUEGO      NUM       MONTO
       const builder = new EscPosBuilder()
       builder.init()
 
+      // Validar fecha
+      let ticketDate = new Date();
+      try {
+        if (ticket.createdAt) {
+          ticketDate = new Date(ticket.createdAt);
+          if (isNaN(ticketDate.getTime())) ticketDate = new Date();
+        }
+      } catch (e) {
+        console.warn('Error al procesar fecha del ticket:', e);
+      }
+
       let processed = template
         .replace(/{{businessName}}/g, settings.businessName || 'LOTOCHOCO')
-        .replace(/{{ticketNumber}}/g, ticket.ticketNumber)
-        .replace(/{{date}}/g, format(new Date(ticket.createdAt), 'dd/MM/yyyy hh:mm a', { locale: es }))
+        .replace(/{{ticketNumber}}/g, ticket.ticketNumber || 'N/A')
+        .replace(/{{date}}/g, format(ticketDate, 'dd/MM/yyyy hh:mm a', { locale: es }))
         .replace(/{{currency}}/g, settings.currency || 'C$')
-        .replace(/{{total}}/g, ticket.totalAmount.toFixed(2))
+        .replace(/{{total}}/g, (ticket.totalAmount || 0).toFixed(2))
         .replace(/{{ticketMessage}}/g, settings.ticketMessage || '')
         .replace(/{{#if client}}.*?{{\/if}}/g, ticket.client ? `CLIENTE: ${ticket.client.toUpperCase()}` : '')
 
       const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
       processed = processed.replace(itemsRegex, (match, content) => {
         return (ticket.items || []).map(item => {
+          const gameName = (item as any).gameName || (item as any).game?.name || 'JUEGO'
           const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
           const prizePotential = item.amount * multiplier
 
           return content
-            .replace(/{{game}}/g, (item as any).gameName || 'JUEGO')
+            .replace(/{{game}}/g, gameName)
             .replace(/{{number}}/g, item.number)
             .replace(/{{amount}}/g, item.amount.toFixed(0))
             .replace(/{{prize}}/g, prizePotential.toFixed(0))
@@ -118,12 +135,12 @@ JUEGO      NUM       MONTO
 
       const lines = processed.split('\n')
       for (const line of lines) {
-        if (line.startsWith('# ')) {
-          builder.alignCenter().bold(true).text(line.replace('# ', '')).bold(false).newline()
-        } else if (line.startsWith('## ')) {
-          builder.alignCenter().bold(true).text(line.replace('## ', '')).bold(false).newline()
+        const trimmedLine = line.trim()
+        if (trimmedLine.startsWith('# ')) {
+          builder.alignCenter().bold(true).text(trimmedLine.replace('# ', '')).bold(false).newline()
+        } else if (trimmedLine.startsWith('## ')) {
+          builder.alignCenter().bold(true).text(trimmedLine.replace('## ', '')).bold(false).newline()
         } else {
-          // Procesar negritas en la línea
           const parts = line.split('**')
           for (let i = 0; i < parts.length; i++) {
             if (i % 2 === 1) builder.bold(true)
@@ -134,15 +151,23 @@ JUEGO      NUM       MONTO
         }
       }
       
-      builder.feed(3)
+      builder.feed(4)
 
+      console.log('Conectando a impresora:', deviceId);
       await bluetoothService.connect(deviceId)
+      
+      console.log('Enviando datos...');
       await bluetoothService.writeData(deviceId, builder.build())
+      
+      // Esperar un momento antes de desconectar para asegurar que el buffer se procese
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       await bluetoothService.disconnect(deviceId)
+      console.log('Impresión finalizada con éxito');
       
       return true
     } catch (error) {
-      console.error('Error al imprimir ticket:', error)
+      console.error('Error crítico al imprimir ticket:', error)
       return false
     }
   },

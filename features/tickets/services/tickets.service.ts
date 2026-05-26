@@ -20,5 +20,9 @@ export const ticketsService = {
 
   async cancelTicket(id: string, reason: string) {
     return ticketsRepository.cancelTicket(id, reason)
+  },
+
+  async deleteTicket(id: string) {
+    return ticketsRepository.deleteTicket(id)
   }
 }

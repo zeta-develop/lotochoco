@@ -95,6 +95,19 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
     }
   }
 
+  const deleteTicket = async (id: string) => {
+    try {
+      await ticketsService.deleteTicket(id)
+      toast({ title: 'Ticket eliminado definitivamente' })
+      await refresh()
+      return true
+    } catch (error) {
+      console.error('Error al eliminar ticket:', error)
+      toast({ variant: 'destructive', title: 'Error al eliminar el ticket' })
+      throw error
+    }
+  }
+
   const getTicketByNumber = async (ticketNumber: string) => {
     try {
       return await ticketsService.searchTicket(ticketNumber)
@@ -115,6 +128,7 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
     isSubmitting,
     createTicket,
     cancelTicket,
+    deleteTicket,
     getTicketByNumber,
     refresh
   }

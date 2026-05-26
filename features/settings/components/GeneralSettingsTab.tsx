@@ -19,7 +19,18 @@ import { useTheme } from 'next-themes'
 
 export function GeneralSettingsTab() {
   const { settings, updateSettings } = useSettingsManager()
-  const { isOwner, role, company } = useCompany()
+  const { isOwner, role, company, updateCompanyName } = useCompany()
+
+  const handleUpdateBusinessName = async (name: string) => {
+    // 1. Actualizar en settings (local/Supabase settings)
+    await updateSettings({ businessName: name })
+    
+    // 2. Sincronizar con la tabla companies
+    if (isOwner) {
+      await updateCompanyName(name)
+    }
+  }
+
   const { theme, setTheme } = useTheme()
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [activeEditorTab, setActiveTab] = useState<'info' | 'template'>('info')
@@ -173,7 +184,7 @@ export function GeneralSettingsTab() {
               <Input
                 id="businessName"
                 value={settings.businessName || ''}
-                onChange={(e) => updateSettings({ businessName: e.target.value })}
+                onChange={(e) => handleUpdateBusinessName(e.target.value)}
                 placeholder="Ej. Lotería La Fortuna"
                 disabled={!isOwner}
                 className={!isOwner ? "bg-muted opacity-80" : "bg-background/50 border-white/10 focus:border-primary/50 transition-all"}

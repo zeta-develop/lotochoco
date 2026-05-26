@@ -122,4 +122,37 @@ export async function cancelTicket(id: string, reason: string): Promise<void> {
   dbEvents.emit('cash:changed')
 }
 
-export const ticketsRepository = { createTicket, getTicketById, searchTicket, getTickets, cancelTicket }
+export async function deleteTicket(id: string): Promise<void> {
+  const ticket = await getTicketById(id)
+  if (!ticket) throw new Error('Ticket no encontrado')
+
+  // Si el ticket está activo, debemos ajustar el total de ventas antes de borrar
+  if (ticket.status === 'active') {
+    const { data: openSession } = await supabase.from('cash_sessions').select('id, sales_total').eq('status', 'open').limit(1).single()
+    if (openSession) {
+      const now = new Date().toISOString()
+      await supabase.from('cash_sessions')
+        .update({ sales_total: Math.max(0, openSession.sales_total - ticket.totalAmount), updated_at: now })
+        .eq('id', openSession.id)
+      
+      // Registrar movimiento de ajuste si es necesario
+      await supabase.from('cash_movements').insert({
+        id: generateId(),
+        cash_session_id: openSession.id,
+        type: 'expense',
+        amount: ticket.totalAmount,
+        description: `Eliminación Ticket ${ticket.ticketNumber}`,
+        created_at: now,
+        updated_at: now
+      })
+    }
+  }
+
+  const { error } = await supabase.from('tickets').delete().eq('id', id)
+  if (error) throw error
+
+  dbEvents.emit('tickets:changed')
+  dbEvents.emit('cash:changed')
+}
+
+export const ticketsRepository = { createTicket, getTicketById, searchTicket, getTickets, cancelTicket, deleteTicket }

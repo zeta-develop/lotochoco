@@ -37,7 +37,8 @@ import {
   ArrowDownRight,
   ChevronRight,
   History,
-  LayoutDashboard
+  LayoutDashboard,
+  Trash2
 } from 'lucide-react'
 import { 
   AreaChart, 
@@ -57,7 +58,7 @@ import { cn } from '@/lib/utils'
 import { printerService } from '@/features/settings/services/printer.service'
 import type { Ticket as TicketType, TicketItem, Game } from '@/lib/types'
 import { toast } from '@/components/ui/use-toast'
-import { usePOSStore } from '@/store/pos-store'
+import { useSalesStore } from '@/features/sales/store/sales.store'
 import type { Module } from '@/components/pos/main-layout'
 import { useMemo } from 'react'
 
@@ -71,7 +72,7 @@ interface ReportsProps {
 
 export function ReportsManager({ onModuleChange }: ReportsProps) {
   const { settings } = useSettingsManager()
-  const { addToCart, clearCart, setSelectedGame, setSelectedSchedule } = usePOSStore()
+  const { addToCart, clearCart, setSelectedGame, setSelectedSchedule, setCart } = useSalesStore()
   const currency = settings.currency || 'C$'
   
   const [dateRange, setDateRange] = useState({
@@ -93,7 +94,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
   
   const { cancellations } = useCancellationsReport(dateRange.start)
   
-  const { tickets: reportTickets } = useTickets(reportOptions)
+  const { tickets: reportTickets, deleteTicket } = useTickets(reportOptions)
   
   // Computar datos del gráfico localmente a partir de los tickets cargados
   const chartData = useMemo(() => {
@@ -143,6 +144,20 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
     else { setFoundTicket(null); setTicketNotFound(true) }
   }
 
+  const handleDeleteTicket = async (ticket: TicketWithDetails) => {
+    if (!confirm(`¿Estás completamente seguro de ELIMINAR el ticket ${ticket.ticketNumber}? Esta acción es irreversible y ajustará los totales de caja.`)) {
+      return
+    }
+
+    try {
+      await deleteTicket(ticket.id)
+      setIsTicketDialogOpen(false)
+      if (foundTicket?.id === ticket.id) setFoundTicket(null)
+    } catch (error) {
+      // Error ya manejado por el hook
+    }
+  }
+
   const openTicketDetails = (ticket: TicketWithDetails) => {
     setSelectedTicket(ticket)
     setIsTicketDialogOpen(true)
@@ -168,12 +183,18 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
       return
     }
 
-    clearCart()
+    // Preparar los items para el carrito
+    const newCartItems = ticketItems.map((item) => {
+      const scheduleObj = item.game.schedules?.find(s => 
+        s.id === item.schedule || 
+        s.name === item.schedule || 
+        s.time === item.schedule ||
+        s.time.startsWith(item.schedule) ||
+        item.schedule.startsWith(s.time)
+      )
 
-    ticketItems.forEach((item) => {
-      const scheduleObj = item.game.schedules?.find(s => s.id === item.schedule || s.name === item.schedule || s.time === item.schedule)
-
-      addToCart({
+      return {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         gameId: item.game.id,
         gameName: item.game.name,
         number: item.number,
@@ -182,18 +203,31 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
         scheduleName: scheduleObj ? scheduleObj.name : item.schedule,
         multiplier: item.game.multiplier ?? 70,
         client: ticket.client || undefined,
-      })
+      }
     })
+
+    // Limpiar y establecer el nuevo carrito de forma atómica
+    clearCart()
+    setCart(newCartItems)
 
     const firstItem = ticketItems[0]
     if (firstItem?.game) {
       setSelectedGame(firstItem.game)
-      const scheduleObj = firstItem.game.schedules?.find(s => s.id === firstItem.schedule || s.name === firstItem.schedule || s.time === firstItem.schedule)
+      const scheduleObj = firstItem.game.schedules?.find(s => 
+        s.id === firstItem.schedule || 
+        s.name === firstItem.schedule || 
+        s.time === firstItem.schedule ||
+        s.time.startsWith(firstItem.schedule) ||
+        firstItem.schedule.startsWith(s.time)
+      )
       setSelectedSchedule(scheduleObj || null)
     }
 
-    onModuleChange('pos')
-    toast({ title: `Ticket ${ticket.ticketNumber} cargado para repetir` })
+    // Pequeño retardo para asegurar que el estado se procese antes de cambiar de vista
+    setTimeout(() => {
+      onModuleChange('pos')
+      toast({ title: `Ticket ${ticket.ticketNumber} cargado para repetir` })
+    }, 50)
   }
 
   return (
@@ -612,20 +646,31 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
 
       {/* Ticket Details Dialog */}
       <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
-        <DialogContent className="max-w-lg rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="max-w-lg rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
           <DialogTitle className="sr-only">Detalles del ticket</DialogTitle>
           {selectedTicket && (
-            <div className="animate-in zoom-in-95 duration-200">
-              <div className="bg-primary p-6 text-white">
+            <>
+              <div className="bg-primary p-6 text-white shrink-0">
                 <div className="flex justify-between items-start mb-4">
-                  <Badge className="bg-white/20 text-white border-none text-[10px] font-black rounded-full uppercase px-3">{selectedTicket.status}</Badge>
+                  <div className="flex gap-2">
+                    <Badge className="bg-white/20 text-white border-none text-[10px] font-black rounded-full uppercase px-3">{selectedTicket.status}</Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-white hover:bg-red-500 hover:text-white rounded-full" 
+                      onClick={() => handleDeleteTicket(selectedTicket)}
+                      title="Eliminar ticket definitivamente"
+                    >
+                      <Trash2 className="h-3 w-3"/>
+                    </Button>
+                  </div>
                   <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-full" onClick={() => setIsTicketDialogOpen(false)}><X className="h-5 w-5"/></Button>
                 </div>
                 <h3 className="text-2xl font-black font-mono tracking-tighter mb-1">{selectedTicket.ticketNumber}</h3>
                 <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{format(new Date(selectedTicket.createdAt), "PPPP hh:mm a", { locale: es })}</p>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 <div className="space-y-3">
                   <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Detalle de Jugadas</h4>
                   <div className="grid gap-2">
@@ -645,28 +690,28 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
                     ))}
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-4 border-t border-dashed space-y-4">
-                   <div className="flex justify-between items-center">
-                     <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Monto Total</span>
-                     <span className="text-3xl font-black text-primary tracking-tighter">{currency}{selectedTicket.totalAmount.toFixed(2)}</span>
-                   </div>
+              <div className="p-6 bg-background border-t border-dashed shrink-0 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Monto Total</span>
+                  <span className="text-3xl font-black text-primary tracking-tighter">{currency}{selectedTicket.totalAmount.toFixed(2)}</span>
+                </div>
 
-                   <div className="grid grid-cols-3 gap-3">
-                      <Button variant="outline" className="h-12 rounded-2xl font-black uppercase text-[10px] border-2" onClick={() => handleSendTicketImage(selectedTicket)}>
-                        Compartir
-                      </Button>
-                      <Button variant="secondary" className="h-12 rounded-2xl font-black uppercase text-[10px]" onClick={() => handleRepeatTicket(selectedTicket)}>
-                        Repetir
-                      </Button>
-                      <Button className="h-12 rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-primary/20" onClick={() => handleReprintTicket(selectedTicket)}>
-                        <Printer className="h-4 w-4 mr-2" />
-                        Imprimir
-                      </Button>
-                   </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <Button variant="outline" className="h-12 rounded-2xl font-black uppercase text-[10px] border-2" onClick={() => handleSendTicketImage(selectedTicket)}>
+                    Compartir
+                  </Button>
+                  <Button variant="secondary" className="h-12 rounded-2xl font-black uppercase text-[10px]" onClick={() => handleRepeatTicket(selectedTicket)}>
+                    Repetir
+                  </Button>
+                  <Button className="h-12 rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-primary/20" onClick={() => handleReprintTicket(selectedTicket)}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Imprimir
+                  </Button>
                 </div>
               </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>

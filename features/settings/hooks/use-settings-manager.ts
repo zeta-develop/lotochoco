@@ -5,6 +5,8 @@ import { dbEvents } from '@/lib/events'
 import { useSettingsStore } from '../store/settings.store'
 import { settingsService } from '../services/settings.service'
 
+const LOCAL_KEYS = ['bluetoothDeviceId', 'bluetoothDeviceName', 'printerAddress', 'printerType', 'theme']
+
 export function useSettingsManager() {
   const { settings, setSettings } = useSettingsStore()
   const [isLoading, setIsLoading] = useState(true)
@@ -14,8 +16,18 @@ export function useSettingsManager() {
     try {
       setError(null)
       const remoteSettings = await settingsService.getAll()
-      // Mezclar: Mantener lo que el usuario tiene localmente (impresora) y actualizar lo de la empresa
-      setSettings({ ...useSettingsStore.getState().settings, ...remoteSettings })
+      
+      const currentLocalSettings = useSettingsStore.getState().settings
+      const merged = { ...currentLocalSettings, ...remoteSettings }
+      
+      // Asegurar que los ajustes locales del dispositivo NO sean sobrescritos por la DB remota
+      LOCAL_KEYS.forEach(key => {
+        if (currentLocalSettings[key]) {
+          merged[key] = currentLocalSettings[key]
+        }
+      })
+
+      setSettings(merged)
     } catch (error) {
       console.error('Error al cargar ajustes:', error)
       setError(error instanceof Error ? error : new Error('Error al cargar ajustes'))
@@ -35,9 +47,6 @@ export function useSettingsManager() {
 
   const updateSettings = async (newSettings: Partial<Record<string, string>>) => {
     try {
-      // Definir qué ajustes son estrictamente locales del dispositivo
-      const LOCAL_KEYS = ['bluetoothDeviceId', 'bluetoothDeviceName', 'printerAddress', 'printerType', 'theme']
-      
       const remoteUpdates: Partial<Record<string, string>> = {}
       const localUpdates: Partial<Record<string, string>> = {}
 
