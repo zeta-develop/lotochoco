@@ -34,6 +34,14 @@ class EscPosBuilder {
     return this
   }
 
+  size(width: number, height: number) {
+    let n = 0;
+    if (width === 2) n |= 0x10;
+    if (height === 2) n |= 0x01;
+    this.buffer.push(0x1D, 0x21, n)
+    return this
+  }
+
   text(str: string) {
     const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     for (let i = 0; i < cleanStr.length; i++) {
@@ -137,10 +145,11 @@ JUEGO      NUM       MONTO
       for (const line of lines) {
         const trimmedLine = line.trim()
         if (trimmedLine.startsWith('# ')) {
-          builder.alignCenter().bold(true).text(trimmedLine.replace('# ', '')).bold(false).newline()
+          builder.alignCenter().size(2, 2).bold(true).text(trimmedLine.replace('# ', '')).size(1, 1).bold(false).newline()
         } else if (trimmedLine.startsWith('## ')) {
-          builder.alignCenter().bold(true).text(trimmedLine.replace('## ', '')).bold(false).newline()
+          builder.alignCenter().size(1, 1).bold(true).text(trimmedLine.replace('## ', '')).bold(false).newline()
         } else {
+          builder.alignLeft().size(1, 1)
           const parts = line.split('**')
           for (let i = 0; i < parts.length; i++) {
             if (i % 2 === 1) builder.bold(true)

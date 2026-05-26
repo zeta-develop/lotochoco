@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS public.companies (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS public.company_users (
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS public.games (
   multiplier REAL DEFAULT 70,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key),
   deleted_at TIMESTAMPTZ
 );
 
@@ -78,6 +80,7 @@ CREATE TABLE IF NOT EXISTS public.draw_schedules (
   is_active INTEGER DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key),
   deleted_at TIMESTAMPTZ
 );
 
@@ -91,6 +94,7 @@ CREATE TABLE IF NOT EXISTS public.results (
   is_processed INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key),
   deleted_at TIMESTAMPTZ
 );
 
@@ -105,7 +109,8 @@ CREATE TABLE IF NOT EXISTS public.tickets (
   cancel_reason TEXT,
   cancelled_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- TICKET ITEMS
@@ -118,7 +123,8 @@ CREATE TABLE IF NOT EXISTS public.ticket_items (
   amount REAL,
   schedule TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- WINNERS
@@ -131,7 +137,8 @@ CREATE TABLE IF NOT EXISTS public.winners (
   is_paid INTEGER DEFAULT 0,
   paid_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- CASH SESSIONS
@@ -147,7 +154,8 @@ CREATE TABLE IF NOT EXISTS public.cash_sessions (
   closed_at TIMESTAMPTZ,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- CASH MOVEMENTS
@@ -159,17 +167,19 @@ CREATE TABLE IF NOT EXISTS public.cash_movements (
   amount REAL,
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- SETTINGS
 CREATE TABLE IF NOT EXISTS public.settings (
   id TEXT PRIMARY KEY,
   company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  key TEXT UNIQUE,
+  key TEXT,
   value TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- CANCELLATION LOGS
@@ -182,7 +192,8 @@ CREATE TABLE IF NOT EXISTS public.cancellation_logs (
   reason TEXT,
   items_json TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- APP ERROR LOGS
@@ -198,7 +209,8 @@ CREATE TABLE IF NOT EXISTS public.app_error_logs (
   user_agent TEXT,
   platform TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_id, key)
 );
 
 -- ==========================================

@@ -14,10 +14,24 @@ export const settingsRepository = {
   },
 
   async update(key: string, value: string): Promise<void> {
+    // Buscar la compañía actual del usuario
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) throw new Error('No user authenticated')
+
+    const { data: memberships } = await supabase
+      .from('company_users')
+      .select('company_id')
+      .eq('user_id', userData.user.id)
+      .limit(1)
+
+    const companyId = memberships?.[0]?.company_id
+    if (!companyId) throw new Error('User has no company')
+
     // Usar maybeSingle para evitar errores si el ajuste no existe aún
     const { data: existing, error: fetchError } = await supabase
       .from('settings')
       .select('id')
+      .eq('company_id', companyId)
       .eq('key', key)
       .maybeSingle()
 
@@ -31,7 +45,8 @@ export const settingsRepository = {
     const { error } = await supabase
       .from('settings')
       .upsert({ 
-        id, 
+        id,
+        company_id: companyId,
         key, 
         value, 
         updated_at: new Date().toISOString() 
