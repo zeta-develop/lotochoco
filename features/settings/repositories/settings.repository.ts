@@ -14,11 +14,32 @@ export const settingsRepository = {
   },
 
   async update(key: string, value: string): Promise<void> {
-    const { data: existing } = await supabase.from('settings').select('id').eq('key', key).single()
+    // Usar maybeSingle para evitar errores si el ajuste no existe aún
+    const { data: existing, error: fetchError } = await supabase
+      .from('settings')
+      .select('id')
+      .eq('key', key)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error('Error al buscar ajuste existente:', fetchError)
+    }
+
     const id = existing?.id || generateId()
+    
+    // Al hacer upsert por ID, evitamos problemas con las restricciones de nombres de columna en onConflict
     const { error } = await supabase
       .from('settings')
-      .upsert({ id, key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-    if (error) throw error
+      .upsert({ 
+        id, 
+        key, 
+        value, 
+        updated_at: new Date().toISOString() 
+      })
+      
+    if (error) {
+      console.error(`Error al guardar ajuste ${key}:`, error)
+      throw error
+    }
   }
 }
