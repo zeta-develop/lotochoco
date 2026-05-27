@@ -18,6 +18,9 @@ interface SalesState {
   selectedSchedule: DrawSchedule | null
   setSelectedSchedule: (schedule: DrawSchedule | null) => void
   
+  isLocked: boolean
+  setLocked: (locked: boolean) => void
+  
   getCartTotal: () => number
   getCartCount: () => number
 }
@@ -42,13 +45,16 @@ export const useSalesStore = create<SalesState>()(
           cart: state.cart.map((item) => ({ ...item, ...updates }))
         }))
       },
-      clearCart: () => set({ cart: [] }),
+      clearCart: () => set({ cart: [], isLocked: false }),
       setCart: (cart) => set({ cart }),
       
       selectedGame: null,
       setSelectedGame: (game) => set({ selectedGame: game }),
       selectedSchedule: null,
       setSelectedSchedule: (schedule) => set({ selectedSchedule: schedule }),
+      
+      isLocked: false,
+      setLocked: (locked) => set({ isLocked: locked }),
       
       getCartTotal: () => {
         return get().cart.reduce((sum, item) => sum + item.amount, 0)

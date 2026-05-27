@@ -166,10 +166,11 @@ CREATE TABLE IF NOT EXISTS public.cash_movements (
 CREATE TABLE IF NOT EXISTS public.settings (
   id TEXT PRIMARY KEY,
   company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  key TEXT UNIQUE,
+  key TEXT,
   value TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (company_id, key)
 );
 
 -- CANCELLATION LOGS

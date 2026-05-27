@@ -21,14 +21,36 @@ export function GeneralSettingsTab() {
   const { settings, updateSettings } = useSettingsManager()
   const { isOwner, role, company, updateCompanyName } = useCompany()
 
-  const handleUpdateBusinessName = async (name: string) => {
-    // 1. Actualizar en settings (local/Supabase settings)
-    await updateSettings({ businessName: name })
-    
-    // 2. Sincronizar con la tabla companies
-    if (isOwner) {
-      await updateCompanyName(name)
+  // Estado local para evitar latencia al escribir
+  const [localBusinessName, setLocalBusinessName] = useState(settings.businessName || '')
+
+  // Sincronizar estado local cuando cargan los ajustes
+  useEffect(() => {
+    if (settings.businessName !== undefined) {
+      setLocalBusinessName(settings.businessName)
     }
+  }, [settings.businessName])
+
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleUpdateBusinessName = (name: string) => {
+    setLocalBusinessName(name)
+    
+    // Limpiar timer previo
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // Programar nuevo guardado
+    debounceTimerRef.current = setTimeout(async () => {
+      // 1. Actualizar en settings (local/Supabase settings)
+      await updateSettings({ businessName: name })
+      
+      // 2. Sincronizar con la tabla companies
+      if (isOwner) {
+        await updateCompanyName(name)
+      }
+    }, 1000) // 1 segundo de calma
   }
 
   const { theme, setTheme } = useTheme()
@@ -84,7 +106,7 @@ export function GeneralSettingsTab() {
   const resetTemplate = async () => {
     if (!confirm('¿Estás seguro de restablecer el diseño? Perderás los cambios actuales.')) return
 
-    const defaultTemplate = `# {{businessName}}\nRECIBO DE VENTA\n--------------------------------\nTICKET: #{{ticketNumber}}\nFECHA: {{date}}\n{{#if client}}CLIENTE: {{client}}{{/if}}\n--------------------------------\nJUEGO      NUM       MONTO\n--------------------------------\n{{#items}}\n{{game}}  {{number}}  {{currency}}{{amount}}\n{{/items}}\n--------------------------------\n**TOTAL: {{currency}}{{total}}**\n\n{{ticketMessage}}\n*** CONSERVE ESTE TICKET ***`
+    const defaultTemplate = `# {{businessName}}\nRECIBO DE VENTA\n--------------------------------\nTICKET: #{{ticketNumber}}\nFECHA: {{date}}\n{{#if client}}CLIENTE: {{client}}{{/if}}\n--------------------------------\nJUEGO      NUM       MONTO\n--------------------------------\n{{#items}}\n{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}\n{{/items}}\n--------------------------------\n**TOTAL: {{currency}}{{total}}**\n\n{{ticketMessage}}\n*** CONSERVE ESTE TICKET ***`
     
     setLocalTemplate(defaultTemplate)
     await updateSettings({ ticketTemplate: defaultTemplate })
@@ -102,21 +124,33 @@ export function GeneralSettingsTab() {
     // Simular valores para la previsualización
     let preview = template
       .replace(/{{businessName}}/g, settings.businessName || 'MI NEGOCIO')
-      .replace(/{{ticketNumber}}/g, '000123')
-      .replace(/{{date}}/g, format(new Date(), 'dd/MM/yyyy hh:mm a'))
+      .replace(/{{ticketNumber}}/g, '2100305')
+      .replace(/{{date}}/g, format(new Date(), 'dd-MM-yyyy hh:mm:ss a'))
+      .replace(/{{gameName}}/g, 'Diaria')
+      .replace(/{{scheduleName}}/g, '9:00 PM')
+      .replace(/{{vendorName}}/g, 'Yamileth')
+      .replace(/{{terminalName}}/g, '= J081 =')
       .replace(/{{currency}}/g, settings.currency || 'C$')
-      .replace(/{{total}}/g, '100.00')
+      .replace(/{{total}}/g, '30')
       .replace(/{{ticketMessage}}/g, settings.ticketMessage || 'Gracias por su compra')
-      .replace(/{{#if client}}.*?{{\/if}}/g, 'CLIENTE: JUAN PEREZ')
+      .replace(/{{#if client}}([\s\S]*?){{\/if}}/g, '* **Cliente:** Anielka')
+      .replace(/{{client}}/g, 'Anielka')
     
     // Simular items
     const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
     preview = preview.replace(itemsRegex, (match, content) => {
       return content
-        .replace(/{{game}}/g, 'NICA 3PM')
-        .replace(/{{number}}/g, '25')
-        .replace(/{{amount}}/g, '100')
-        .replace(/{{prize}}/g, '7000')
+        .replace(/{{game}}/g, 'Diaria')
+        .replace(/{{number}}/g, '08')
+        .replace(/{{amount}}/g, '15')
+        .replace(/{{prize}}/g, '1200')
+        .replace(/{{currency}}/g, settings.currency || 'C$') +
+        content
+        .replace(/{{game}}/g, 'Diaria')
+        .replace(/{{number}}/g, '80')
+        .replace(/{{amount}}/g, '15')
+        .replace(/{{prize}}/g, '1200')
+        .replace(/{{currency}}/g, settings.currency || 'C$')
     })
 
     return preview.split('\n').map((line, i) => {
@@ -183,7 +217,7 @@ export function GeneralSettingsTab() {
               <Label htmlFor="businessName">Nombre del Negocio</Label>
               <Input
                 id="businessName"
-                value={settings.businessName || ''}
+                value={localBusinessName}
                 onChange={(e) => handleUpdateBusinessName(e.target.value)}
                 placeholder="Ej. Lotería La Fortuna"
                 disabled={!isOwner}
@@ -332,21 +366,60 @@ export function GeneralSettingsTab() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {['businessName', 'ticketNumber', 'date', 'currency', 'total', 'ticketMessage', 'prize'].map(v => (
-                <Button 
-                  key={v} 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-7 text-[10px] px-2 font-mono bg-muted/50"
-                  onClick={() => insertVariable(v)}
-                >
-                  {`{{${v}}}`}
-                </Button>
-              ))}
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">General</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['businessName', 'date', 'currency', 'terminalName'].map(v => (
+                    <Button 
+                      key={v} 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 text-[10px] px-2 font-mono bg-muted/50 border-white/5 hover:bg-primary/20 hover:border-primary/30 transition-all"
+                      onClick={() => insertVariable(v)}
+                    >
+                      {`{{${v}}}`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Venta / Ticket</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['ticketNumber', 'gameName', 'scheduleName', 'client', 'vendorName', 'total', 'ticketMessage'].map(v => (
+                    <Button 
+                      key={v} 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 text-[10px] px-2 font-mono bg-muted/50 border-white/5 hover:bg-primary/20 hover:border-primary/30 transition-all"
+                      onClick={() => insertVariable(v)}
+                    >
+                      {`{{${v}}}`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Dentro de {`{{#items}}`}</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['game', 'number', 'amount', 'prize'].map(v => (
+                    <Button 
+                      key={v} 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 text-[10px] px-2 font-mono bg-primary/5 border-primary/10 hover:bg-primary/20 hover:border-primary/30 transition-all"
+                      onClick={() => insertVariable(v)}
+                    >
+                      {`{{${v}}}`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <Textarea
                 id="ticketTemplate"
                 value={localTemplate}

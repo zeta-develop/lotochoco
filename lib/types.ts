@@ -171,3 +171,5 @@ export type SettingKey =
   | 'ticketFontSize'
   | 'ticketFontType'
   | 'ticketDensity'
+  | 'ticketTemplate'
+  | 'ticketWidth'

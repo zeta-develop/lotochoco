@@ -10,22 +10,27 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   ticketDensity: '1',
   ticketWidth: '58mm',
   ticketTemplate: `# {{businessName}}
-RECIBO DE VENTA
+**Juego:** {{gameName}}
+**Venta No:** {{ticketNumber}}
+**Fecha:** {{date}}
+**Sorteo:** {{scheduleName}}
+
+{{#if client}}* **Cliente:** {{client}}{{/if}}
+* **Vendedor:** {{vendorName}}
+* **Puesto:** {{terminalName}}
+
 --------------------------------
-TICKET: #{{ticketNumber}}
-FECHA: {{date}}
-{{#if client}}CLIENTE: {{client}}{{/if}}
---------------------------------
-JUEGO      NUM       MONTO
+APUESTA    MONTO    PREMIO
 --------------------------------
 {{#items}}
-{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}
+{{number}}         {{amount}}       {{prize}}
 {{/items}}
 --------------------------------
-**TOTAL: {{currency}}{{total}}**
+**Total: {{currency}}{{total}}**
 
-{{ticketMessage}}
-*** CONSERVE ESTE TICKET ***`
+*Válido para 1 sorteo*
+*Por favor revise su ticket*
+*Premio válido por 7 días*`
 }
 
 export const settingsService = {

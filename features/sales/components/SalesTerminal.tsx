@@ -55,6 +55,8 @@ export function SalesTerminal() {
     updateAllCartItems,
     setSelectedSchedule,
     setCart,
+    isLocked,
+    setLocked,
   } = useSalesStore()
 
   const [number, setNumber] = useState('')
@@ -123,6 +125,7 @@ export function SalesTerminal() {
       client: client || undefined,
     })
 
+    setLocked(true) // Bloquear selectores al añadir manualmente
     setNumber('')
     toast({ title: 'Jugada agregada' })
   }
@@ -176,6 +179,13 @@ export function SalesTerminal() {
     if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
+  const handleRemoveFromCart = (id: string) => {
+    removeFromCart(id)
+    if (cart.length <= 1) {
+      setLocked(false)
+    }
+  }
+
   const currency = settings?.currency || 'C$'
 
   if (gamesLoading) {
@@ -223,12 +233,13 @@ export function SalesTerminal() {
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Juego</label>
                   <select
-                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none"
+                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     value={selectedGame?.id || ''}
                     onChange={(event) => {
                       const game = games.find((item) => item.id === event.target.value)
                       if (game) handleGameSelect(game as any)
                     }}
+                    disabled={isLocked}
                   >
                     {games.map((game) => (
                       <option key={game.id} value={game.id}>
@@ -241,16 +252,17 @@ export function SalesTerminal() {
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Horario</label>
                   <select
-                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none disabled:opacity-50"
+                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     value={selectedSchedule?.id || ''}
                     onChange={(event) => {
                       const schedule = selectedGame?.schedules?.find((item) => item.id === event.target.value)
                       setSelectedSchedule(schedule || null)
                       if (schedule) {
                         updateAllCartItems({ schedule: schedule.time, scheduleName: schedule.name })
+                        toast({ title: `Horario actualizado a ${schedule.name}` })
                       }
                     }}
-                    disabled={!selectedGame || !selectedGame.schedules?.length}
+                    disabled={!selectedGame || !selectedGame.schedules?.length || isLocked}
                   >
                     {selectedGame?.schedules?.length ? (
                       selectedGame.schedules.map((schedule) => (
@@ -349,7 +361,7 @@ export function SalesTerminal() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => handleRemoveFromCart(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

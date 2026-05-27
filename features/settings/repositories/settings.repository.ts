@@ -14,24 +14,43 @@ export const settingsRepository = {
   },
 
   async update(key: string, value: string): Promise<void> {
-    const now = new Date().toISOString()
+    try {
+      // 1. Obtener el ID de la empresa del usuario actual de forma segura.
+      const { data: membership, error: membershipError } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .limit(1)
+        .maybeSingle()
 
-    // Guardar por `key` para que el mismo ajuste se actualice en vez de intentar crear una fila nueva por cada cambio.
-    // Antes se hacía upsert sin `onConflict`, lo cual usaba el PK `id` y podía provocar filas duplicadas/errores de unicidad en `key`.
-    const { error } = await supabase
-      .from('settings')
-      .upsert({ 
-        id: generateId(),
-        key, 
-        value, 
-        updated_at: now
-      }, {
-        onConflict: 'key'
-      })
-      
-    if (error) {
-      console.error(`Error al guardar ajuste ${key}:`, error)
-      throw error
+      if (membershipError) throw membershipError
+      const company_id = membership?.company_id
+
+      if (!company_id) {
+        console.warn('No se pudo determinar la empresa para guardar el ajuste:', key)
+        return
+      }
+
+      // 2. Usar upsert atómico con onConflict. 
+      // Esto es seguro contra condiciones de carrera (race conditions).
+      // Omitimos el 'id' para que la DB use el existente o genere uno nuevo vía DEFAULT.
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ 
+          company_id, 
+          key, 
+          value, 
+          updated_at: new Date().toISOString() 
+        }, { 
+          onConflict: 'company_id,key' 
+        })
+        
+      if (error) {
+        console.error(`Error de base de datos al guardar ajuste ${key}:`, error)
+        throw new Error(`Error al guardar ajuste: ${error.message}`)
+      }
+    } catch (err) {
+      console.error('Error crítico en settingsRepository.update:', err)
+      throw err
     }
   }
 }

@@ -83,11 +83,12 @@ RECIBO DE VENTA
 --------------------------------
 TICKET: #{{ticketNumber}}
 FECHA: {{date}}
+{{#if client}}CLIENTE: {{client}}{{/if}}
 --------------------------------
 JUEGO      NUM       MONTO
 --------------------------------
 {{#items}}
-{{game}}  {{number}}  {{currency}}{{amount}}
+{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}
 {{/items}}
 --------------------------------
 **TOTAL: {{currency}}{{total}}**
@@ -109,27 +110,43 @@ JUEGO      NUM       MONTO
         console.warn('Error al procesar fecha del ticket:', e);
       }
 
+      const currency = settings.currency || 'C$'
+      const ticketMessage = settings.ticketMessage || '¡Gracias por su compra!'
+      const businessName = settings.businessName || 'LOTOCHOCO'
+      
+      // Obtener info del primer item para el encabezado si es necesario
+      const firstItem = ticket.items?.[0] as any
+      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
+      const scheduleName = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+
       let processed = template
-        .replace(/{{businessName}}/g, settings.businessName || 'LOTOCHOCO')
+        .replace(/{{businessName}}/g, businessName)
         .replace(/{{ticketNumber}}/g, ticket.ticketNumber || 'N/A')
-        .replace(/{{date}}/g, format(ticketDate, 'dd/MM/yyyy hh:mm a', { locale: es }))
-        .replace(/{{currency}}/g, settings.currency || 'C$')
-        .replace(/{{total}}/g, (ticket.totalAmount || 0).toFixed(2))
-        .replace(/{{ticketMessage}}/g, settings.ticketMessage || '')
-        .replace(/{{#if client}}.*?{{\/if}}/g, ticket.client ? `CLIENTE: ${ticket.client.toUpperCase()}` : '')
+        .replace(/{{date}}/g, format(ticketDate, 'dd-MM-yyyy hh:mm:ss a', { locale: es }))
+        .replace(/{{gameName}}/g, gameName)
+        .replace(/{{scheduleName}}/g, scheduleName)
+        .replace(/{{vendorName}}/g, 'Yamileth') // TODO: Vincular con usuario real
+        .replace(/{{terminalName}}/g, '= J081 =') // TODO: Vincular con terminal real
+        .replace(/{{currency}}/g, currency)
+        .replace(/{{total}}/g, (ticket.totalAmount || 0).toFixed(0))
+        .replace(/{{ticketMessage}}/g, ticketMessage)
+        .replace(/{{#if client}}([\s\S]*?){{\/if}}/g, ticket.client ? `$1`.replace(/{{client}}/g, ticket.client.toUpperCase()) : '')
+        .replace(/{{client}}/g, ticket.client ? ticket.client.toUpperCase() : '')
 
       const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
       processed = processed.replace(itemsRegex, (match, content) => {
         return (ticket.items || []).map(item => {
-          const gameName = (item as any).gameName || (item as any).game?.name || 'JUEGO'
           const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
           const prizePotential = item.amount * multiplier
 
+          // Formateo de columnas simple (suponiendo 32 chars de ancho)
+          // APUESTA(10) MONTO(10) PREMIO(12)
           return content
-            .replace(/{{game}}/g, gameName)
-            .replace(/{{number}}/g, item.number)
-            .replace(/{{amount}}/g, item.amount.toFixed(0))
-            .replace(/{{prize}}/g, prizePotential.toFixed(0))
+            .replace(/{{game}}/g, (item as any).gameName || (item as any).game?.name || 'Diaria')
+            .replace(/{{number}}/g, item.number.padEnd(8))
+            .replace(/{{amount}}/g, item.amount.toFixed(0).padEnd(8))
+            .replace(/{{prize}}/g, prizePotential.toFixed(0).padStart(8))
+            .replace(/{{currency}}/g, currency)
         }).join('\n')
       })
 
@@ -188,11 +205,12 @@ RECIBO DE VENTA
 --------------------------------
 TICKET: #{{ticketNumber}}
 FECHA: {{date}}
+{{#if client}}CLIENTE: {{client}}{{/if}}
 --------------------------------
 JUEGO      NUM       MONTO
 --------------------------------
 {{#items}}
-{{game}}  {{number}}  {{currency}}{{amount}}
+{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}
 {{/items}}
 --------------------------------
 **TOTAL: {{currency}}{{total}}**
@@ -200,26 +218,42 @@ JUEGO      NUM       MONTO
 {{ticketMessage}}
 *** CONSERVE ESTE TICKET ***`
 
+      const currency = settings.currency || 'C$'
+      const ticketMessage = settings.ticketMessage || '¡Gracias por su compra!'
+      const businessName = settings.businessName || 'LOTOCHOCO'
+
+      // Obtener info del primer item para el encabezado
+      const firstItem = ticket.items?.[0] as any
+      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
+      const scheduleName = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+
       let processed = template
-        .replace(/{{businessName}}/g, settings.businessName || 'LOTOCHOCO')
+        .replace(/{{businessName}}/g, businessName)
         .replace(/{{ticketNumber}}/g, ticket.ticketNumber)
-        .replace(/{{date}}/g, format(new Date(ticket.createdAt), 'dd/MM/yyyy hh:mm a', { locale: es }))
-        .replace(/{{currency}}/g, settings.currency || 'C$')
-        .replace(/{{total}}/g, ticket.totalAmount.toFixed(2))
-        .replace(/{{ticketMessage}}/g, settings.ticketMessage || '')
-        .replace(/{{#if client}}.*?{{\/if}}/g, ticket.client ? `CLIENTE: ${ticket.client.toUpperCase()}` : '')
+        .replace(/{{date}}/g, format(new Date(ticket.createdAt), 'dd-MM-yyyy hh:mm:ss a', { locale: es }))
+        .replace(/{{gameName}}/g, gameName)
+        .replace(/{{scheduleName}}/g, scheduleName)
+        .replace(/{{vendorName}}/g, 'Yamileth')
+        .replace(/{{terminalName}}/g, '= J081 =')
+        .replace(/{{currency}}/g, currency)
+        .replace(/{{total}}/g, ticket.totalAmount.toFixed(0))
+        .replace(/{{ticketMessage}}/g, ticketMessage)
+        .replace(/{{#if client}}([\s\S]*?){{\/if}}/g, ticket.client ? `$1`.replace(/{{client}}/g, ticket.client.toUpperCase()) : '')
+        .replace(/{{client}}/g, ticket.client ? ticket.client.toUpperCase() : '')
 
       const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
       processed = processed.replace(itemsRegex, (match, content) => {
         return (ticket.items || []).map(item => {
+          const gameName = (item as any).gameName || (item as any).game?.name || 'Diaria'
           const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
           const prizePotential = item.amount * multiplier
 
           return content
-            .replace(/{{game}}/g, (item as any).gameName || 'JUEGO')
-            .replace(/{{number}}/g, item.number)
-            .replace(/{{amount}}/g, item.amount.toFixed(0))
-            .replace(/{{prize}}/g, prizePotential.toFixed(0))
+            .replace(/{{game}}/g, gameName)
+            .replace(/{{number}}/g, item.number.padEnd(8))
+            .replace(/{{amount}}/g, item.amount.toFixed(0).padEnd(8))
+            .replace(/{{prize}}/g, prizePotential.toFixed(0).padStart(8))
+            .replace(/{{currency}}/g, currency)
         }).join('\n')
       })
 

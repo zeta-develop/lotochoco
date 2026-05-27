@@ -207,7 +207,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
     })
 
     // Limpiar y establecer el nuevo carrito de forma atómica
-    clearCart()
+    clearCart() // Esto pone isLocked en false
     setCart(newCartItems)
 
     const firstItem = ticketItems[0]
