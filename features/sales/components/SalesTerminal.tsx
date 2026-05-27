@@ -362,6 +362,7 @@ export function SalesTerminal() {
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
                         onClick={() => handleRemoveFromCart(item.id)}
+                        aria-label="Eliminar del ticket"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
