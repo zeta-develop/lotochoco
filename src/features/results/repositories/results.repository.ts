@@ -82,13 +82,22 @@ export const resultsRepository = {
   },
 
   async findMatchingTicketsForProcessing(gameId: string, scheduleTime: string, scheduleName: string, winningNumber: string) {
-    const { data: matchingItems } = await supabase
+    const sTime = (scheduleTime || '').trim()
+    const sName = (scheduleName || '').trim()
+    const wNum = (winningNumber || '').trim()
+
+    const { data: matchingItems, error } = await supabase
       .from('ticket_items')
       .select(`*, tickets!inner(status)`)
       .eq('game_id', gameId)
-      .eq('number', winningNumber)
+      .eq('number', wNum)
       .eq('tickets.status', 'active')
-      .or(`schedule.eq."${scheduleTime}",schedule.eq."${scheduleName}"`)
+      .or(`schedule.ilike."${sTime}",schedule.ilike."${sName}"`)
+    
+    if (error) {
+      console.error("Error finding matching tickets:", error)
+      return []
+    }
     
     return matchingItems || []
   },

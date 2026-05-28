@@ -22,17 +22,20 @@ export const resultsService = {
     if (!result) throw new Error("Resultado no encontrado")
     if (result.isProcessed) throw new Error("El resultado ya fue procesado")
 
+    console.log(`Buscando ganadores para: Juego=${result.gameId}, Hora=${result.schedule?.time}, Nombre=${result.schedule?.name}, Numero=${result.winningNumber}`)
     const matchingItems = await resultsRepository.findMatchingTicketsForProcessing(
       result.gameId, 
       result.schedule?.time || '', 
       result.schedule?.name || '',
       result.winningNumber
     )
+    console.log(`Tickets encontrados: ${matchingItems?.length || 0}`)
 
     let winnersCount = 0
     if (matchingItems && matchingItems.length > 0) {
       const winnersToInsert = matchingItems.map((item: any) => ({
         ticket_id: item.ticket_id,
+        company_id: item.company_id,
         result_id: id,
         prize_amount: item.amount * (result.game?.multiplier || 70)
       }))

@@ -47,6 +47,7 @@ export const winnersRepository = {
   async insertWinners(winners: any[]): Promise<void> {
     const winnersToInsert = winners.map((item) => ({
       id: generateId(),
+      company_id: item.company_id,
       ticket_id: item.ticket_id,
       result_id: item.result_id,
       prize_amount: item.prize_amount,
