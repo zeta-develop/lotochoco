@@ -145,7 +145,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
   }
 
   const handleDeleteTicket = async (ticket: TicketWithDetails) => {
-    if (!confirm(`¿Estás completamente seguro de ELIMINAR el ticket ${ticket.ticketNumber}? Esta acción es irreversible y ajustará los totales de caja.`)) {
+    if (!confirm(`¿Estás seguro de ANULAR el ticket ${ticket.ticketNumber}? Esta acción ajustará los totales de caja.`)) {
       return
     }
 
@@ -659,7 +659,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
                       size="icon" 
                       className="h-6 w-6 text-white hover:bg-red-500 hover:text-white rounded-full" 
                       onClick={() => handleDeleteTicket(selectedTicket)}
-                      title="Eliminar ticket definitivamente"
+                      title="Anular ticket"
                     >
                       <Trash2 className="h-3 w-3"/>
                     </Button>

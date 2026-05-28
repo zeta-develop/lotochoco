@@ -11,6 +11,34 @@ function mapWinner(row: any): Winner {
     ticket: row.tickets ? {
       id: row.tickets.id, ticketNumber: row.tickets.ticket_number, totalAmount: row.tickets.total_amount,
       status: row.tickets.status as any, createdAt: new Date(row.tickets.created_at), updatedAt: new Date(row.tickets.updated_at), client: row.tickets.client
+    } : undefined,
+    result: row.results ? {
+      id: row.results.id,
+      gameId: row.results.game_id,
+      scheduleId: row.results.schedule_id,
+      winningNumber: row.results.winning_number,
+      drawDate: new Date(row.results.draw_date),
+      isProcessed: row.results.is_processed === 1 || row.results.is_processed === true,
+      createdAt: new Date(row.results.created_at),
+      updatedAt: new Date(row.results.updated_at),
+      game: row.results.games ? {
+        id: row.results.games.id,
+        name: row.results.games.name,
+        isActive: row.results.games.is_active === 1 || row.results.games.is_active === true,
+        digitCount: row.results.games.digit_count,
+        multiplier: row.results.games.multiplier,
+        createdAt: new Date(row.results.games.created_at),
+        updatedAt: new Date(row.results.games.updated_at)
+      } : undefined,
+      schedule: row.results.draw_schedules ? {
+        id: row.results.draw_schedules.id,
+        gameId: row.results.draw_schedules.game_id,
+        name: row.results.draw_schedules.name,
+        time: row.results.draw_schedules.time,
+        isActive: row.results.draw_schedules.is_active === 1 || row.results.draw_schedules.is_active === true,
+        createdAt: new Date(row.results.draw_schedules.created_at),
+        updatedAt: new Date(row.results.draw_schedules.updated_at)
+      } : undefined
     } : undefined
   }
 }
@@ -32,7 +60,7 @@ export const winnersRepository = {
   },
 
   async getWinners(options?: { isPaid?: boolean }): Promise<Winner[]> {
-    let query = supabase.from('winners').select(`*, tickets (*)`).order('created_at', { ascending: false })
+    let query = supabase.from('winners').select(`*, tickets (*), results (*, games (*), draw_schedules (*))`).order('created_at', { ascending: false })
     if (options?.isPaid !== undefined) {
       query = query.eq('is_paid', options.isPaid ? 1 : 0)
     }

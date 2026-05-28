@@ -24,7 +24,8 @@ export const resultsService = {
 
     const matchingItems = await resultsRepository.findMatchingTicketsForProcessing(
       result.gameId, 
-      result.schedule?.name || '', 
+      result.schedule?.time || '', 
+      result.schedule?.name || '',
       result.winningNumber
     )
 

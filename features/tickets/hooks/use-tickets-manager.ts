@@ -98,12 +98,12 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
   const deleteTicket = async (id: string) => {
     try {
       await ticketsService.deleteTicket(id)
-      toast({ title: 'Ticket eliminado definitivamente' })
+      toast({ title: 'Ticket anulado exitosamente' })
       await refresh()
       return true
     } catch (error) {
-      console.error('Error al eliminar ticket:', error)
-      toast({ variant: 'destructive', title: 'Error al eliminar el ticket' })
+      console.error('Error al anular ticket:', error)
+      toast({ variant: 'destructive', title: 'Error al anular el ticket' })
       throw error
     }
   }

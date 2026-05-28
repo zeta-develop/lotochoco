@@ -14,7 +14,8 @@ function mapResult(row: any): Result {
     updatedAt: new Date(row.updated_at),
     deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
     game: row.games ? mapGameFromJoin(row.games) : undefined,
-    schedule: row.draw_schedules ? mapScheduleFromJoin(row.draw_schedules) : undefined
+    schedule: row.draw_schedules ? mapScheduleFromJoin(row.draw_schedules) : undefined,
+    winners: row.winners || []
   }
 }
 
@@ -36,7 +37,7 @@ function mapScheduleFromJoin(row: any): DrawSchedule {
 
 export const resultsRepository = {
   async getResults(options?: { startDate?: Date; endDate?: Date; gameId?: string; limit?: number; }): Promise<Result[]> {
-    let query = supabase.from('results').select(`*, games (*), draw_schedules (*)`).is('deleted_at', null).order('draw_date', { ascending: false })
+    let query = supabase.from('results').select(`*, games (*), draw_schedules (*), winners (*)`).is('deleted_at', null).order('draw_date', { ascending: false })
     if (options?.startDate) { query = query.gte('draw_date', options.startDate.toISOString()) }
     if (options?.endDate) { query = query.lte('draw_date', options.endDate.toISOString()) }
     if (options?.gameId) { query = query.eq('game_id', options.gameId) }
@@ -48,7 +49,7 @@ export const resultsRepository = {
   },
 
   async getResultById(id: string): Promise<Result | null> {
-    const { data: result, error } = await supabase.from('results').select(`*, games (*), draw_schedules (*)`).eq('id', id).single()
+    const { data: result, error } = await supabase.from('results').select(`*, games (*), draw_schedules (*), winners (*)`).eq('id', id).single()
     if (error || !result) return null
     return mapResult(result)
   },
@@ -75,14 +76,14 @@ export const resultsRepository = {
     if (error) throw error
   },
 
-  async findMatchingTicketsForProcessing(gameId: string, scheduleName: string, winningNumber: string) {
+  async findMatchingTicketsForProcessing(gameId: string, scheduleTime: string, scheduleName: string, winningNumber: string) {
     const { data: matchingItems } = await supabase
       .from('ticket_items')
       .select(`*, tickets!inner(status)`)
       .eq('game_id', gameId)
-      .eq('schedule', scheduleName)
       .eq('number', winningNumber)
       .eq('tickets.status', 'active')
+      .or(`schedule.eq."${scheduleTime}",schedule.eq."${scheduleName}"`)
     
     return matchingItems || []
   },

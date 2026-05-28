@@ -3,35 +3,8 @@
 -- Fase 9.1: Limpieza Total y Reconfiguración de Esquema
 -- ==============================================================================
 
--- 0. LIMPIEZA TOTAL (DROP TABLES)
--- El orden es crítico debido a las claves foráneas. CASCADE elimina políticas y dependencias.
-
--- Borrado explícito de políticas que suelen causar bloqueos circulares
-DROP POLICY IF EXISTS "Users can view their own companies" ON public.companies;
-DROP POLICY IF EXISTS "Users can update their own companies" ON public.companies;
-DROP POLICY IF EXISTS "Users can view their own memberships" ON public.company_users;
-DROP POLICY IF EXISTS "Users can create their own memberships" ON public.company_users;
-DROP POLICY IF EXISTS "Users can update their own memberships" ON public.company_users;
-
-DROP TABLE IF EXISTS public.app_error_logs CASCADE;
-DROP TABLE IF EXISTS public.cancellation_logs CASCADE;
-DROP TABLE IF EXISTS public.settings CASCADE;
-DROP TABLE IF EXISTS public.cash_movements CASCADE;
-DROP TABLE IF EXISTS public.cash_sessions CASCADE;
-DROP TABLE IF EXISTS public.winners CASCADE;
-DROP TABLE IF EXISTS public.ticket_items CASCADE;
-DROP TABLE IF EXISTS public.tickets CASCADE;
-DROP TABLE IF EXISTS public.results CASCADE;
-DROP TABLE IF EXISTS public.draw_schedules CASCADE;
-DROP TABLE IF EXISTS public.games CASCADE;
-DROP TABLE IF EXISTS public.company_users CASCADE;
-DROP TABLE IF EXISTS public.companies CASCADE;
-
--- Limpiar funciones y triggers antiguos si existen
-DROP FUNCTION IF EXISTS set_default_company_id() CASCADE;
-DROP FUNCTION IF EXISTS set_company_owner_membership() CASCADE;
-
--- Habilitar extensión UUID
+-- 0. CONFIGURACIÓN INICIAL
+-- Habilitar extensión UUID si no existe
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==========================================
@@ -237,6 +210,10 @@ CREATE INDEX IF NOT EXISTS idx_cancellation_logs_ticket_id ON public.cancellatio
 
 CREATE INDEX IF NOT EXISTS idx_app_error_logs_created_at ON public.app_error_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_app_error_logs_company_id ON public.app_error_logs(company_id);
+
+-- Índices compuestos para optimización de búsqueda de ganadores y estadísticas
+CREATE INDEX IF NOT EXISTS idx_ticket_items_winner_search ON public.ticket_items(game_id, number, schedule);
+CREATE INDEX IF NOT EXISTS idx_results_game_winning_number ON public.results(game_id, winning_number);
 
 
 -- ==========================================
@@ -455,7 +432,149 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS trigger_set_company_owner ON public.companies;
-CREATE TRIGGER trigger_set_company_owner
-  AFTER INSERT ON public.companies
-  FOR EACH ROW EXECUTE FUNCTION set_company_owner_membership();
+-- ==========================================
+-- 7. INDEXES (Optimization)
+-- ==========================================
+CREATE INDEX IF NOT EXISTS idx_tickets_company_id ON public.tickets(company_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON public.tickets(created_at);
+CREATE INDEX IF NOT EXISTS idx_ticket_items_ticket_id ON public.ticket_items(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_results_game_id ON public.results(game_id);
+CREATE INDEX IF NOT EXISTS idx_results_draw_date ON public.results(draw_date);
+CREATE INDEX IF NOT EXISTS idx_winners_ticket_id ON public.winners(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_cash_sessions_company_id ON public.cash_sessions(company_id);
+-- ==========================================
+-- 8. RPC FUNCTIONS (Performance)
+-- ==========================================
+
+-- Función para obtener reporte de ventas optimizado
+CREATE OR REPLACE FUNCTION public.get_sales_report(p_start_date TIMESTAMPTZ, p_end_date TIMESTAMPTZ)
+RETURNS TABLE (
+  total_sales NUMERIC,
+  total_tickets BIGINT,
+  total_prizes NUMERIC,
+  total_paid NUMERIC,
+  pending_prizes NUMERIC,
+  net_profit NUMERIC
+) AS $$
+DECLARE
+    v_company_id UUID;
+BEGIN
+    -- Obtener la compañía del usuario actual (seguridad)
+    SELECT company_id INTO v_company_id FROM public.company_users WHERE user_id = auth.uid() LIMIT 1;
+
+    RETURN QUERY
+    WITH sales_data AS (
+        SELECT 
+            COALESCE(SUM(total_amount), 0) as sales,
+            COUNT(*) as tickets
+        FROM public.tickets
+        WHERE company_id = v_company_id
+          AND status = 'active'
+          AND created_at BETWEEN p_start_date AND p_end_date
+    ),
+    winner_data AS (
+        SELECT 
+            COALESCE(SUM(prize_amount), 0) as prizes,
+            COALESCE(SUM(CASE WHEN is_paid = true OR is_paid::int = 1 THEN prize_amount ELSE 0 END), 0) as paid
+        FROM public.winners
+        WHERE company_id = v_company_id
+          AND created_at BETWEEN p_start_date AND p_end_date
+    )
+    SELECT 
+        s.sales::NUMERIC,
+        s.tickets::BIGINT,
+        w.prizes::NUMERIC,
+        w.paid::NUMERIC,
+        (w.prizes - w.paid)::NUMERIC as pending,
+        (s.sales - w.prizes)::NUMERIC as profit
+    FROM sales_data s, winner_data w;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función para obtener estadísticas por juego optimizadas
+CREATE OR REPLACE FUNCTION public.get_game_stats(p_start_date TIMESTAMPTZ, p_end_date TIMESTAMPTZ)
+RETURNS TABLE (
+  game_id TEXT,
+  game_name TEXT,
+  total_sales NUMERIC,
+  total_prizes NUMERIC,
+  net_profit NUMERIC
+) AS $$
+DECLARE
+    v_company_id UUID;
+BEGIN
+    SELECT company_id INTO v_company_id FROM public.company_users WHERE user_id = auth.uid() LIMIT 1;
+
+    RETURN QUERY
+    WITH game_sales AS (
+        SELECT 
+            ti.game_id, 
+            MAX(g.name) as game_name,
+            SUM(ti.amount) as sales
+        FROM public.ticket_items ti
+        JOIN public.games g ON ti.game_id = g.id
+        WHERE ti.company_id = v_company_id
+          AND ti.created_at BETWEEN p_start_date AND p_end_date
+        GROUP BY ti.game_id
+    ),
+    game_prizes AS (
+        SELECT 
+            r.game_id, 
+            SUM(w.prize_amount) as prizes
+        FROM public.winners w
+        JOIN public.results r ON w.result_id = r.id
+        WHERE w.company_id = v_company_id
+          AND w.created_at BETWEEN p_start_date AND p_end_date
+        GROUP BY r.game_id
+    )
+    SELECT 
+        gs.game_id::TEXT,
+        gs.game_name::TEXT,
+        gs.sales::NUMERIC,
+        COALESCE(gp.prizes, 0)::NUMERIC as total_prizes,
+        (gs.sales - COALESCE(gp.prizes, 0))::NUMERIC as net_profit
+    FROM game_sales gs
+    LEFT JOIN game_prizes gp ON gs.game_id = gp.game_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función para obtener números calientes y fríos optimizada
+CREATE OR REPLACE FUNCTION public.get_hot_cold_numbers(p_game_id TEXT, p_limit INT DEFAULT 5)
+RETURNS TABLE (
+  number TEXT,
+  frequency BIGINT,
+  type TEXT
+) AS $$
+DECLARE
+    v_company_id UUID;
+BEGIN
+    SELECT company_id INTO v_company_id FROM public.company_users WHERE user_id = auth.uid() LIMIT 1;
+
+    RETURN QUERY
+    WITH counts AS (
+        SELECT winning_number, COUNT(*) as freq
+        FROM public.results
+        WHERE (p_game_id IS NULL OR game_id = p_game_id)
+          -- Aquí podrías añadir un filtro por compañía si la tabla results tuviera company_id
+          -- Por ahora asumimos que results están ligados a games de la compañía
+          AND game_id IN (SELECT id FROM public.games WHERE company_id = v_company_id)
+        GROUP BY winning_number
+    ),
+    hot AS (
+        SELECT winning_number, freq, 'hot'::TEXT as t
+        FROM counts
+        ORDER BY freq DESC, winning_number ASC
+        LIMIT p_limit
+    ),
+    cold AS (
+        SELECT winning_number, freq, 'cold'::TEXT as t
+        FROM counts
+        ORDER BY freq ASC, winning_number ASC
+        LIMIT p_limit
+    )
+    SELECT * FROM hot
+    UNION ALL
+    SELECT * FROM cold;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
