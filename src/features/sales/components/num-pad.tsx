@@ -50,6 +50,7 @@ export const NumPad = memo(function NumPad({ value, onChange, onConfirm, maxLeng
         size="lg"
         className="h-14 text-muted-foreground"
         onClick={handleClear}
+        aria-label="Limpiar"
       >
         C
       </Button>
@@ -68,6 +69,7 @@ export const NumPad = memo(function NumPad({ value, onChange, onConfirm, maxLeng
         size="lg"
         className="h-14"
         onClick={handleDelete}
+        aria-label="Borrar último dígito"
       >
         <Delete className="h-5 w-5" />
       </Button>
@@ -138,6 +140,7 @@ export const AmountPad = memo(function AmountPad({ value, onChange, quickAmounts
           size="lg"
           className="h-12"
           onClick={() => onChange(Math.floor(value / 10))}
+          aria-label="Borrar último dígito"
         >
           <Delete className="h-5 w-5" />
         </Button>
@@ -147,6 +150,7 @@ export const AmountPad = memo(function AmountPad({ value, onChange, quickAmounts
           size="lg"
           className="h-12 text-muted-foreground"
           onClick={() => onChange(0)}
+          aria-label="Limpiar"
         >
           C
         </Button>
