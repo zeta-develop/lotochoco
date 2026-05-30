@@ -40,3 +40,11 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+
+## 2024-05-30 - [Memoizing callback in React.memo components]
+**Learning:** React.memo() won't prevent unnecessary re-renders if one of the props passed to the component is a callback that isn't memoized. If the parent component renders frequently (e.g. from input typing) and passes down an unmemoized callback, all memoized children will re-render anyway.
+**Action:** Always wrap callback functions in `useCallback` when passing them down to components wrapped in `React.memo()`.
+
+## 2024-05-30 - [Build Failure on Validation]
+**Learning:** The project's existing codebase has broken module resolution (`@/components/auth/auth-provider` etc. cannot be found) out of the box, as noted in the initial memory context.
+**Action:** These errors are preexisting and not caused by the current performance change.
