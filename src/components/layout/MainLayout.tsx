@@ -164,6 +164,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Open menu"
             className="lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
@@ -178,6 +179,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
             <Button 
               variant="ghost" 
               size="icon" 
+              aria-label="Refresh data"
               onClick={handleGlobalRefresh}
               disabled={isRefreshing}
               className={cn("text-muted-foreground", isRefreshing && "animate-spin")}
