@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '../hooks/use-dashboard';
@@ -26,7 +27,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const currency = settings.currency || 'C$';
 
-  const stats = [
+  // ⚡ Bolt: Memoize the stats array to prevent unnecessary re-creations and re-renders
+  // of the top-level stats cards when non-stat data (like todayResults or pendingWinners) updates.
+  // Impact: Reduces object creation overhead on every render when dashboard refreshes via polling/events.
+  const stats = useMemo(() => [
     {
       title: 'Ventas del Día',
       value: `${currency}${(data.stats.totalSales || 0).toLocaleString()}`,
@@ -59,7 +63,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       titleColor: data.stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600',
       valColor: data.stats.netProfit >= 0 ? 'text-green-700' : 'text-red-700'
     }
-  ];
+  ], [currency, data.stats.totalSales, data.stats.totalTickets, data.stats.pendingPrizes, data.stats.netProfit]);
 
   if (isLoading) {
     return (
