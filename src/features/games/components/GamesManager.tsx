@@ -299,6 +299,7 @@ export function GamesManager() {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeSchedule(index)}
+                        aria-label="Eliminar horario"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

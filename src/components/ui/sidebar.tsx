@@ -271,6 +271,7 @@ function SidebarTrigger({
         onClick?.(event)
         toggleSidebar()
       }}
+      aria-label="Alternar barra lateral"
       {...props}
     >
       <PanelLeftIcon />
