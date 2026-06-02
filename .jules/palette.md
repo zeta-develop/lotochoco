@@ -1,0 +1,3 @@
+## 2024-05-24 - Missing ARIA Labels on Icon Buttons Pattern
+**Learning:** The codebase heavily uses a custom `<Button size="icon">` and `<Button size="icon-sm">` component for icon-only buttons (like the `X` close, `Menu` open, and `RefreshCw` update buttons in MainLayout.tsx), but these instances often lack `aria-label` attributes across different modules, making them inaccessible to screen readers.
+**Action:** Always verify that icon-only buttons (`size="icon"` or `size="icon-sm"`) have descriptive `aria-label` attributes in Spanish (e.g., "Cerrar menú", "Abrir menú", "Actualizar") when auditing or refactoring components.
