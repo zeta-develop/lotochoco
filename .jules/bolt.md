@@ -40,3 +40,8 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+
+### 2024-05-23
+- **Title:** Redundant Hooks and Re-renders in WinnersManager
+- **Learning:** Calling a hook (`usePendingWinners`) that internally calls another hook (`useWinnersManager`) which is already being used in the same component causes duplicate API fetches, duplicate real-time Supabase subscriptions, and triggers redundant state updates/re-renders.
+- **Action:** Removed `usePendingWinners` and derived its state (`pendingWinners`, `paidWinners`) locally within `WinnersManager` using a single `useMemo` block that iterates over `allWinners` (which also calculates their totals in the same loop O(n) instead of separate `filter` and `reduce` loops O(4n)).

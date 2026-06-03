@@ -4,35 +4,54 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useWinnersManager, usePendingWinners } from '../hooks/use-winners-manager'
+import { useWinnersManager } from '../hooks/use-winners-manager'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { DollarSign, Check, Clock, Trophy } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { useMemo } from 'react'
 
 export function WinnersManager() {
   const { winners: allWinners, isLoading, markAsPaid, refresh } = useWinnersManager()
-  const { winners: pendingWinners, refresh: refreshPending } = usePendingWinners()
   const { settings } = useSettingsManager()
 
   const currency = settings.currency || 'C$'
-  const paidWinners = allWinners.filter(w => w.isPaid)
+
+  const { pendingWinners, paidWinners, totalPending, totalPaid } = useMemo(() => {
+    const pending = []
+    const paid = []
+    let tPending = 0
+    let tPaid = 0
+
+    for (const w of allWinners) {
+      if (w.isPaid) {
+        paid.push(w)
+        tPaid += w.prizeAmount
+      } else {
+        pending.push(w)
+        tPending += w.prizeAmount
+      }
+    }
+
+    return {
+      pendingWinners: pending,
+      paidWinners: paid,
+      totalPending: tPending,
+      totalPaid: tPaid
+    }
+  }, [allWinners])
 
   const handleMarkAsPaid = async (winnerId: string) => {
     try {
       await markAsPaid(winnerId)
-      await refreshPending()
       toast({ title: 'Premio marcado como pagado' })
       await refresh()
     } catch (error) {
       toast({ variant: 'destructive', title: error instanceof Error ? error.message : 'Error al marcar como pagado' })
     }
   }
-
-  const totalPending = pendingWinners.reduce((sum, w) => sum + w.prizeAmount, 0)
-  const totalPaid = paidWinners.reduce((sum, w) => sum + w.prizeAmount, 0)
 
   if (isLoading) {
     return (
