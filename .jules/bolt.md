@@ -40,3 +40,6 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+## 2026-05-23 - Memoization Breaking via Inline Functions
+**Learning:** In the `SalesTerminal` component, a `CartItemRow` was correctly wrapped in `React.memo()`, but the parent component passed a newly created inline function `handleRemoveFromCart` as a prop on every render. This completely defeated the memoization, causing full re-renders of the cart list on any parent state change (like typing in an input).
+**Action:** When using `React.memo()` on child components in this codebase, always ensure that any function props passed from the parent are wrapped in `useCallback`. This is especially critical for list items.

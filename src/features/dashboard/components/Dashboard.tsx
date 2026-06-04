@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '../hooks/use-dashboard';
@@ -26,7 +27,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const currency = settings.currency || 'C$';
 
-  const stats = [
+  // ⚡ Bolt: Memoize stats array to prevent recreation on every render
+  const stats = useMemo(() => [
     {
       title: 'Ventas del Día',
       value: `${currency}${(data.stats.totalSales || 0).toLocaleString()}`,
@@ -59,7 +61,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       titleColor: data.stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600',
       valColor: data.stats.netProfit >= 0 ? 'text-green-700' : 'text-red-700'
     }
-  ];
+  ], [currency, data.stats]);
 
   if (isLoading) {
     return (

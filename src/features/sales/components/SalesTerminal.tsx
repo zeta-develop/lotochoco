@@ -36,7 +36,7 @@ import {
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
 import { toast } from '@/components/ui/use-toast'
-import React, { memo } from 'react'
+import React, { memo, useCallback } from 'react'
 
 // Componente memoizado para las filas del carrito para optimizar el rendimiento
 const CartItemRow = memo(({ 
@@ -230,12 +230,13 @@ export function SalesTerminal() {
     if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
-  const handleRemoveFromCart = (id: string) => {
+  // ⚡ Bolt: Memoize callback to prevent breaking React.memo on CartItemRow
+  const handleRemoveFromCart = useCallback((id: string) => {
     removeFromCart(id)
     if (cart.length <= 1) {
       setLocked(false)
     }
-  }
+  }, [removeFromCart, cart.length, setLocked])
 
   const currency = settings?.currency || 'C$'
 
