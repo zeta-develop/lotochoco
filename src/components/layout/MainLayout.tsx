@@ -102,6 +102,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
             size="icon-sm" 
             className="lg:hidden"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Cerrar menú"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -166,6 +167,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
             size="icon"
             className="lg:hidden"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menú"
           >
             <Menu className="h-5 w-5" />
           </Button>
@@ -181,6 +183,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
               onClick={handleGlobalRefresh}
               disabled={isRefreshing}
               className={cn("text-muted-foreground", isRefreshing && "animate-spin")}
+              aria-label="Actualizar datos"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
