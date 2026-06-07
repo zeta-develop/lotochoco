@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -35,7 +35,50 @@ import {
   User
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
+import type { CartItem } from '../domain/types'
 import { toast } from '@/components/ui/use-toast'
+
+
+
+// Memoized Cart Item to prevent re-renders when inputs change
+const CartItemRow = memo(({ item, currency, onRemove }: { item: CartItem, currency: string, onRemove: (id: string) => void }) => (
+  <div className="group flex flex-col gap-2 rounded-2xl border-2 border-muted bg-background p-4 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
+    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
+    <div className="flex items-center justify-between">
+      <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
+        {item.gameName}
+      </Badge>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
+        onClick={() => onRemove(item.id)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+
+    <div className="flex items-end justify-between">
+      <div>
+        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
+          <Clock className="h-3 w-3" /> {item.scheduleName}
+        </div>
+        <div className="font-mono text-3xl font-black text-foreground">
+          {item.number}
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="text-xl font-black text-primary">
+          {currency}{item.amount.toFixed(2)}
+        </div>
+        <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+          Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
+        </div>
+      </div>
+    </div>
+  </div>
+));
+CartItemRow.displayName = 'CartItemRow';
 
 export function SalesTerminal() {
   const { games, isLoading: gamesLoading } = useGamesManager()
@@ -179,12 +222,12 @@ export function SalesTerminal() {
     if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
-  const handleRemoveFromCart = (id: string) => {
+  const handleRemoveFromCart = useCallback((id: string) => {
     removeFromCart(id)
     if (cart.length <= 1) {
       setLocked(false)
     }
-  }
+  }, [removeFromCart, cart.length, setLocked])
 
   const currency = settings?.currency || 'C$'
 
@@ -351,41 +394,12 @@ export function SalesTerminal() {
                 </div>
               ) : (
                 cart.map((item) => (
-                  <div key={item.id} className="group flex flex-col gap-2 rounded-2xl border-2 border-muted bg-background p-4 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                    <div className="flex items-center justify-between">
-                      <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
-                        {item.gameName}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
-                        onClick={() => handleRemoveFromCart(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
-                          <Clock className="h-3 w-3" /> {item.scheduleName}
-                        </div>
-                        <div className="font-mono text-3xl font-black text-foreground">
-                          {item.number}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-black text-primary">
-                          {currency}{item.amount.toFixed(2)}
-                        </div>
-                        <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
-                          Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <CartItemRow
+                    key={item.id}
+                    item={item}
+                    currency={currency}
+                    onRemove={handleRemoveFromCart}
+                  />
                 ))
               )}
             </CardContent>

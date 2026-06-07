@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -35,8 +35,8 @@ import {
   User
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
+import type { CartItem } from '../domain/types'
 import { toast } from '@/components/ui/use-toast'
-import React, { memo } from 'react'
 
 // Componente memoizado para las filas del carrito para optimizar el rendimiento
 const CartItemRow = memo(({ 
@@ -44,7 +44,7 @@ const CartItemRow = memo(({
   currency, 
   onRemove 
 }: { 
-  item: any, 
+  item: CartItem,
   currency: string, 
   onRemove: (id: string) => void 
 }) => {
@@ -230,12 +230,12 @@ export function SalesTerminal() {
     if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
-  const handleRemoveFromCart = (id: string) => {
+  const handleRemoveFromCart = useCallback((id: string) => {
     removeFromCart(id)
     if (cart.length <= 1) {
       setLocked(false)
     }
-  }
+  }, [removeFromCart, cart.length, setLocked])
 
   const currency = settings?.currency || 'C$'
 

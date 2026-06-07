@@ -40,3 +40,6 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+## 2026-06-07 - [React.memo Optimization in Complex Forms]
+**Learning:** Extracting inline map renders into isolated memoized components prevents large parent re-renders caused by unrelated text input states updating rapidly. This is particularly noticeable in complex POS terminal views where the main render function is large.
+**Action:** Always consider `React.memo()` for list items inside large components with frequent state changes (e.g. typing numbers or amounts), and ensure callback functions passed to them are wrapped in `useCallback`.
