@@ -1,0 +1,3 @@
+## 2024-05-30 - Missing aria-labels on icon-only buttons
+**Learning:** The codebase heavily uses custom `<Button size="icon">` and `<Button size="icon-sm">` components for various UI actions (like closing dialogs or deleting items), but these instances often lack `aria-label` attributes across different modules. Because the application's interface language is Spanish, ensuring icon-only buttons include descriptive `aria-label`s in Spanish is crucial for screen reader accessibility.
+**Action:** When adding or modifying icon-only buttons, always verify that an `aria-label` attribute is present and correctly translated to Spanish (e.g., `aria-label="Cerrar detalles del ticket"` instead of "Close").
