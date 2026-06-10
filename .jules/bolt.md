@@ -40,3 +40,6 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+## 2025-06-10 - Zustand Selector Performance
+**Learning:** Splitting bulk Zustand destructuring (e.g., `const { cart, addToCart } = useSalesStore()`) into individual atomic selectors (e.g., `const cart = useSalesStore(s => s.cart)`) prevents unnecessary re-renders when unrelated store properties update.
+**Action:** Always use granular atomic Zustand selectors, especially in frequently updated components like `SalesTerminal`, instead of extracting all state values via a single store hook call.

@@ -36,6 +36,58 @@ import {
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
 import { toast } from '@/components/ui/use-toast'
+import React, { memo, useCallback } from 'react'
+
+// Componente memoizado para las filas del carrito para optimizar el rendimiento
+const CartItemRow = memo(({
+  item,
+  currency,
+  onRemove
+}: {
+  item: any,
+  currency: string,
+  onRemove: (id: string) => void
+}) => {
+  return (
+    <div className="group flex flex-col gap-2 rounded-2xl border-2 border-muted bg-background p-4 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
+      <div className="flex items-center justify-between">
+        <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
+          {item.gameName}
+        </Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
+          onClick={() => onRemove(item.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex items-end justify-between">
+        <div>
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
+            <Clock className="h-3 w-3" /> {item.scheduleName}
+          </div>
+          <div className="font-mono text-3xl font-black text-foreground">
+            {item.number}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl font-black text-primary">
+            {currency}{item.amount.toFixed(2)}
+          </div>
+          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+            Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
+
+CartItemRow.displayName = 'CartItemRow'
 
 export function SalesTerminal() {
   const { games, isLoading: gamesLoading } = useGamesManager()
@@ -43,21 +95,20 @@ export function SalesTerminal() {
   const { isOpen: isCashOpen } = useCurrentSession()
   const { processSale, isProcessing } = useCheckout()
 
-  const {
-    cart,
-    addToCart,
-    removeFromCart,
-    clearCart,
-    getCartTotal,
-    selectedGame,
-    setSelectedGame,
-    selectedSchedule,
-    updateAllCartItems,
-    setSelectedSchedule,
-    setCart,
-    isLocked,
-    setLocked,
-  } = useSalesStore()
+  // Selectores de Zustand optimizados para evitar re-renderizados innecesarios
+  const cart = useSalesStore(state => state.cart)
+  const addToCart = useSalesStore(state => state.addToCart)
+  const removeFromCart = useSalesStore(state => state.removeFromCart)
+  const clearCart = useSalesStore(state => state.clearCart)
+  const getCartTotal = useSalesStore(state => state.getCartTotal)
+  const selectedGame = useSalesStore(state => state.selectedGame)
+  const setSelectedGame = useSalesStore(state => state.setSelectedGame)
+  const selectedSchedule = useSalesStore(state => state.selectedSchedule)
+  const updateAllCartItems = useSalesStore(state => state.updateAllCartItems)
+  const setSelectedSchedule = useSalesStore(state => state.setSelectedSchedule)
+  const setCart = useSalesStore(state => state.setCart)
+  const isLocked = useSalesStore(state => state.isLocked)
+  const setLocked = useSalesStore(state => state.setLocked)
 
   const [number, setNumber] = useState('')
   const [amount, setAmount] = useState(20)
@@ -179,12 +230,12 @@ export function SalesTerminal() {
     if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
-  const handleRemoveFromCart = (id: string) => {
+  const handleRemoveFromCart = useCallback((id: string) => {
     removeFromCart(id)
     if (cart.length <= 1) {
       setLocked(false)
     }
-  }
+  }, [removeFromCart, cart.length, setLocked])
 
   const currency = settings?.currency || 'C$'
 
@@ -351,41 +402,12 @@ export function SalesTerminal() {
                 </div>
               ) : (
                 cart.map((item) => (
-                  <div key={item.id} className="group flex flex-col gap-2 rounded-2xl border-2 border-muted bg-background p-4 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                    <div className="flex items-center justify-between">
-                      <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
-                        {item.gameName}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
-                        onClick={() => handleRemoveFromCart(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
-                          <Clock className="h-3 w-3" /> {item.scheduleName}
-                        </div>
-                        <div className="font-mono text-3xl font-black text-foreground">
-                          {item.number}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-black text-primary">
-                          {currency}{item.amount.toFixed(2)}
-                        </div>
-                        <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
-                          Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <CartItemRow
+                    key={item.id}
+                    item={item}
+                    currency={currency}
+                    onRemove={handleRemoveFromCart}
+                  />
                 ))
               )}
             </CardContent>
