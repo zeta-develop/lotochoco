@@ -1,0 +1,3 @@
+## 2025-01-24 - Missing ARIA Labels on Icon Buttons Pattern
+**Learning:** The codebase heavily uses custom `<Button size="icon">` and `<Button size="icon-sm">` components for various UI actions (like opening/closing menus, refreshing data, deleting items), but these instances consistently lack `aria-label` attributes, rendering them inaccessible to screen readers in Spanish. This is a common pattern across `src/components/` and `src/features/`.
+**Action:** Always verify that icon-only buttons (`<Button size="icon">` or similar) include a descriptive `aria-label` attribute in Spanish to ensure screen reader accessibility. Check for this pattern when creating or reviewing new components.
