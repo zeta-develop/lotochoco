@@ -1,0 +1,3 @@
+## 2026-06-12 - Ensure screen readers can interpret icon-only Buttons
+**Learning:** In this application, custom `<Button size="icon">` and `<Button size="icon-sm">` are heavily used across various feature modules (Sales, Games, Reports, Layout) but often lack `aria-label`s. Since the app is in Spanish, ensuring these labels explicitly describe actions in Spanish (like "Cerrar menú", "Anular ticket", "Eliminar artículo") is crucial for the accessibility of interactive elements.
+**Action:** When adding new icon-only buttons, always ensure an explicit, descriptive `aria-label` attribute in Spanish is included.
