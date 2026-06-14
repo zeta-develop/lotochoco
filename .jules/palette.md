@@ -1,0 +1,3 @@
+## 2024-06-14 - Icon-only Buttons Missing ARIA Labels
+**Learning:** The codebase heavily utilizes custom `<Button size="icon">` and `<Button size="icon-sm">` components for various interactions (e.g., menu toggling, refreshing data, deleting items). However, these instances frequently lack `aria-label` attributes, making them inaccessible to screen readers since they contain no visible text.
+**Action:** When implementing or modifying icon-only buttons (`size="icon"` or similar), ensure descriptive `aria-label`s are included in Spanish to guarantee accessibility for screen reader users across different modules.
