@@ -1,0 +1,3 @@
+## 2024-06-15 - Primary Navigation Icon Button Accessibility Pattern
+**Learning:** Top-level navigation layouts (`MainLayout` variants) frequently use icon-only `<Button size="icon">` components without `aria-label` attributes. Since these elements handle core interaction (like opening menus or refreshing data), screen readers cannot interpret their purpose, leading to significant accessibility failures at the highest structural level of the app.
+**Action:** When implementing or modifying global layouts and navigation structures, strictly enforce the inclusion of localized (Spanish) `aria-label` attributes on any icon-only interactive element.
