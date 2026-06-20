@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -230,12 +230,13 @@ export function SalesTerminal() {
     if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
-  const handleRemoveFromCart = (id: string) => {
+  // ⚡ Bolt: Memoize handler to prevent O(n) re-renders of CartItemRow when typing in inputs
+  const handleRemoveFromCart = useCallback((id: string) => {
     removeFromCart(id)
     if (cart.length <= 1) {
       setLocked(false)
     }
-  }
+  }, [removeFromCart, cart.length, setLocked]);
 
   const currency = settings?.currency || 'C$'
 
