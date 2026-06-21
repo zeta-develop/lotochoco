@@ -40,3 +40,6 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+## 2025-02-18 - [Zustand Store Selector Destructuring Anti-Pattern]
+**Learning:** Destructuring the entire return value of `useSalesStore()` (e.g., `const { addToCart, ... } = useSalesStore()`) instead of using specific selectors causes a component to re-render whenever *any* value in the store changes (like a cart item being added). This is a massive performance bottleneck when used in a heavy top-level layout or chart component like `ReportsManager`.
+**Action:** Always prefer selecting specific values `useSalesStore(state => state.property)`.
