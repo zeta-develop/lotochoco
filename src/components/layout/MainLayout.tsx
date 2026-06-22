@@ -98,10 +98,11 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
             </span>
           </div>
           <Button 
-            variant="ghost" 
-            size="icon-sm" 
+            variant="ghost"
+            size="icon-sm"
             className="lg:hidden"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Cerrar menú"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -166,6 +167,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
             size="icon"
             className="lg:hidden"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menú"
           >
             <Menu className="h-5 w-5" />
           </Button>
@@ -176,10 +178,11 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
 
           <div className="ml-auto flex items-center gap-2">
             <Button 
-              variant="ghost" 
-              size="icon" 
+              variant="ghost"
+              size="icon"
               onClick={handleGlobalRefresh}
               disabled={isRefreshing}
+              aria-label="Actualizar datos"
               className={cn("text-muted-foreground", isRefreshing && "animate-spin")}
             >
               <RefreshCw className="h-4 w-4" />

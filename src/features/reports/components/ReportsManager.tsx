@@ -655,16 +655,17 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
                   <div className="flex gap-2">
                     <Badge className="bg-white/20 text-white border-none text-[10px] font-black rounded-full uppercase px-3">{selectedTicket.status}</Badge>
                     <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-white hover:bg-red-500 hover:text-white rounded-full" 
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-white hover:bg-red-500 hover:text-white rounded-full"
                       onClick={() => handleDeleteTicket(selectedTicket)}
                       title="Anular ticket"
+                      aria-label="Anular ticket"
                     >
                       <Trash2 className="h-3 w-3"/>
                     </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-full" onClick={() => setIsTicketDialogOpen(false)}><X className="h-5 w-5"/></Button>
+                  <Button variant="ghost" size="icon" aria-label="Cerrar detalles del ticket" className="text-white hover:bg-white/10 rounded-full" onClick={() => setIsTicketDialogOpen(false)}><X className="h-5 w-5"/></Button>
                 </div>
                 <h3 className="text-2xl font-black font-mono tracking-tighter mb-1">{selectedTicket.ticketNumber}</h3>
                 <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{format(new Date(selectedTicket.createdAt), "PPPP hh:mm a", { locale: es })}</p>

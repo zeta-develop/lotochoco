@@ -1,0 +1,3 @@
+## 2024-06-22 - Adding ARIA Labels to Icon-Only Buttons
+**Learning:** The codebase heavily uses custom `<Button size="icon">` and `<Button size="icon-sm">` components for various UI actions (like opening/closing the sidebar, refreshing data, deleting items, or closing dialogs). However, these icon-only buttons often lack `aria-label` attributes across different modules, making them inaccessible to screen readers.
+**Action:** When adding icon-only buttons (`size="icon"` or `size="icon-sm"`) throughout the app, always include a descriptive `aria-label` attribute in Spanish (e.g., "Abrir menú", "Eliminar del carrito"). I've patched existing instances in MainLayout, ReportsManager, GamesManager, and SalesTerminal, including their duplicate directory files.
