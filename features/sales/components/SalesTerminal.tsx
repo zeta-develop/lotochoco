@@ -43,21 +43,21 @@ export function SalesTerminal() {
   const { isOpen: isCashOpen } = useCurrentSession()
   const { processSale, isProcessing } = useCheckout()
 
-  const {
-    cart,
-    addToCart,
-    removeFromCart,
-    clearCart,
-    getCartTotal,
-    selectedGame,
-    setSelectedGame,
-    selectedSchedule,
-    updateAllCartItems,
-    setSelectedSchedule,
-    setCart,
-    isLocked,
-    setLocked,
-  } = useSalesStore()
+  // Selectores de Zustand optimizados para evitar re-renderizados innecesarios
+  // ⚡ Bolt: Optimización de rendimiento
+  const cart = useSalesStore(state => state.cart)
+  const addToCart = useSalesStore(state => state.addToCart)
+  const removeFromCart = useSalesStore(state => state.removeFromCart)
+  const clearCart = useSalesStore(state => state.clearCart)
+  const getCartTotal = useSalesStore(state => state.getCartTotal)
+  const selectedGame = useSalesStore(state => state.selectedGame)
+  const setSelectedGame = useSalesStore(state => state.setSelectedGame)
+  const selectedSchedule = useSalesStore(state => state.selectedSchedule)
+  const updateAllCartItems = useSalesStore(state => state.updateAllCartItems)
+  const setSelectedSchedule = useSalesStore(state => state.setSelectedSchedule)
+  const setCart = useSalesStore(state => state.setCart)
+  const isLocked = useSalesStore(state => state.isLocked)
+  const setLocked = useSalesStore(state => state.setLocked)
 
   const [number, setNumber] = useState('')
   const [amount, setAmount] = useState(20)

@@ -40,3 +40,8 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+
+### 2024-06-24
+- **Title:** Evitar Destructuring en Zustand Stores
+- **Aprendizaje:** In this codebase, the `useAuthStore`, `useSettingsStore`, and `useSalesStore` hooks were frequently used by destructuring properties directly from them (e.g., `const { user } = useAuthStore()`). This is a well-known anti-pattern in Zustand because it subscribes the component to the *entire* state object, causing a full re-render whenever *any* unrelated property changes. Given the size of `SalesTerminal` and `ReportsManager`, this creates severe performance bottlenecks.
+- **Acción:** Always extract state atom-by-atom using individual selectors (e.g., `const user = useAuthStore(state => state.user)`). I have applied this refactoring across 6 different component/hook files, making sure to apply it in both the `src/features/` and `features/` duplicate directories.

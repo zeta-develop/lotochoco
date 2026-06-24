@@ -7,7 +7,10 @@ import { signOut } from '@/lib/supabase/auth'
 import { LogOut } from 'lucide-react'
 
 export function AccountSettingsTab() {
-  const { user } = useAuthStore()
+  // ⚡ Bolt: Optimización de rendimiento
+  // Selectores individuales para evitar re-renderizados innecesarios
+  // cuando cambian otras propiedades en auth-store
+  const user = useAuthStore(state => state.user)
 
   return (
     <Card className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden relative">
