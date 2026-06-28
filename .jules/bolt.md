@@ -40,3 +40,6 @@ Acción: Inyectados los secretos NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE
 ### 2024-05-25 - Limpieza de dependencias innecesarias
 **Aprendizaje**: `swr` estaba incluido en `package.json` y `SWRProvider` envuelve a toda la aplicación en `app/layout.tsx`. Sin embargo, en el resto de la aplicación no se utilizaba en ningún lugar.
 **Acción**: Se desinstaló `swr` del `package.json` y se eliminó el archivo `SWRProvider`, quitando el wrapper innecesario en `app/layout.tsx` para optimizar un poco el bundle, reducir la complejidad y quitar código muerto.
+## 2025-02-18 - Zustand Destructuring Performance Impact
+**Learning:** The codebase previously contained instances where whole Zustand stores were destructured (e.g., `const { a, b } = useStore()`). This is a critical performance bottleneck in React, as it causes the component to re-render whenever ANY property in the entire store changes, even those not destructured.
+**Action:** Always use individual state selectors (e.g., `const a = useStore(state => state.a)`) when consuming Zustand stores to guarantee components only re-render when the specific properties they depend on are updated. Check for this anti-pattern during frontend performance reviews.
