@@ -72,7 +72,12 @@ interface ReportsProps {
 
 export function ReportsManager({ onModuleChange }: ReportsProps) {
   const { settings } = useSettingsManager()
-  const { addToCart, clearCart, setSelectedGame, setSelectedSchedule, setCart } = useSalesStore()
+  // ⚡ Bolt: Optimize Zustand selectors to prevent unnecessary re-renders when other state changes
+  const addToCart = useSalesStore(state => state.addToCart)
+  const clearCart = useSalesStore(state => state.clearCart)
+  const setSelectedGame = useSalesStore(state => state.setSelectedGame)
+  const setSelectedSchedule = useSalesStore(state => state.setSelectedSchedule)
+  const setCart = useSalesStore(state => state.setCart)
   const currency = settings.currency || 'C$'
   
   const [dateRange, setDateRange] = useState({
