@@ -13,7 +13,8 @@ export interface CompanyInfo {
 export function useCompany() {
   const [company, setCompany] = useState<CompanyInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const { user } = useAuthStore()
+  // ⚡ Bolt: Usando selectores individuales para evitar re-renderizados innecesarios
+  const user = useAuthStore(state => state.user)
 
   const fetchCompany = useCallback(async () => {
     if (!user) {

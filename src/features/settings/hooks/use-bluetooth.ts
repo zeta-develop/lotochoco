@@ -10,7 +10,9 @@ export function useBluetooth() {
   const [isScanning, setIsScanning] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [devices, setDevices] = useState<BleDevice[]>([])
-  const { settings, updateSetting } = useSettingsStore()
+  // ⚡ Bolt: Usando selectores individuales para evitar re-renderizados innecesarios
+  const settings = useSettingsStore(state => state.settings)
+  const updateSetting = useSettingsStore(state => state.updateSetting)
 
   const scanForDevices = useCallback(async () => {
     try {
