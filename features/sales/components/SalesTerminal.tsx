@@ -360,6 +360,7 @@ export function SalesTerminal() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Eliminar elemento"
                         className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
                         onClick={() => handleRemoveFromCart(item.id)}
                       >

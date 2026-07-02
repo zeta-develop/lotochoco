@@ -1,0 +1,3 @@
+## 2026-07-02 - Icon Buttons Lack ARIA Labels
+**Learning:** In the POS lottery application, custom `<Button size="icon">` components are heavily utilized for various actions like toggling sidebars, refreshing data, and removing items from the cart. However, a widespread pattern was discovered where these icon-only buttons lacked descriptive `aria-label` attributes, making them inaccessible to screen readers (in Spanish).
+**Action:** Ensure all instances of `<Button size="icon">` or similar icon-only interactive elements include context-aware `aria-label` attributes, especially focusing on Spanish translations as per the project requirements.
