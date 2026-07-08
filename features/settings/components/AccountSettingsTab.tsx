@@ -7,7 +7,8 @@ import { signOut } from '@/lib/supabase/auth'
 import { LogOut } from 'lucide-react'
 
 export function AccountSettingsTab() {
-  const { user } = useAuthStore()
+  // ⚡ Bolt: Use individual state selector to prevent unnecessary re-renders on other auth store changes.
+  const user = useAuthStore(state => state.user)
 
   return (
     <Card className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden relative">
