@@ -8,7 +8,9 @@ import { settingsService } from '../services/settings.service'
 const LOCAL_KEYS = ['bluetoothDeviceId', 'bluetoothDeviceName', 'printerAddress', 'printerType', 'theme']
 
 export function useSettingsManager() {
-  const { settings, setSettings } = useSettingsStore()
+  // ⚡ Bolt: Use individual selectors to prevent unnecessary re-renders
+  const settings = useSettingsStore(state => state.settings)
+  const setSettings = useSettingsStore(state => state.setSettings)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 

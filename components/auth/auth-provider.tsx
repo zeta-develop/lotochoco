@@ -8,7 +8,10 @@ import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setSession, setUser, session: currentSession } = useAuthStore();
+  // ⚡ Bolt: Use individual selectors to prevent unnecessary re-renders
+  const setSession = useAuthStore(state => state.setSession);
+  const setUser = useAuthStore(state => state.setUser);
+  const currentSession = useAuthStore(state => state.session);
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
