@@ -58,6 +58,8 @@ const CartItemRow = memo(({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Eliminar jugada"
+          title="Eliminar jugada"
           className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
           onClick={() => onRemove(item.id)}
         >
