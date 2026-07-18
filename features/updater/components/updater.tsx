@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { Download, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useUpdater } from "@/features/updater/hooks/use-updater";
 
 export function Updater() {
-  const { isUpdateAvailable, latestVersion, downloadAndInstallUpdate, currentVersion } = useUpdater();
+  const { isUpdateAvailable, latestVersion, downloadAndInstallUpdate, currentVersion, isDownloading, downloadProgress } = useUpdater();
   const [showNotification, setShowNotification] = useState(false);
 
   useEffect(() => {
@@ -37,18 +38,28 @@ export function Updater() {
             size="sm"
             className="flex-1"
             onClick={downloadAndInstallUpdate}
+            disabled={isDownloading}
           >
-            Actualizar ahora
+            {isDownloading ? `Descargando ${downloadProgress}%` : 'Actualizar ahora'}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             className="flex-1 hover:bg-primary-foreground/10"
             onClick={() => setShowNotification(false)}
+            disabled={isDownloading}
           >
             Más tarde
           </Button>
         </div>
+        {isDownloading && (
+          <div className="space-y-1.5">
+            <Progress value={downloadProgress} className="h-2 bg-white/20" />
+            <p className="text-xs text-primary-foreground/80 text-right">
+              {downloadProgress}% descargado
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

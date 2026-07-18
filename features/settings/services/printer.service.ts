@@ -5,6 +5,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { formatTime12h } from '@/lib/utils'
 
 class EscPosBuilder {
   private buffer: number[] = []
@@ -117,7 +118,8 @@ JUEGO      NUM       MONTO
       // Obtener info del primer item para el encabezado si es necesario
       const firstItem = ticket.items?.[0] as any
       const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
-      const scheduleName = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+      const scheduleSource = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+      const scheduleName = scheduleSource === 'Sorteo' ? scheduleSource : formatTime12h(scheduleSource)
 
       let processed = template
         .replace(/{{businessName}}/g, businessName)
@@ -225,7 +227,8 @@ JUEGO      NUM       MONTO
       // Obtener info del primer item para el encabezado
       const firstItem = ticket.items?.[0] as any
       const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
-      const scheduleName = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+      const scheduleSource = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+      const scheduleName = scheduleSource === 'Sorteo' ? scheduleSource : formatTime12h(scheduleSource)
 
       let processed = template
         .replace(/{{businessName}}/g, businessName)

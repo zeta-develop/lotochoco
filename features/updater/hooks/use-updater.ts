@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { App } from "@capacitor/app";
 import { Dialog } from "@capacitor/dialog";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Http } from "@capacitor-community/http";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Capacitor } from "@capacitor/core";
 import { toast } from '@/components/ui/use-toast';
@@ -90,26 +91,40 @@ export function useUpdater() {
 
       if (value) {
         toast({ title: 'Descargando actualización...' });
-        
+
         const fileName = `lotochoco_v${latestVersion}.apk`;
 
-        // Descargar el archivo a Documentos (más fiable para el instalador)
-        const downloadResult = await Filesystem.downloadFile({
-          url: apkAsset.browser_download_url,
-          path: fileName,
-          directory: Directory.Documents,
-          recursive: true
+        const progressListener = await Http.addListener('progress', (progress) => {
+          if (progress.type !== 'DOWNLOAD') return;
+          if (!progress.contentLength) return;
+
+          const percent = Math.max(0, Math.min(100, Math.round((progress.bytes / progress.contentLength) * 100)));
+          setDownloadProgress(percent);
         });
 
-        if (downloadResult.path) {
-          console.log('APK descargado en:', downloadResult.path);
-          toast({ title: 'Descarga completada. Iniciando instalación...' });
-          
-          // Abrir el instalador con la ruta absoluta
-          await FileOpener.open({
-            filePath: downloadResult.path,
-            contentType: 'application/vnd.android.package-archive'
+        try {
+          // Descargar el archivo a Documentos (más fiable para el instalador)
+          const downloadResult = await Http.downloadFile({
+            url: apkAsset.browser_download_url,
+            filePath: fileName,
+            fileDirectory: Directory.Documents,
+            progress: true
           });
+
+          setDownloadProgress(100);
+
+          if (downloadResult.path) {
+            console.log('APK descargado en:', downloadResult.path);
+            toast({ title: 'Descarga completada. Iniciando instalación...' });
+
+            // Abrir el instalador con la ruta absoluta
+            await FileOpener.open({
+              filePath: downloadResult.path,
+              contentType: 'application/vnd.android.package-archive'
+            });
+          }
+        } finally {
+          await progressListener.remove();
         }
       }
 
