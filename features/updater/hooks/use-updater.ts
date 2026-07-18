@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { App } from "@capacitor/app";
 import { Dialog } from "@capacitor/dialog";
-import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Directory } from "@capacitor/filesystem";
 import { Http } from "@capacitor-community/http";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Capacitor } from "@capacitor/core";
@@ -104,10 +104,11 @@ export function useUpdater() {
 
         try {
           // Descargar el archivo a Documentos (más fiable para el instalador)
+          // En Android moderno, la caché privada evita problemas de permisos y acceso.
           const downloadResult = await Http.downloadFile({
             url: apkAsset.browser_download_url,
             filePath: fileName,
-            fileDirectory: Directory.Documents,
+            fileDirectory: Directory.Cache,
             progress: true
           });
 
@@ -117,11 +118,18 @@ export function useUpdater() {
             console.log('APK descargado en:', downloadResult.path);
             toast({ title: 'Descarga completada. Iniciando instalación...' });
 
-            // Abrir el instalador con la ruta absoluta
-            await FileOpener.open({
-              filePath: downloadResult.path,
-              contentType: 'application/vnd.android.package-archive'
-            });
+            try {
+              // Abrir el instalador con la ruta absoluta
+              await FileOpener.open({
+                filePath: downloadResult.path,
+                contentType: 'application/vnd.android.package-archive'
+              });
+            } catch (installError) {
+              console.error('Error al abrir el instalador:', installError);
+              throw new Error('El APK se descargó, pero no se pudo abrir el instalador.');
+            }
+          } else {
+            throw new Error('No se recibió la ruta del archivo descargado.');
           }
         } finally {
           await progressListener.remove();
@@ -132,7 +140,7 @@ export function useUpdater() {
       console.error("Error updating app:", error);
       await Dialog.alert({
         title: 'Error',
-        message: 'No se pudo iniciar la actualización.'
+        message: error instanceof Error ? error.message : 'No se pudo iniciar la actualización.'
       });
     } finally {
       setIsDownloading(false);
