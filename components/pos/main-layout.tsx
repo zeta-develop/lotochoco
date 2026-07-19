@@ -73,7 +73,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-background pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="flex min-h-[100dvh] bg-background pb-[env(safe-area-inset-bottom,0px)]">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div 
@@ -158,9 +158,9 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden min-h-[100dvh]">
+        <div className="flex flex-1 flex-col overflow-hidden min-h-[100dvh]">
         {/* Top bar */}
-        <header className="flex h-16 items-center gap-4 border-b bg-card px-4 pt-[env(safe-area-inset-top,0px)] lg:pt-0">
+          <header className="flex h-16 items-center gap-4 border-b bg-card px-4">
           <Button
             variant="ghost"
             size="icon"
