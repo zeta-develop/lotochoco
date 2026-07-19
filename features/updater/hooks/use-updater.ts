@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { App } from "@capacitor/app";
 import { Dialog } from "@capacitor/dialog";
-import { Directory } from "@capacitor/filesystem";
+import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Http } from "@capacitor-community/http";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Capacitor } from "@capacitor/core";
@@ -93,7 +93,6 @@ export function useUpdater() {
         toast({ title: 'Descargando actualización...' });
 
         const fileName = `lotochoco_v${latestVersion}.apk`;
-
         const progressListener = await Http.addListener('progress', (progress) => {
           if (progress.type !== 'DOWNLOAD') return;
           if (!progress.contentLength) return;
@@ -102,9 +101,19 @@ export function useUpdater() {
           setDownloadProgress(percent);
         });
 
-        try {
-          // Descargar el archivo a Documentos (más fiable para el instalador)
-          // En Android moderno, la caché privada evita problemas de permisos y acceso.
+        const installFromCache = async (path: string) => {
+          try {
+            await FileOpener.open({
+              filePath: path,
+              contentType: 'application/vnd.android.package-archive'
+            });
+          } catch (installError) {
+            console.error('Error al abrir el instalador:', installError);
+            throw new Error('El APK se descargó, pero no se pudo abrir el instalador.');
+          }
+        };
+
+        const downloadWithHttpFile = async () => {
           const downloadResult = await Http.downloadFile({
             url: apkAsset.browser_download_url,
             filePath: fileName,
@@ -112,25 +121,55 @@ export function useUpdater() {
             progress: true
           });
 
-          setDownloadProgress(100);
-
-          if (downloadResult.path) {
-            console.log('APK descargado en:', downloadResult.path);
-            toast({ title: 'Descarga completada. Iniciando instalación...' });
-
-            try {
-              // Abrir el instalador con la ruta absoluta
-              await FileOpener.open({
-                filePath: downloadResult.path,
-                contentType: 'application/vnd.android.package-archive'
-              });
-            } catch (installError) {
-              console.error('Error al abrir el instalador:', installError);
-              throw new Error('El APK se descargó, pero no se pudo abrir el instalador.');
-            }
-          } else {
+          if (!downloadResult.path) {
             throw new Error('No se recibió la ruta del archivo descargado.');
           }
+
+          return downloadResult.path;
+        };
+
+        const downloadWithBinaryFallback = async () => {
+          const response = await Http.request({
+            url: apkAsset.browser_download_url,
+            method: 'GET',
+            responseType: 'arraybuffer'
+          });
+
+          const base64Data = String(response.data || '');
+          if (!base64Data) {
+            throw new Error('La descarga binaria devolvió un archivo vacío.');
+          }
+
+          await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Cache
+          });
+
+          const uri = await Filesystem.getUri({
+            path: fileName,
+            directory: Directory.Cache
+          });
+
+          return uri.uri;
+        };
+
+        try {
+          const downloadedPath = await downloadWithHttpFile();
+          setDownloadProgress(100);
+          console.log('APK descargado en:', downloadedPath);
+          toast({ title: 'Descarga completada. Iniciando instalación...' });
+          await installFromCache(downloadedPath);
+        } catch (downloadError) {
+          console.error('Error en descarga nativa, usando fallback binario:', downloadError);
+          setDownloadProgress(0);
+          toast({ title: 'Reintentando descarga...' });
+
+          const fallbackPath = await downloadWithBinaryFallback();
+          setDownloadProgress(100);
+          console.log('APK descargado por fallback en:', fallbackPath);
+          toast({ title: 'Descarga completada. Iniciando instalación...' });
+          await installFromCache(fallbackPath);
         } finally {
           await progressListener.remove();
         }
