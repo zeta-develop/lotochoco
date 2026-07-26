@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { App } from "@capacitor/app";
 import { Dialog } from "@capacitor/dialog";
 import { Directory, Filesystem } from "@capacitor/filesystem";
-import { Http } from "@capacitor-community/http";
+import { CapacitorHttp } from "@capacitor/core";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Capacitor } from "@capacitor/core";
 import { toast } from '@/components/ui/use-toast';
@@ -93,12 +93,11 @@ export function useUpdater() {
         toast({ title: 'Descargando actualización...' });
 
         const fileName = `lotochoco_v${latestVersion}.apk`;
-        const progressListener = await Http.addListener('progress', (progress) => {
-          if (progress.type !== 'DOWNLOAD') return;
-          if (!progress.contentLength) return;
-
-          const percent = Math.max(0, Math.min(100, Math.round((progress.bytes / progress.contentLength) * 100)));
-          setDownloadProgress(percent);
+        const progressListener = await Filesystem.addListener('progress', (progress: any) => {
+          if (progress.contentLength) {
+            const percent = Math.max(0, Math.min(100, Math.round((progress.bytes / progress.contentLength) * 100)));
+            setDownloadProgress(percent);
+          }
         });
 
         const installFromCache = async (path: string) => {
@@ -114,10 +113,10 @@ export function useUpdater() {
         };
 
         const downloadWithHttpFile = async () => {
-          const downloadResult = await Http.downloadFile({
+          const downloadResult = await Filesystem.downloadFile({
             url: apkAsset.browser_download_url,
-            filePath: fileName,
-            fileDirectory: Directory.Cache,
+            path: fileName,
+            directory: Directory.Cache,
             progress: true
           });
 
@@ -129,29 +128,31 @@ export function useUpdater() {
         };
 
         const downloadWithBinaryFallback = async () => {
-          const response = await Http.request({
-            url: apkAsset.browser_download_url,
-            method: 'GET',
-            responseType: 'arraybuffer'
+          const response = await fetch(apkAsset.browser_download_url);
+          const blob = await response.blob();
+          
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+              try {
+                const base64Data = (reader.result as string).split(',')[1];
+                await Filesystem.writeFile({
+                  path: fileName,
+                  data: base64Data,
+                  directory: Directory.Cache
+                });
+                const uri = await Filesystem.getUri({
+                  path: fileName,
+                  directory: Directory.Cache
+                });
+                resolve(uri.uri);
+              } catch (e) {
+                reject(e);
+              }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
           });
-
-          const base64Data = String(response.data || '');
-          if (!base64Data) {
-            throw new Error('La descarga binaria devolvió un archivo vacío.');
-          }
-
-          await Filesystem.writeFile({
-            path: fileName,
-            data: base64Data,
-            directory: Directory.Cache
-          });
-
-          const uri = await Filesystem.getUri({
-            path: fileName,
-            directory: Directory.Cache
-          });
-
-          return uri.uri;
         };
 
         try {
