@@ -212,81 +212,90 @@ JUEGO      NUM       MONTO
       }
 
       const items = ticket.items || []
-      const itemHeight = 21
-      const contentHeight = Math.max(145, 80 + (items.length * itemHeight))
+      const itemHeight = 18
+      const hasClient = Boolean(ticket.client)
+      const metaHeight = hasClient ? 20 : 15
+      const contentHeight = Math.max(130, 68 + metaHeight + (items.length * itemHeight))
 
       const doc = new jsPDF({
         unit: 'mm',
-        format: [85, contentHeight]
+        format: [80, contentHeight]
       })
 
-      // 1. Fondo Oscuro Premium (Estilo App Dark Mode)
-      doc.setFillColor(15, 23, 42) // Slate 900 (#0f172a)
-      doc.rect(0, 0, 85, contentHeight, 'F')
+      // 1. Fondo Blanco Limpio
+      doc.setFillColor(255, 255, 255)
+      doc.rect(0, 0, 80, contentHeight, 'F')
 
-      // 2. Encabezado / Branding
-      // Barra Superior Verde Esmeralda
-      doc.setFillColor(16, 185, 129) // Emerald 500 (#10b981)
-      doc.roundedRect(5, 5, 75, 3, 1.5, 1.5, 'F')
+      // 2. Barra Superior de Acento Esmeralda
+      doc.setFillColor(5, 150, 105) // Emerald 600
+      doc.rect(0, 0, 80, 4, 'F')
 
-      // Tarjeta de Título
-      doc.setFillColor(30, 41, 59) // Slate 800 (#1e293b)
-      doc.roundedRect(5, 9, 75, 24, 3, 3, 'F')
-
+      // 3. Encabezado / Nombre del Negocio
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.setTextColor(255, 255, 255)
-      doc.text(businessName.toUpperCase(), 42.5, 17, { align: 'center' })
+      doc.setFontSize(15)
+      doc.setTextColor(15, 23, 42) // Slate 900
+      doc.text(businessName.toUpperCase(), 40, 12, { align: 'center' })
 
-      doc.setFontSize(8)
-      doc.setTextColor(52, 211, 153) // Emerald 400
-      doc.text('COMPROBANTE DIGITAL DE VENTA', 42.5, 22, { align: 'center' })
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(5, 150, 105)
+      doc.text('COMPROBANTE OFICIAL DE VENTA', 40, 16, { align: 'center' })
 
       // Badge Número de Ticket
-      doc.setFillColor(51, 65, 85) // Slate 700
-      doc.roundedRect(20, 25, 45, 6, 3, 3, 'F')
-      doc.setFontSize(8)
-      doc.setTextColor(255, 255, 255)
-      doc.text(`TICKET #${ticket.ticketNumber || 'N/A'}`, 42.5, 29.2, { align: 'center' })
-
-      // 3. Info del Ticket (Fecha, Cliente, etc.)
-      doc.setFillColor(30, 41, 59)
-      doc.roundedRect(5, 36, 75, ticket.client ? 22 : 16, 3, 3, 'F')
-
+      doc.setFillColor(241, 245, 249) // Slate 100
+      doc.setDrawColor(226, 232, 240) // Slate 200
+      doc.roundedRect(18, 19, 44, 6, 3, 3, 'FD')
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(148, 163, 184) // Slate 400
-      doc.text('FECHA:', 8, 42)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(241, 245, 249) // Slate 100
-      doc.text(format(ticketDate, 'dd/MM/yyyy - hh:mm:ss a', { locale: es }), 24, 42)
+      doc.setTextColor(15, 23, 42)
+      doc.text(`TICKET #${ticket.ticketNumber || 'N/A'}`, 40, 23.2, { align: 'center' })
 
-      if (ticket.client) {
+      // 4. Tarjeta de Metadata (Fecha, Cliente, Estado)
+      doc.setFillColor(248, 250, 252) // Slate 50
+      doc.setDrawColor(226, 232, 240)
+      doc.roundedRect(5, 28, 70, metaHeight, 2, 2, 'FD')
+
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(100, 116, 139) // Slate 500
+      doc.text('FECHA:', 8, 33)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(15, 23, 42)
+      doc.text(format(ticketDate, 'dd/MM/yyyy - hh:mm:ss a', { locale: es }), 23, 33)
+
+      if (hasClient && ticket.client) {
         doc.setFont('helvetica', 'bold')
-        doc.setTextColor(148, 163, 184)
-        doc.text('CLIENTE:', 8, 48)
+        doc.setTextColor(100, 116, 139)
+        doc.text('CLIENTE:', 8, 38)
         doc.setFont('helvetica', 'normal')
-        doc.setTextColor(241, 245, 249)
-        doc.text(ticket.client.toUpperCase(), 25, 48)
+        doc.setTextColor(15, 23, 42)
+        doc.text(ticket.client.toUpperCase(), 23, 38)
       }
 
-      const statusY = ticket.client ? 54 : 48
+      const statusY = hasClient ? 43 : 38
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(148, 163, 184)
+      doc.setTextColor(100, 116, 139)
       doc.text('ESTADO:', 8, statusY)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(52, 211, 153)
-      doc.text('EMITIDO / OFFLINE', 25, statusY)
+      doc.setTextColor(5, 150, 105)
+      doc.text('COMPLETADO', 23, statusY)
 
-      // 4. Detalle de Jugadas
-      let y = ticket.client ? 63 : 57
-
+      // 5. Encabezado de Tabla de Jugadas
+      let y = 32 + metaHeight
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.setTextColor(148, 163, 184)
-      doc.text('JUGADAS REGISTRADAS', 8, y)
+      doc.setFontSize(7.5)
+      doc.setTextColor(100, 116, 139)
+      doc.text('JUGADA / NÚMERO', 8, y)
+      doc.text('INVERSIÓN', 72, y, { align: 'right' })
+      y += 2
+
+      // Línea divisoria
+      doc.setDrawColor(226, 232, 240)
+      doc.setLineWidth(0.3)
+      doc.line(5, y, 75, y)
       y += 3
 
+      // 6. Lista de Jugadas
       items.forEach((item) => {
         const gameName = (item as any).gameName || (item as any).game?.name || 'JUEGO'
         const scheduleSource = (item as any).scheduleName || (item as any).schedule || 'Sorteo'
@@ -295,73 +304,75 @@ JUEGO      NUM       MONTO
         const prizePotential = item.amount * multiplier
         const formattedNum = item.number.length === 4 ? formatDateNumber(item.number) : item.number
 
-        // Fondo de tarjeta de jugada
-        doc.setFillColor(30, 41, 59)
-        doc.roundedRect(5, y, 75, 18, 3, 3, 'F')
+        // Tarjeta de Jugada
+        doc.setFillColor(248, 250, 252)
+        doc.setDrawColor(226, 232, 240)
+        doc.roundedRect(5, y, 70, 15, 2, 2, 'FD')
 
         // Borde izquierdo esmeralda
-        doc.setFillColor(16, 185, 129)
-        doc.roundedRect(5, y, 2.5, 18, 1, 1, 'F')
+        doc.setFillColor(5, 150, 105)
+        doc.roundedRect(5, y, 2, 15, 1, 1, 'F')
 
-        // Juego + Horario
+        // Juego y Horario
         doc.setFont('helvetica', 'bold')
-        doc.setFontSize(8)
-        doc.setTextColor(52, 211, 153)
-        doc.text(`${gameName.toUpperCase()}`, 10, y + 5)
+        doc.setFontSize(7.5)
+        doc.setTextColor(5, 150, 105)
+        doc.text(gameName.toUpperCase(), 9, y + 4.5)
 
         doc.setFont('helvetica', 'normal')
-        doc.setFontSize(7)
-        doc.setTextColor(148, 163, 184)
-        doc.text(`(${scheduleName})`, 10 + doc.getTextWidth(`${gameName.toUpperCase()} `), y + 5)
+        doc.setFontSize(6.5)
+        doc.setTextColor(100, 116, 139)
+        doc.text(`(${scheduleName})`, 9 + doc.getTextWidth(`${gameName.toUpperCase()} `), y + 4.5)
 
-        // Número jugado
+        // Número Jugado (Destacado)
         doc.setFont('helvetica', 'bold')
-        doc.setFontSize(12)
-        doc.setTextColor(255, 255, 255)
-        doc.text(formattedNum, 10, y + 14)
+        doc.setFontSize(11)
+        doc.setTextColor(15, 23, 42)
+        doc.text(formattedNum, 9, y + 11.5)
 
-        // Monto
+        // Monto Invertido
         doc.setFont('helvetica', 'bold')
-        doc.setFontSize(10)
-        doc.setTextColor(16, 185, 129)
-        doc.text(`${currency}${item.amount.toFixed(2)}`, 76, y + 6, { align: 'right' })
+        doc.setFontSize(9)
+        doc.setTextColor(15, 23, 42)
+        doc.text(`${currency}${item.amount.toFixed(2)}`, 72, y + 5.5, { align: 'right' })
 
-        // Premio potencial
+        // Premio Potencial
         doc.setFont('helvetica', 'normal')
-        doc.setFontSize(7)
-        doc.setTextColor(148, 163, 184)
-        doc.text(`Gana: ${currency}${prizePotential.toLocaleString()}`, 76, y + 13, { align: 'right' })
+        doc.setFontSize(6.5)
+        doc.setTextColor(100, 116, 139)
+        doc.text(`Premio: ${currency}${prizePotential.toLocaleString()}`, 72, y + 11, { align: 'right' })
 
         y += itemHeight
       })
 
-      // 5. Total
-      y += 2
-      doc.setFillColor(16, 185, 129) // Emerald Background
-      doc.roundedRect(5, y, 75, 18, 3, 3, 'F')
+      // 7. Tarjeta de Total
+      y += 1
+      doc.setFillColor(5, 150, 105) // Fondo Esmeralda
+      doc.roundedRect(5, y, 70, 15, 2.5, 2.5, 'F')
 
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
+      doc.setFontSize(8.5)
       doc.setTextColor(255, 255, 255)
-      doc.text('TOTAL DE VENTA:', 10, y + 11)
+      doc.text('TOTAL A PAGAR:', 9, y + 9)
 
-      doc.setFontSize(14)
-      doc.text(`${currency}${(ticket.totalAmount || 0).toFixed(2)}`, 75, y + 12, { align: 'right' })
+      doc.setFontSize(13)
+      doc.text(`${currency}${(ticket.totalAmount || 0).toFixed(2)}`, 72, y + 9.5, { align: 'right' })
 
-      // 6. Mensaje y Pie de página
-      y += 24
+      // 8. Pie de página
+      y += 20
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8)
-      doc.setTextColor(203, 213, 225) // Slate 300
-      doc.text(ticketMessage, 42.5, y, { align: 'center' })
+      doc.setFontSize(7.5)
+      doc.setTextColor(51, 65, 85)
+      doc.text(ticketMessage, 40, y, { align: 'center' })
 
-      doc.setFontSize(7)
-      doc.setTextColor(100, 116, 139) // Slate 500
-      doc.text('Conservar comprobante para reclamo de premios', 42.5, y + 5, { align: 'center' })
+      doc.setFontSize(6.5)
+      doc.setTextColor(148, 163, 184)
+      doc.text('Verifique su ticket antes de retirarse. Conservar para reclamos.', 40, y + 4.5, { align: 'center' })
 
       doc.setFontSize(6)
-      doc.setTextColor(16, 185, 129)
-      doc.text('Lotochoco POS • Sistema POS 100% Offline', 42.5, y + 9, { align: 'center' })
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(5, 150, 105)
+      doc.text('LOTOCHOCO POS • SISTEMA OFFLINE DE LOTERÍA', 40, y + 8.5, { align: 'center' })
 
       const pdfBase64 = doc.output('datauristring').split(',')[1]
       const fileName = `ticket_${ticket.ticketNumber}.pdf`
@@ -379,9 +390,9 @@ JUEGO      NUM       MONTO
 
       await Share.share({
         title: `Ticket #${ticket.ticketNumber}`,
-        text: `Ticket #${ticket.ticketNumber} - ${businessName}`,
+        text: `Comprobante de Ticket #${ticket.ticketNumber} - ${businessName}`,
         url: fileUri.uri,
-        dialogTitle: 'Compartir Ticket'
+        dialogTitle: 'Compartir Comprobante'
       })
 
       return { success: true }
