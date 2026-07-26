@@ -19,7 +19,7 @@ import { useGamesManager } from '@/features/games/hooks/use-games-manager'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { useCurrentSession } from '@/features/cash/hooks/use-cash-manager'
 import { printerService } from '@/features/settings/services/printer.service'
-import { formatTime12h } from '@/lib/utils'
+import { formatTime12h, isDateGame, formatDateNumber, getDaysInMonth } from '@/lib/utils'
 import {
   AlertCircle,
   Check,
@@ -35,6 +35,7 @@ import {
   User
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
+import { CalendarDays } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 
 export function SalesTerminal() {
@@ -65,6 +66,11 @@ export function SalesTerminal() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [lastTicket, setLastTicket] = useState<AppTicket | null>(null)
+
+  // Estado para juegos de fecha (4 dígitos)
+  const [dateDay, setDateDay] = useState('')
+  const [dateMonth, setDateMonth] = useState('')
+  const isCurrentGameDate = isDateGame(selectedGame?.digitCount || 0)
 
   useEffect(() => {
     if (games.length > 0 && !selectedGame) {
@@ -104,20 +110,36 @@ export function SalesTerminal() {
   }
 
   const handleAddToCart = () => {
-    if (!selectedGame || !selectedSchedule || !number || amount <= 0) {
+    if (!selectedGame || !selectedSchedule || amount <= 0) {
       toast({ variant: 'destructive', title: 'Completa todos los campos' })
       return
     }
 
-    if (number.length !== selectedGame.digitCount) {
-      toast({ variant: 'destructive', title: `El número debe tener ${selectedGame.digitCount} dígito(s)` })
-      return
+    let finalNumber = number
+
+    // Para juegos de fecha, construir el número DDMM desde los selectores
+    if (isCurrentGameDate) {
+      if (!dateDay || !dateMonth) {
+        toast({ variant: 'destructive', title: 'Selecciona día y mes' })
+        return
+      }
+      finalNumber = dateDay.padStart(2, '0') + dateMonth.padStart(2, '0')
+    } else {
+      if (!number) {
+        toast({ variant: 'destructive', title: 'Ingresa un número' })
+        return
+      }
+      if (number.length !== selectedGame.digitCount) {
+        toast({ variant: 'destructive', title: `El número debe tener ${selectedGame.digitCount} dígito(s)` })
+        return
+      }
+      finalNumber = number.padStart(selectedGame.digitCount, '0')
     }
 
     addToCart({
       gameId: selectedGame.id,
       gameName: selectedGame.name,
-      number: number.padStart(selectedGame.digitCount, '0'),
+      number: finalNumber,
       amount,
       schedule: selectedSchedule.time,
       scheduleName: selectedSchedule.name,
@@ -125,8 +147,10 @@ export function SalesTerminal() {
       client: client || undefined,
     })
 
-    setLocked(true) // Bloquear selectores al añadir manualmente
+    setLocked(true)
     setNumber('')
+    setDateDay('')
+    setDateMonth('')
     toast({ title: 'Jugada agregada' })
   }
 
@@ -279,17 +303,70 @@ export function SalesTerminal() {
 
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Número Jugado</label>
-                  <Input
-                    value={number}
-                    onChange={(event) =>
-                      setNumber(event.target.value.replace(/\D/g, '').slice(0, selectedGame?.digitCount || 2))
-                    }
-                    placeholder={`Ingrese ${selectedGame?.digitCount || 2} dígitos`}
-                    className="h-16 text-center text-3xl font-black rounded-2xl border-2 border-muted focus:border-primary transition-all tracking-[0.25em]"
-                    inputMode="numeric"
-                    maxLength={selectedGame?.digitCount || 2}
-                  />
+                  {isCurrentGameDate ? (
+                    <>
+                      <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" /> Fecha Jugada
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest ml-1 text-muted-foreground/60">Día</label>
+                          <select
+                            value={dateDay}
+                            onChange={(e) => setDateDay(e.target.value)}
+                            className="h-16 w-full rounded-2xl border-2 border-muted bg-background px-3 text-center text-2xl font-black focus:border-primary transition-all outline-none"
+                          >
+                            <option value="">--</option>
+                            {Array.from({ length: getDaysInMonth(parseInt(dateMonth) || 12) }, (_, i) => i + 1).map(d => (
+                              <option key={d} value={d.toString().padStart(2, '0')}>
+                                {d.toString().padStart(2, '0')}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest ml-1 text-muted-foreground/60">Mes</label>
+                          <select
+                            value={dateMonth}
+                            onChange={(e) => {
+                              setDateMonth(e.target.value)
+                              // Ajustar día si excede los días del nuevo mes
+                              const maxDays = getDaysInMonth(parseInt(e.target.value) || 12)
+                              if (parseInt(dateDay) > maxDays) setDateDay(maxDays.toString().padStart(2, '0'))
+                            }}
+                            className="h-16 w-full rounded-2xl border-2 border-muted bg-background px-3 text-center text-lg font-black focus:border-primary transition-all outline-none"
+                          >
+                            <option value="">--</option>
+                            {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                              <option key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {dateDay && dateMonth && (
+                        <div className="text-center py-2 bg-primary/5 rounded-xl border border-primary/10">
+                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Fecha: </span>
+                          <span className="text-lg font-black text-primary">{formatDateNumber(dateDay.padStart(2, '0') + dateMonth.padStart(2, '0'))}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Número Jugado</label>
+                      <Input
+                        value={number}
+                        onChange={(event) =>
+                          setNumber(event.target.value.replace(/\D/g, '').slice(0, selectedGame?.digitCount || 2))
+                        }
+                        placeholder={`Ingrese ${selectedGame?.digitCount || 2} dígitos`}
+                        className="h-16 text-center text-3xl font-black rounded-2xl border-2 border-muted focus:border-primary transition-all tracking-[0.25em]"
+                        inputMode="numeric"
+                        maxLength={selectedGame?.digitCount || 2}
+                      />
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -325,7 +402,7 @@ export function SalesTerminal() {
                 size="lg"
                 className="h-14 w-full text-sm font-black uppercase tracking-tighter rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95"
                 onClick={handleAddToCart}
-                disabled={!selectedGame || !selectedSchedule || !number || amount <= 0 || !isCashOpen}
+                disabled={!selectedGame || !selectedSchedule || (!isCurrentGameDate && !number) || (isCurrentGameDate && (!dateDay || !dateMonth)) || amount <= 0 || !isCashOpen}
               >
                 <Plus className="mr-2 h-5 w-5" />
                 Añadir al Ticket
@@ -373,7 +450,7 @@ export function SalesTerminal() {
                           <Clock className="h-3 w-3" /> {item.scheduleName}
                         </div>
                         <div className="font-mono text-3xl font-black text-foreground">
-                          {item.number}
+                          {item.number.length === 4 ? formatDateNumber(item.number) : item.number}
                         </div>
                       </div>
                       <div className="text-right">

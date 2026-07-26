@@ -156,7 +156,7 @@ export function GamesManager() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-muted-foreground">Dígitos</div>
-                  <div className="text-lg font-semibold">{game.digitCount}</div>
+                  <div className="text-lg font-semibold">{game.digitCount === 4 ? 'Fecha' : game.digitCount}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">Multiplicador</div>
@@ -251,6 +251,7 @@ export function GamesManager() {
                     <SelectItem value="1">1 dígito</SelectItem>
                     <SelectItem value="2">2 dígitos</SelectItem>
                     <SelectItem value="3">3 dígitos</SelectItem>
+                    <SelectItem value="4">4 dígitos (Fecha)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -26,7 +26,8 @@ export const resultsService = {
       result.gameId, 
       result.schedule?.time || '', 
       result.schedule?.name || '',
-      result.winningNumber
+      result.winningNumber,
+      result.drawDate
     )
 
     let winnersCount = 0

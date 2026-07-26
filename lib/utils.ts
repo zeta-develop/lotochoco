@@ -42,3 +42,44 @@ export function formatTime12h(timeStr: string | undefined): string {
     return timeStr;
   }
 }
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]
+
+const MONTH_NAMES_SHORT = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+]
+
+/**
+ * Convierte un número de 4 dígitos en formato DDMM a texto legible "DD Mes".
+ * Ejemplo: "0505" → "05 Mayo", "2512" → "25 Diciembre"
+ */
+export function formatDateNumber(number: string, short?: boolean): string {
+  if (!number || number.length !== 4) return number
+  const day = number.substring(0, 2)
+  const monthIndex = parseInt(number.substring(2, 4), 10) - 1
+  if (monthIndex < 0 || monthIndex > 11) return number
+  const dayNum = parseInt(day, 10)
+  if (dayNum < 1 || dayNum > 31) return number
+  const names = short ? MONTH_NAMES_SHORT : MONTH_NAMES
+  return `${day} ${names[monthIndex]}`
+}
+
+/**
+ * Verifica si un juego usa formato de fecha (4 dígitos).
+ */
+export function isDateGame(digitCount: number): boolean {
+  return digitCount === 4
+}
+
+/**
+ * Retorna los días válidos para un mes dado (1-12).
+ */
+export function getDaysInMonth(month: number): number {
+  // Usar año actual como referencia
+  if (month < 1 || month > 12) return 31
+  return new Date(new Date().getFullYear(), month, 0).getDate()
+}

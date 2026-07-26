@@ -1,7 +1,7 @@
 // ESC/POS Printer Service para PT-210 (58mm)
 import type { Ticket, TicketItem, CashSession } from '@/lib/types'
 import { format } from 'date-fns'
-import { formatTime12h } from '@/lib/utils'
+import { formatTime12h, formatDateNumber } from '@/lib/utils'
 import { es } from 'date-fns/locale'
 
 // ESC/POS Commands
@@ -77,7 +77,7 @@ export function generateTicketReceipt(
   
   for (const item of ticket.items) {
     const gameName = (item.game?.name || 'NICA').substring(0, 10).padEnd(10)
-    const number = item.number.padStart(4)
+    const number = (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number).padStart(4)
     const multiplier = item.game?.multiplier || 70
     const prize = item.amount * multiplier
     const prizeStr = `${currency}${prize.toFixed(0)}`.padStart(12)

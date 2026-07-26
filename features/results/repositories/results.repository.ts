@@ -79,14 +79,22 @@ export const resultsRepository = {
     if (error) throw error
   },
 
-  async findMatchingTicketsForProcessing(gameId: string, scheduleTime: string, scheduleName: string, winningNumber: string) {
+  async findMatchingTicketsForProcessing(gameId: string, scheduleTime: string, scheduleName: string, winningNumber: string, drawDate: Date) {
+    // Calcular inicio y fin del día del sorteo para filtrar solo tickets de esa fecha
+    const startOfDay = new Date(drawDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(drawDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
     const { data: matchingItems } = await supabase
       .from('ticket_items')
-      .select(`*, tickets!inner(status)`)
+      .select(`*, tickets!inner(status, created_at)`)
       .eq('game_id', gameId)
       .eq('number', winningNumber)
       .eq('tickets.status', 'active')
       .or(`schedule.eq.${scheduleTime},schedule.eq.${scheduleName}`)
+      .gte('tickets.created_at', startOfDay.toISOString())
+      .lte('tickets.created_at', endOfDay.toISOString())
     
     return matchingItems || []
   },

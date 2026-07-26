@@ -24,9 +24,9 @@ import {
 
 import { useGamesManager } from '@/features/games/hooks/use-games-manager'
 import { useResultsManager, useTodayResults } from '../hooks/use-results-manager'
-import { Plus, Trophy, Check, Clock, Users } from 'lucide-react'
+import { Plus, Trophy, Check, Clock, Users, CalendarDays } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
-import { formatTime12h } from '@/lib/utils'
+import { formatTime12h, isDateGame, formatDateNumber, getDaysInMonth } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Game, DrawSchedule } from '@/lib/types'
@@ -42,11 +42,18 @@ export function ResultsManager() {
   const [winningNumber, setWinningNumber] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Estado para juegos de fecha (4 dígitos)
+  const [resultDateDay, setResultDateDay] = useState('')
+  const [resultDateMonth, setResultDateMonth] = useState('')
+  const isSelectedGameDate = isDateGame(selectedGame?.digitCount || 0)
+
   const handleGameChange = (gameId: string) => {
     const game = games.find(g => g.id === gameId)
     setSelectedGame(game as any)
     setSelectedSchedule(null)
     setWinningNumber('')
+    setResultDateDay('')
+    setResultDateMonth('')
   }
 
   const handleScheduleChange = (scheduleId: string) => {
@@ -55,14 +62,29 @@ export function ResultsManager() {
   }
 
   const handleSubmitResult = async () => {
-    if (!selectedGame || !selectedSchedule || !winningNumber) {
+    if (!selectedGame || !selectedSchedule) {
       toast({ variant: 'destructive', title: 'Completa todos los campos' })
       return
     }
 
-    if (winningNumber.length !== selectedGame.digitCount) {
-      toast({ variant: 'destructive', title: `El número debe tener ${selectedGame.digitCount} dígito(s)` })
-      return
+    let finalNumber = winningNumber
+
+    if (isSelectedGameDate) {
+      if (!resultDateDay || !resultDateMonth) {
+        toast({ variant: 'destructive', title: 'Selecciona día y mes' })
+        return
+      }
+      finalNumber = resultDateDay.padStart(2, '0') + resultDateMonth.padStart(2, '0')
+    } else {
+      if (!winningNumber) {
+        toast({ variant: 'destructive', title: 'Ingresa el número ganador' })
+        return
+      }
+      if (winningNumber.length !== selectedGame.digitCount) {
+        toast({ variant: 'destructive', title: `El número debe tener ${selectedGame.digitCount} dígito(s)` })
+        return
+      }
+      finalNumber = winningNumber.padStart(selectedGame.digitCount, '0')
     }
 
     setIsSubmitting(true)
@@ -70,13 +92,15 @@ export function ResultsManager() {
       await addResult({
         gameId: selectedGame.id,
         scheduleId: selectedSchedule.id,
-        winningNumber: winningNumber.padStart(selectedGame.digitCount, '0'),
+        winningNumber: finalNumber,
       })
       
       setShowCreateDialog(false)
       setSelectedGame(null)
       setSelectedSchedule(null)
       setWinningNumber('')
+      setResultDateDay('')
+      setResultDateMonth('')
       refreshToday()
     } catch (error) {
       toast({ variant: 'destructive', title: error instanceof Error ? error.message : 'Error al registrar resultado' })
@@ -89,6 +113,8 @@ export function ResultsManager() {
     setSelectedGame(null)
     setSelectedSchedule(null)
     setWinningNumber('')
+    setResultDateDay('')
+    setResultDateMonth('')
     setShowCreateDialog(true)
   }
 
@@ -139,7 +165,7 @@ export function ResultsManager() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-3xl font-bold font-mono text-primary">
-                      {result.winningNumber}
+                      {result.winningNumber.length === 4 ? formatDateNumber(result.winningNumber) : result.winningNumber}
                     </div>
                     {result.winners && result.winners.length > 0 && (
                       <Badge variant="default" className="flex items-center gap-1">
@@ -236,21 +262,68 @@ export function ResultsManager() {
 
             {selectedSchedule && (
               <div className="space-y-2">
-                <Label>Número Ganador</Label>
-                <Input
-                  value={winningNumber}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '')
-                    if (value.length <= (selectedGame?.digitCount || 2)) {
-                      setWinningNumber(value)
-                    }
-                  }}
-                  placeholder={`Ingresa ${selectedGame?.digitCount || 2} dígitos`}
-                  className="text-center text-3xl font-bold h-16 font-mono"
-                  maxLength={selectedGame?.digitCount || 2}
-                  type="tel"
-                  inputMode="numeric"
-                />
+                <Label>{isSelectedGameDate ? 'Fecha Ganadora' : 'Número Ganador'}</Label>
+                {isSelectedGameDate ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Día</Label>
+                        <select
+                          value={resultDateDay}
+                          onChange={(e) => setResultDateDay(e.target.value)}
+                          className="h-14 w-full rounded-lg border bg-background px-3 text-center text-2xl font-black focus:border-primary transition-all outline-none"
+                        >
+                          <option value="">--</option>
+                          {Array.from({ length: getDaysInMonth(parseInt(resultDateMonth) || 12) }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={d.toString().padStart(2, '0')}>
+                              {d.toString().padStart(2, '0')}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Mes</Label>
+                        <select
+                          value={resultDateMonth}
+                          onChange={(e) => {
+                            setResultDateMonth(e.target.value)
+                            const maxDays = getDaysInMonth(parseInt(e.target.value) || 12)
+                            if (parseInt(resultDateDay) > maxDays) setResultDateDay(maxDays.toString().padStart(2, '0'))
+                          }}
+                          className="h-14 w-full rounded-lg border bg-background px-3 text-center text-lg font-bold focus:border-primary transition-all outline-none"
+                        >
+                          <option value="">--</option>
+                          {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                            <option key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    {resultDateDay && resultDateMonth && (
+                      <div className="text-center py-2 bg-primary/5 rounded-lg border border-primary/10">
+                        <span className="text-sm text-muted-foreground">Fecha: </span>
+                        <span className="text-lg font-black text-primary">{formatDateNumber(resultDateDay.padStart(2, '0') + resultDateMonth.padStart(2, '0'))}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Input
+                    value={winningNumber}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '')
+                      if (value.length <= (selectedGame?.digitCount || 2)) {
+                        setWinningNumber(value)
+                      }
+                    }}
+                    placeholder={`Ingresa ${selectedGame?.digitCount || 2} dígitos`}
+                    className="text-center text-3xl font-bold h-16 font-mono"
+                    maxLength={selectedGame?.digitCount || 2}
+                    type="tel"
+                    inputMode="numeric"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -261,7 +334,7 @@ export function ResultsManager() {
             </Button>
             <Button 
               onClick={handleSubmitResult}
-              disabled={!selectedGame || !selectedSchedule || !winningNumber || isSubmitting}
+              disabled={!selectedGame || !selectedSchedule || (!isSelectedGameDate && !winningNumber) || (isSelectedGameDate && (!resultDateDay || !resultDateMonth)) || isSubmitting}
             >
               {isSubmitting ? (
                 'Procesando...'

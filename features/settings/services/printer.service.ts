@@ -5,7 +5,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { formatTime12h } from '@/lib/utils'
+import { formatTime12h, formatDateNumber } from '@/lib/utils'
 
 class EscPosBuilder {
   private buffer: number[] = []
@@ -145,7 +145,7 @@ JUEGO      NUM       MONTO
           // APUESTA(10) MONTO(10) PREMIO(12)
           return content
             .replace(/{{game}}/g, (item as any).gameName || (item as any).game?.name || 'Diaria')
-            .replace(/{{number}}/g, item.number.padEnd(8))
+            .replace(/{{number}}/g, (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number).padEnd(8))
             .replace(/{{amount}}/g, item.amount.toFixed(0).padEnd(8))
             .replace(/{{prize}}/g, prizePotential.toFixed(0).padStart(8))
             .replace(/{{currency}}/g, currency)
@@ -253,7 +253,7 @@ JUEGO      NUM       MONTO
 
           return content
             .replace(/{{game}}/g, gameName)
-            .replace(/{{number}}/g, item.number.padEnd(8))
+            .replace(/{{number}}/g, (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number).padEnd(8))
             .replace(/{{amount}}/g, item.amount.toFixed(0).padEnd(8))
             .replace(/{{prize}}/g, prizePotential.toFixed(0).padStart(8))
             .replace(/{{currency}}/g, currency)
