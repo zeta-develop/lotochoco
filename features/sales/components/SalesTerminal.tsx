@@ -110,6 +110,11 @@ export function SalesTerminal() {
   }
 
   const handleAddToCart = () => {
+    if (cart.length >= 15) {
+      toast({ variant: 'destructive', title: 'Límite alcanzado', description: 'Máximo 15 jugadas por ticket' })
+      return
+    }
+
     if (!selectedGame || !selectedSchedule || amount <= 0) {
       toast({ variant: 'destructive', title: 'Completa todos los campos' })
       return
@@ -402,7 +407,7 @@ export function SalesTerminal() {
                 size="lg"
                 className="h-14 w-full text-sm font-black uppercase tracking-tighter rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95"
                 onClick={handleAddToCart}
-                disabled={!selectedGame || !selectedSchedule || (!isCurrentGameDate && !number) || (isCurrentGameDate && (!dateDay || !dateMonth)) || amount <= 0 || !isCashOpen}
+                disabled={!selectedGame || !selectedSchedule || (!isCurrentGameDate && !number) || (isCurrentGameDate && (!dateDay || !dateMonth)) || amount <= 0 || !isCashOpen || cart.length >= 15}
               >
                 <Plus className="mr-2 h-5 w-5" />
                 Añadir al Ticket
@@ -413,22 +418,23 @@ export function SalesTerminal() {
 
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-none shadow-xl bg-card/40 rounded-3xl overflow-hidden flex flex-col h-full animate-in fade-in slide-in-from-bottom-4">
-            <CardHeader className="bg-primary/5 pb-6 border-b border-primary/5">
+            <CardHeader className="bg-primary/5 pb-4 border-b border-primary/5">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Ticket className="h-5 w-5" /></div>
                 <CardTitle className="text-lg font-black uppercase tracking-tighter">Ticket Actual</CardTitle>
-                <Badge className="ml-auto bg-primary text-white border-none rounded-full px-3">{cart.length}</Badge>
+                <Badge className="ml-auto bg-primary text-white border-none rounded-full px-3">{cart.length}/15</Badge>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-3">
+            <CardContent className="flex-1 overflow-y-auto p-3 space-y-1.5">
               {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-                  <div className="p-4 bg-muted/50 rounded-full"><ShoppingCart className="h-10 w-10 opacity-30" /></div>
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
+                  <div className="p-4 bg-muted/50 rounded-full"><ShoppingCart className="h-8 w-8 opacity-30" /></div>
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-60">El ticket está vacío</p>
                 </div>
-              ) : (
+              ) : cart.length <= 4 ? (
+                /* Vista detallada para pocas jugadas (1-4) */
                 cart.map((item) => (
-                  <div key={item.id} className="group flex flex-col gap-2 rounded-2xl border-2 border-muted bg-background p-4 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
+                  <div key={item.id} className="group flex flex-col gap-1.5 rounded-2xl border-2 border-muted bg-background p-3 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
                     <div className="flex items-center justify-between">
                       <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
@@ -437,40 +443,92 @@ export function SalesTerminal() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
+                        className="h-7 w-7 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
                         onClick={() => handleRemoveFromCart(item.id)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    
                     <div className="flex items-end justify-between">
                       <div>
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
-                          <Clock className="h-3 w-3" /> {item.scheduleName}
+                        <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" /> {item.scheduleName}
                         </div>
-                        <div className="font-mono text-3xl font-black text-foreground">
+                        <div className="font-mono text-2xl font-black text-foreground">
                           {item.number.length === 4 ? formatDateNumber(item.number) : item.number}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-black text-primary">
+                        <div className="text-lg font-black text-primary">
                           {currency}{item.amount.toFixed(2)}
                         </div>
-                        <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
+                        <div className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
                           Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
                         </div>
                       </div>
                     </div>
                   </div>
                 ))
+              ) : (
+                /* Vista compacta tipo tabla para muchas jugadas (5-15) */
+                <div className="space-y-0.5">
+                  {/* Encabezado de tabla */}
+                  <div className="grid grid-cols-12 gap-1 px-2 py-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground border-b border-muted">
+                    <div className="col-span-3">Juego</div>
+                    <div className="col-span-3 text-center">Número</div>
+                    <div className="col-span-2 text-right">Monto</div>
+                    <div className="col-span-3 text-right">Premio</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  {cart.map((item) => (
+                    <div
+                      key={item.id}
+                      className="group grid grid-cols-12 gap-1 items-center px-2 py-1.5 rounded-xl hover:bg-muted/30 transition-colors border border-transparent hover:border-primary/10"
+                    >
+                      <div className="col-span-3 min-w-0">
+                        <div className="text-[10px] font-black text-foreground truncate">{item.gameName}</div>
+                        <div className="text-[8px] font-bold text-muted-foreground flex items-center gap-0.5">
+                          <Clock className="h-2 w-2 shrink-0" /> {item.scheduleName}
+                        </div>
+                      </div>
+                      <div className="col-span-3 text-center">
+                        <span className="font-mono text-sm font-black text-foreground">
+                          {item.number.length === 4 ? formatDateNumber(item.number, true) : item.number}
+                        </span>
+                      </div>
+                      <div className="col-span-2 text-right">
+                        <span className="text-xs font-black text-primary">{currency}{item.amount.toFixed(0)}</span>
+                      </div>
+                      <div className="col-span-3 text-right">
+                        <span className="text-[10px] font-bold text-muted-foreground">{currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}</span>
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          onClick={() => handleRemoveFromCart(item.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Indicador de límite */}
+              {cart.length >= 15 && (
+                <div className="text-center py-2 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400">Límite de 15 jugadas alcanzado</p>
+                </div>
               )}
             </CardContent>
 
-            <div className="border-t-2 border-dashed border-muted p-6 space-y-6 bg-muted/10">
-              <div className="flex items-center justify-between text-lg font-black uppercase tracking-tighter">
-                <span>Total a Pagar</span>
-                <span className="text-3xl text-primary">{currency}{getCartTotal().toFixed(2)}</span>
+            <div className="border-t-2 border-dashed border-muted p-4 space-y-4 bg-muted/10">
+              <div className="flex items-center justify-between font-black uppercase tracking-tighter">
+                <span className="text-sm">Total a Pagar</span>
+                <span className="text-2xl text-primary">{currency}{getCartTotal().toFixed(2)}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -478,7 +536,7 @@ export function SalesTerminal() {
                   variant="outline" 
                   onClick={clearCart} 
                   disabled={cart.length === 0}
-                  className="h-14 rounded-2xl font-black uppercase text-[10px] border-2 shadow-sm"
+                  className="h-12 rounded-2xl font-black uppercase text-[10px] border-2 shadow-sm"
                 >
                   <X className="mr-2 h-4 w-4" />
                   Descartar
@@ -486,7 +544,7 @@ export function SalesTerminal() {
                 <Button 
                   onClick={() => setShowConfirmDialog(true)} 
                   disabled={cart.length === 0 || !isCashOpen}
-                  className="h-14 rounded-2xl font-black uppercase text-[11px] shadow-xl shadow-primary/20 active:scale-95 transition-all"
+                  className="h-12 rounded-2xl font-black uppercase text-[11px] shadow-xl shadow-primary/20 active:scale-95 transition-all"
                 >
                   <Check className="mr-2 h-4 w-4" />
                   Imprimir Venta
