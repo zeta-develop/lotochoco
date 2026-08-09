@@ -9,10 +9,12 @@ interface TicketReceiptProps {
   settings?: Record<string, string>;
   vendorName?: string;
   terminalName?: string;
+  /** Modo compacto: reduce padding y fuente para que hasta 15 jugadas quepan sin scroll. */
+  compact?: boolean;
 }
 
 export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
-  ({ ticket, settings, vendorName, terminalName }, ref) => {
+  ({ ticket, settings, vendorName, terminalName, compact = false }, ref) => {
     const template = settings?.ticketTemplate || `# {{businessName}}
 RECIBO DE VENTA
 --------------------------------
@@ -43,7 +45,9 @@ JUEGO      NUM       MONTO
           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
           .replace(/_(.*?)_/g, '<em>$1</em>')
         
-        let className = "text-[11px] font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"
+        let className = compact
+          ? "text-[10px] font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"
+          : "text-[11px] font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"
         if (line.startsWith('# ')) {
           className = "text-lg font-bold text-center uppercase mb-1"
           content = content.replace('# ', '')
@@ -63,11 +67,11 @@ JUEGO      NUM       MONTO
     return (
       <div
         ref={ref}
-        className="bg-white text-black p-6 font-mono mx-auto w-full max-w-[320px] print:w-[58mm] print:p-0"
+        className={`bg-white text-black font-mono mx-auto w-full max-w-[320px] print:w-[58mm] print:p-0 ${compact ? 'p-2' : 'p-6'}`}
       >
         <div 
           style={{ width: paperWidth }}
-          className="border-2 border-black/5 p-4 rounded-sm shadow-inner bg-slate-50/50 mx-auto print:bg-transparent print:border-none print:shadow-none print:p-0 print:w-full"
+          className={`border-2 border-black/5 rounded-sm shadow-inner bg-slate-50/50 mx-auto print:bg-transparent print:border-none print:shadow-none print:p-0 print:w-full ${compact ? 'p-2' : 'p-4'}`}
         >
           {renderTemplate(template)}
         </div>

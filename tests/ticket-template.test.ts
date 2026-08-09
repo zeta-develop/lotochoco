@@ -4,7 +4,7 @@
  */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { renderTicketTemplate } from "../lib/ticket-template.ts";
+import { renderTicketTemplate } from "../lib/ticket-template";
 
 const TEMPLATE_HONDURENO = `# {{businessName}}
 **Juego:** {{gameName}}
