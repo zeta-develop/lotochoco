@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Printer, X, Share2, Loader2 } from "lucide-react"
@@ -27,15 +27,20 @@ export function TicketPreview({
   onClose 
 }: TicketPreviewProps) {
   const [isSharing, setIsSharing] = useState(false)
+  const ticketRef = useRef<HTMLDivElement | null>(null)
 
   const handleShare = async () => {
     try {
       setIsSharing(true)
-      const result = await printerService.shareTicketPDF(ticket as any, {
-        businessName,
-        currency,
-        ticketMessage
-      })
+      const result = await printerService.shareTicketImage(
+        ticket as any,
+        {
+          businessName,
+          currency,
+          ticketMessage
+        },
+        ticketRef.current
+      )
       if (!result.success) {
         toast({
           variant: "destructive",
@@ -90,7 +95,7 @@ export function TicketPreview({
       <Card className="w-full max-w-[320px] bg-white text-black shadow-2xl border-0 overflow-hidden" onClick={(event) => event.stopPropagation()}>
         <CardContent className="p-0 flex flex-col max-h-[85vh]">
           {/* Ticket Content - Simula papel termico */}
-          <div className="p-5 overflow-y-auto" style={{ fontFamily: "'Courier New', Courier, monospace" }}>
+          <div ref={ticketRef} className="p-5 overflow-y-auto" style={{ fontFamily: "'Courier New', Courier, monospace" }}>
             <div className="text-sm">
               {/* Header */}
               <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">

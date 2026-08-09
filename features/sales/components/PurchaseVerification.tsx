@@ -5,24 +5,45 @@ import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Check, Printer, Repeat, Share2 } from 'lucide-react'
+import { ArrowLeft, Check, Printer, Repeat, Share2, Trash2 } from 'lucide-react'
 import type { CartItem } from '../domain/types'
+import type { Ticket, TicketItem, Game } from '@/lib/types'
+
+export type TicketWithDetails = Ticket & {
+  items?: (TicketItem & { game?: Game })[]
+}
 
 interface PurchaseVerificationProps {
-  cart: CartItem[]
+  /** Modo checkout: cart viene del store y onConfirm crea la venta. */
+  cart?: CartItem[]
+  /** Modo view: ticket ya vendido (reportes). onReprint solo reimprime. */
+  ticket?: TicketWithDetails
   currency: string
   isProcessing: boolean
   onBack: () => void
-  onShare: () => void
-  onConfirm: () => void
+  onShare: (element: HTMLElement | null) => void
+  /** Solo modo checkout: confirma y crea la venta. */
+  onConfirm?: () => void
+  /** Solo modo view: reimprime el ticket existente (no crea compra). */
+  onReprint?: () => void
+  /** Modo view opcional: repite la jugada cargándola al carrito. */
+  onRepeat?: () => void
+  /** Modo view opcional: anula el ticket vendido. */
+  onDelete?: () => void
+  /** Ref para capturar el boleto como imagen. */
+  captureRef?: React.RefObject<HTMLDivElement | null>
 }
 
 /**
  * Página completa de verificación de compra (reemplaza el modal anterior).
  *
- * Muestra las 15 jugadas simultáneamente sin scroll vertical, agrupando
- * la información común (juego/sorteo) una sola vez. Ocupa todo el viewport
- * disponible del área de contenido.
+ * Dos modos:
+ * - checkout: muestra el carrito y confirma la venta (flujo de compra).
+ * - view: muestra un ticket YA VENDIDO (reportes); IMPRIMIR solo reimprime,
+ *   nunca genera una nueva compra.
+ *
+ * Muestra hasta 15 jugadas simultáneamente sin scroll vertical, agrupando
+ * la información común (juego/sorteo) una sola vez.
  *
  * Layout:
  *   [← Verificar compra]
@@ -33,23 +54,55 @@ interface PurchaseVerificationProps {
  */
 export function PurchaseVerification({
   cart,
+  ticket,
   currency,
   isProcessing,
   onBack,
   onShare,
   onConfirm,
+  onReprint,
+  onRepeat,
+  onDelete,
+  captureRef,
 }: PurchaseVerificationProps) {
-  const total = useMemo(() => cart.reduce((sum, item) => sum + item.amount, 0), [cart])
+  const isViewMode = Boolean(ticket)
+
+  // Fuente de datos según modo
+  const items = useMemo(() => {
+    if (ticket?.items) {
+      return ticket.items.map((item) => ({
+        id: item.id,
+        number: item.number,
+        amount: item.amount,
+        multiplier: item.game?.multiplier ?? 70,
+        gameName: item.game?.name || 'Juego',
+        scheduleName: item.schedule || '',
+      }))
+    }
+    return (cart || []).map((item) => ({
+      id: item.id,
+      number: item.number,
+      amount: item.amount,
+      multiplier: item.multiplier ?? 70,
+      gameName: item.gameName,
+      scheduleName: item.scheduleName || item.schedule || '',
+    }))
+  }, [cart, ticket])
+
+  const total = useMemo(
+    () => (ticket ? ticket.totalAmount : (cart || []).reduce((sum, item) => sum + item.amount, 0)),
+    [cart, ticket]
+  )
 
   // Información agrupada: si todas las jugadas comparten juego/sorteo, se
   // muestra una sola vez (no repetida en cada fila)
-  const gameName = cart[0]?.gameName || ''
-  const scheduleName = cart[0]?.scheduleName || ''
-  const allSameGame = cart.every((i) => i.gameName === gameName)
-  const allSameSchedule = cart.every((i) => i.scheduleName === scheduleName)
+  const gameName = items[0]?.gameName || ''
+  const scheduleName = items[0]?.scheduleName || ''
+  const allSameGame = items.every((i) => i.gameName === gameName)
+  const allSameSchedule = items.every((i) => i.scheduleName === scheduleName)
   const showContext = allSameGame || allSameSchedule
 
-  // Android Back Button: regresa a la pantalla anterior conservando el carrito
+  // Android Back Button: regresa a la pantalla anterior conservando el estado
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -64,6 +117,8 @@ export function PurchaseVerification({
       handler?.remove()
     }
   }, [onBack])
+
+  const headerTitle = isViewMode ? `Ticket ${ticket?.ticketNumber || ''}` : 'Verificar compra'
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -80,7 +135,7 @@ export function PurchaseVerification({
         </Button>
         <div className="min-w-0">
           <h1 className="text-[15px] font-black uppercase tracking-tighter text-foreground leading-tight truncate">
-            Verificar compra
+            {headerTitle}
           </h1>
           {showContext && (
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight truncate">
@@ -91,88 +146,113 @@ export function PurchaseVerification({
           )}
         </div>
         <Badge className="ml-auto bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] rounded-full px-2.5">
-          {cart.length}/15
+          {items.length}/15
         </Badge>
+        {isViewMode && onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl text-red-500 hover:bg-red-500/10 active:scale-95 transition-all"
+            onClick={onDelete}
+            aria-label="Anular ticket"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </header>
 
-      {/* Lista compacta de jugadas: 15 filas visibles sin scroll */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
-          <div className="col-span-4 pl-1">Número</div>
-          <div className="col-span-3 text-right">Monto</div>
-          <div className="col-span-5 text-right pr-1">Premio</div>
-        </div>
+      {/* Boleto capturable como imagen (ref) */}
+      <div ref={captureRef} className="flex-1 min-h-0 flex flex-col bg-white">
+        {/* Lista compacta de jugadas: 15 filas visibles sin scroll */}
+        <div className="flex-1 min-h-0 overflow-hidden px-2 pt-1">
+          <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+            <div className="col-span-4 pl-1">Número</div>
+            <div className="col-span-3 text-right">Monto</div>
+            <div className="col-span-5 text-right pr-1">Premio</div>
+          </div>
 
-        <div className="h-[calc(100%-26px)] overflow-hidden">
-          <div className="flex flex-col">
-            {cart.map((item) => {
-              const prize = (item.amount || 0) * (item.multiplier || 0)
-              const number = item.number
-              return (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-12 items-center gap-1 px-2 py-[5px] border-b border-muted/30 min-h-[32px]"
-                >
-                  <div className="col-span-4 flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-[15px] font-black text-foreground leading-none tracking-tight">
-                      {number}
-                    </span>
-                    {!showContext && (
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase truncate">
-                        {item.gameName}
+          <div className="h-[calc(100%-26px)] overflow-hidden">
+            <div className="flex flex-col">
+              {items.map((item) => {
+                const prize = (item.amount || 0) * (item.multiplier || 0)
+                return (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-12 items-center gap-1 px-2 py-[5px] border-b border-muted/30 min-h-[32px]"
+                  >
+                    <div className="col-span-4 flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-[15px] font-black text-foreground leading-none tracking-tight">
+                        {item.number}
                       </span>
-                    )}
+                      {!showContext && (
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase truncate">
+                          {item.gameName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="col-span-3 text-right">
+                      <span className="text-[13px] font-black text-primary leading-none">
+                        {currency}{item.amount.toFixed(0)}
+                      </span>
+                    </div>
+                    <div className="col-span-5 text-right pr-1">
+                      <span className="text-[11px] font-bold text-muted-foreground leading-none">
+                        {currency}{prize.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="col-span-3 text-right">
-                    <span className="text-[13px] font-black text-primary leading-none">
-                      {currency}{item.amount.toFixed(0)}
-                    </span>
-                  </div>
-                  <div className="col-span-5 text-right pr-1">
-                    <span className="text-[11px] font-bold text-muted-foreground leading-none">
-                      {currency}{prize.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Total fijo, siempre visible */}
-      <div className="shrink-0 border-t-2 border-muted/60 px-2 py-2 flex items-center justify-between bg-muted/10">
-        <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-          Total
-        </span>
-        <span className="text-2xl font-black text-primary leading-none tracking-tighter">
-          {currency}{total.toFixed(2)}
-        </span>
+        {/* Total fijo, siempre visible */}
+        <div className="shrink-0 border-t-2 border-muted/60 px-4 py-2 flex items-center justify-between bg-muted/10">
+          <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+            Total
+          </span>
+          <span className="text-2xl font-black text-primary leading-none tracking-tighter">
+            {currency}{total.toFixed(2)}
+          </span>
+        </div>
       </div>
 
       {/* Acciones: Imprimir primaria, secundarias compactas */}
       <div className="shrink-0 grid grid-cols-3 gap-2 pt-2 pb-[env(safe-area-inset-bottom,0px)]">
         <Button
           variant="outline"
-          onClick={onShare}
+          onClick={() => onShare(captureRef?.current ?? null)}
           disabled={isProcessing}
           className="h-11 rounded-xl font-black uppercase text-[9px] border-2 flex flex-col gap-0.5"
         >
           <Share2 className="h-4 w-4" />
           Compartir
         </Button>
+        {isViewMode && onRepeat ? (
+          <Button
+            variant="secondary"
+            onClick={onRepeat}
+            disabled={isProcessing}
+            className="h-11 rounded-xl font-black uppercase text-[9px] flex flex-col gap-0.5"
+          >
+            <Repeat className="h-4 w-4" />
+            Repetir
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            onClick={onBack}
+            disabled={isProcessing}
+            className="h-11 rounded-xl font-black uppercase text-[9px] flex flex-col gap-0.5"
+          >
+            <Repeat className="h-4 w-4" />
+            Repetir
+          </Button>
+        )}
         <Button
-          variant="secondary"
-          onClick={onBack}
-          disabled={isProcessing}
-          className="h-11 rounded-xl font-black uppercase text-[9px] flex flex-col gap-0.5"
-        >
-          <Repeat className="h-4 w-4" />
-          Repetir
-        </Button>
-        <Button
-          onClick={onConfirm}
-          disabled={isProcessing || cart.length === 0}
+          onClick={isViewMode ? onReprint : onConfirm}
+          disabled={isProcessing || items.length === 0}
           className="h-11 rounded-xl font-black uppercase text-[9px] bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-95 transition-all flex flex-col gap-0.5"
         >
           {isProcessing ? (
@@ -183,7 +263,7 @@ export function PurchaseVerification({
           ) : (
             <>
               <Printer className="h-4 w-4" />
-              Imprimir
+              {isViewMode ? 'Reimprimir' : 'Imprimir'}
             </>
           )}
         </Button>
@@ -192,7 +272,7 @@ export function PurchaseVerification({
       {/* Nota de confirmación */}
       <p className="shrink-0 text-center text-[9px] font-bold text-muted-foreground/70 uppercase tracking-widest pb-1 flex items-center justify-center gap-1">
         <Check className="h-3 w-3 text-primary" />
-        Verifica el monto antes de generar el ticket
+        {isViewMode ? 'Ticket ya vendido · Reimprimir no genera nueva compra' : 'Verifica el monto antes de generar el ticket'}
       </p>
     </div>
   )

@@ -1,11 +1,11 @@
 import { bluetoothService } from './bluetooth.service'
 import type { Ticket, CashSession } from '@/lib/types'
-import { jsPDF } from 'jspdf'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatTime12h, formatDateNumber } from '@/lib/utils'
+import { toPng } from 'html-to-image'
 
 class EscPosBuilder {
   private buffer: number[] = []
@@ -195,210 +195,46 @@ JUEGO      NUM       MONTO
     return true
   },
 
-  async shareTicketPDF(ticket: Ticket, settings: Record<string, string>) {
+  async shareTicketImage(ticket: Ticket, settings: Record<string, string>, element: HTMLElement | null) {
     try {
-      const currency = settings.currency || 'C$'
-      const ticketMessage = settings.ticketMessage || '¡Gracias por su compra!'
       const businessName = settings.businessName || 'LOTOCHOCO'
 
-      let ticketDate = new Date();
-      try {
-        if (ticket.createdAt) {
-          ticketDate = new Date(ticket.createdAt);
-          if (isNaN(ticketDate.getTime())) ticketDate = new Date();
-        }
-      } catch (e) {
-        console.warn('Error al procesar fecha del ticket:', e);
+      if (!element) {
+        throw new Error('No se pudo capturar el ticket')
       }
 
-      const items = ticket.items || []
-      const itemHeight = 18
-      const hasClient = Boolean(ticket.client)
-      const metaHeight = hasClient ? 20 : 15
-      const contentHeight = Math.max(130, 68 + metaHeight + (items.length * itemHeight))
-
-      const doc = new jsPDF({
-        unit: 'mm',
-        format: [80, contentHeight]
+      // Capturar el boleto como imagen PNG (estilo captura de pantalla)
+      const dataUrl = await toPng(element, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
       })
 
-      // 1. Fondo Blanco Limpio
-      doc.setFillColor(255, 255, 255)
-      doc.rect(0, 0, 80, contentHeight, 'F')
-
-      // 2. Barra Superior de Acento Esmeralda
-      doc.setFillColor(5, 150, 105) // Emerald 600
-      doc.rect(0, 0, 80, 4, 'F')
-
-      // 3. Encabezado / Nombre del Negocio
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(15)
-      doc.setTextColor(15, 23, 42) // Slate 900
-      doc.text(businessName.toUpperCase(), 40, 12, { align: 'center' })
-
-      doc.setFontSize(7)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(5, 150, 105)
-      doc.text('COMPROBANTE OFICIAL DE VENTA', 40, 16, { align: 'center' })
-
-      // Badge Número de Ticket
-      doc.setFillColor(241, 245, 249) // Slate 100
-      doc.setDrawColor(226, 232, 240) // Slate 200
-      doc.roundedRect(18, 19, 44, 6, 3, 3, 'FD')
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(15, 23, 42)
-      doc.text(`TICKET #${ticket.ticketNumber || 'N/A'}`, 40, 23.2, { align: 'center' })
-
-      // 4. Tarjeta de Metadata (Fecha, Cliente, Estado)
-      doc.setFillColor(248, 250, 252) // Slate 50
-      doc.setDrawColor(226, 232, 240)
-      doc.roundedRect(5, 28, 70, metaHeight, 2, 2, 'FD')
-
-      doc.setFontSize(7.5)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(100, 116, 139) // Slate 500
-      doc.text('FECHA:', 8, 33)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(15, 23, 42)
-      doc.text(format(ticketDate, 'dd/MM/yyyy - hh:mm:ss a', { locale: es }), 23, 33)
-
-      if (hasClient && ticket.client) {
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(100, 116, 139)
-        doc.text('CLIENTE:', 8, 38)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(15, 23, 42)
-        doc.text(ticket.client.toUpperCase(), 23, 38)
-      }
-
-      const statusY = hasClient ? 43 : 38
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(100, 116, 139)
-      doc.text('ESTADO:', 8, statusY)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(5, 150, 105)
-      doc.text('COMPLETADO', 23, statusY)
-
-      // 5. Encabezado de Tabla de Jugadas
-      let y = 32 + metaHeight
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7.5)
-      doc.setTextColor(100, 116, 139)
-      doc.text('JUGADA / NÚMERO', 8, y)
-      doc.text('INVERSIÓN', 72, y, { align: 'right' })
-      y += 2
-
-      // Línea divisoria
-      doc.setDrawColor(226, 232, 240)
-      doc.setLineWidth(0.3)
-      doc.line(5, y, 75, y)
-      y += 3
-
-      // 6. Lista de Jugadas
-      items.forEach((item) => {
-        const gameName = (item as any).gameName || (item as any).game?.name || 'JUEGO'
-        const scheduleSource = (item as any).scheduleName || (item as any).schedule || 'Sorteo'
-        const scheduleName = scheduleSource === 'Sorteo' ? scheduleSource : formatTime12h(scheduleSource)
-        const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
-        const prizePotential = item.amount * multiplier
-        const formattedNum = item.number.length === 4 ? formatDateNumber(item.number) : item.number
-
-        // Tarjeta de Jugada
-        doc.setFillColor(248, 250, 252)
-        doc.setDrawColor(226, 232, 240)
-        doc.roundedRect(5, y, 70, 15, 2, 2, 'FD')
-
-        // Borde izquierdo esmeralda
-        doc.setFillColor(5, 150, 105)
-        doc.roundedRect(5, y, 2, 15, 1, 1, 'F')
-
-        // Juego y Horario
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(7.5)
-        doc.setTextColor(5, 150, 105)
-        doc.text(gameName.toUpperCase(), 9, y + 4.5)
-
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(6.5)
-        doc.setTextColor(100, 116, 139)
-        doc.text(`(${scheduleName})`, 9 + doc.getTextWidth(`${gameName.toUpperCase()} `), y + 4.5)
-
-        // Número Jugado (Destacado)
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(11)
-        doc.setTextColor(15, 23, 42)
-        doc.text(formattedNum, 9, y + 11.5)
-
-        // Monto Invertido
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(9)
-        doc.setTextColor(15, 23, 42)
-        doc.text(`${currency}${item.amount.toFixed(2)}`, 72, y + 5.5, { align: 'right' })
-
-        // Premio Potencial
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(6.5)
-        doc.setTextColor(100, 116, 139)
-        doc.text(`Premio: ${currency}${prizePotential.toLocaleString()}`, 72, y + 11, { align: 'right' })
-
-        y += itemHeight
-      })
-
-      // 7. Tarjeta de Total
-      y += 1
-      doc.setFillColor(5, 150, 105) // Fondo Esmeralda
-      doc.roundedRect(5, y, 70, 15, 2.5, 2.5, 'F')
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8.5)
-      doc.setTextColor(255, 255, 255)
-      doc.text('TOTAL A PAGAR:', 9, y + 9)
-
-      doc.setFontSize(13)
-      doc.text(`${currency}${(ticket.totalAmount || 0).toFixed(2)}`, 72, y + 9.5, { align: 'right' })
-
-      // 8. Pie de página
-      y += 20
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7.5)
-      doc.setTextColor(51, 65, 85)
-      doc.text(ticketMessage, 40, y, { align: 'center' })
-
-      doc.setFontSize(6.5)
-      doc.setTextColor(148, 163, 184)
-      doc.text('Verifique su ticket antes de retirarse. Conservar para reclamos.', 40, y + 4.5, { align: 'center' })
-
-      doc.setFontSize(6)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(5, 150, 105)
-      doc.text('LOTOCHOCO POS • SISTEMA OFFLINE DE LOTERÍA', 40, y + 8.5, { align: 'center' })
-
-      const pdfBase64 = doc.output('datauristring').split(',')[1]
-      const fileName = `ticket_${ticket.ticketNumber}.pdf`
+      const base64 = dataUrl.split(',')[1]
+      const fileName = `ticket_${ticket.ticketNumber || 'preview'}.png`
 
       await Filesystem.writeFile({
         path: fileName,
-        data: pdfBase64,
-        directory: Directory.Cache
+        data: base64,
+        directory: Directory.Cache,
       })
 
       const fileUri = await Filesystem.getUri({
         directory: Directory.Cache,
-        path: fileName
+        path: fileName,
       })
 
       await Share.share({
         title: `Ticket #${ticket.ticketNumber}`,
         text: `Comprobante de Ticket #${ticket.ticketNumber} - ${businessName}`,
         url: fileUri.uri,
-        dialogTitle: 'Compartir Comprobante'
+        dialogTitle: 'Compartir Comprobante',
       })
 
       return { success: true }
     } catch (error) {
-      console.error('Error sharing PDF:', error)
-      return { success: false, message: 'No se pudo generar o compartir el PDF' }
+      console.error('Error sharing ticket image:', error)
+      return { success: false, message: 'No se pudo generar o compartir la imagen del ticket' }
     }
   },
 
