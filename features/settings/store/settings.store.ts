@@ -16,8 +16,6 @@ export const useSettingsStore = create<SettingsState>()(
         businessName: 'Lotería La Fortuna',
         currency: 'C$',
         ticketMessage: '¡Buena suerte!',
-        vendorName: '',
-        terminalName: 'Terminal 1',
         printerType: 'network',
         printerAddress: '192.168.1.100',
         darkMode: 'false',

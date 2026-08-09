@@ -5,8 +5,6 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   businessName: 'Lotería La Fortuna',
   currency: 'C$',
   ticketMessage: '¡Buena suerte! Gracias por su compra.',
-  vendorName: '',
-  terminalName: 'Terminal 1',
   ticketFontSize: 'normal',
   ticketFontType: 'A',
   ticketDensity: '1',

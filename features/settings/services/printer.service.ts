@@ -6,7 +6,6 @@ import { Share } from '@capacitor/share'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatTime12h, formatDateNumber } from '@/lib/utils'
-import { renderTicketTemplate, type TemplateTicket } from '@/lib/ticket-template'
 
 class EscPosBuilder {
   private buffer: number[] = []
@@ -101,27 +100,55 @@ JUEGO      NUM       MONTO
       const builder = new EscPosBuilder()
       builder.init()
 
-      // Renderizar el template con el motor unificado (vendedor/puesto reales)
-      // y formateo de columnas para ancho 58mm/80mm
-      let processed = renderTicketTemplate(template, ticket as TemplateTicket, settings, {
-        vendorName: settings.vendorName,
-        terminalName: settings.terminalName,
-      })
+      // Validar fecha
+      let ticketDate = new Date();
+      try {
+        if (ticket.createdAt) {
+          ticketDate = new Date(ticket.createdAt);
+          if (isNaN(ticketDate.getTime())) ticketDate = new Date();
+        }
+      } catch (e) {
+        console.warn('Error al procesar fecha del ticket:', e);
+      }
 
-      // Formateo de columnas simple (suponiendo 32 chars de ancho)
-      // APUESTA(10) MONTO(10) PREMIO(12)
+      const currency = settings.currency || 'C$'
+      const ticketMessage = settings.ticketMessage || '¡Gracias por su compra!'
+      const businessName = settings.businessName || 'LOTOCHOCO'
+      
+      // Obtener info del primer item para el encabezado si es necesario
+      const firstItem = ticket.items?.[0] as any
+      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
+      const scheduleSource = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
+      const scheduleName = scheduleSource === 'Sorteo' ? scheduleSource : formatTime12h(scheduleSource)
+
+      let processed = template
+        .replace(/{{businessName}}/g, businessName)
+        .replace(/{{ticketNumber}}/g, ticket.ticketNumber || 'N/A')
+        .replace(/{{date}}/g, format(ticketDate, 'dd-MM-yyyy hh:mm:ss a', { locale: es }))
+        .replace(/{{gameName}}/g, gameName)
+        .replace(/{{scheduleName}}/g, scheduleName)
+        .replace(/{{vendorName}}/g, 'Yamileth') // TODO: Vincular con usuario real
+        .replace(/{{terminalName}}/g, '= J081 =') // TODO: Vincular con terminal real
+        .replace(/{{currency}}/g, currency)
+        .replace(/{{total}}/g, (ticket.totalAmount || 0).toFixed(0))
+        .replace(/{{ticketMessage}}/g, ticketMessage)
+        .replace(/{{#if client}}([\s\S]*?){{\/if}}/g, ticket.client ? `$1`.replace(/{{client}}/g, ticket.client.toUpperCase()) : '')
+        .replace(/{{client}}/g, ticket.client ? ticket.client.toUpperCase() : '')
+
       const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
       processed = processed.replace(itemsRegex, (match, content) => {
         return (ticket.items || []).map(item => {
           const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
           const prizePotential = item.amount * multiplier
 
+          // Formateo de columnas simple (suponiendo 32 chars de ancho)
+          // APUESTA(10) MONTO(10) PREMIO(12)
           return content
             .replace(/{{game}}/g, (item as any).gameName || (item as any).game?.name || 'Diaria')
             .replace(/{{number}}/g, (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number).padEnd(8))
             .replace(/{{amount}}/g, item.amount.toFixed(0).padEnd(8))
             .replace(/{{prize}}/g, prizePotential.toFixed(0).padStart(8))
-            .replace(/{{currency}}/g, settings.currency || 'C$')
+            .replace(/{{currency}}/g, currency)
         }).join('\n')
       })
 
@@ -187,9 +214,7 @@ JUEGO      NUM       MONTO
       const items = ticket.items || []
       const itemHeight = 18
       const hasClient = Boolean(ticket.client)
-      const vendorName = settings.vendorName || ''
-      const terminalName = settings.terminalName || ''
-      const metaHeight = (hasClient ? 20 : 15) + (vendorName ? 5 : 0) + (terminalName ? 5 : 0)
+      const metaHeight = hasClient ? 20 : 15
       const contentHeight = Math.max(130, 68 + metaHeight + (items.length * itemHeight))
 
       const doc = new jsPDF({
@@ -225,57 +250,35 @@ JUEGO      NUM       MONTO
       doc.setTextColor(15, 23, 42)
       doc.text(`TICKET #${ticket.ticketNumber || 'N/A'}`, 40, 23.2, { align: 'center' })
 
-      // 4. Tarjeta de Metadata (Fecha, Cliente, Vendedor, Puesto, Estado)
+      // 4. Tarjeta de Metadata (Fecha, Cliente, Estado)
       doc.setFillColor(248, 250, 252) // Slate 50
       doc.setDrawColor(226, 232, 240)
       doc.roundedRect(5, 28, 70, metaHeight, 2, 2, 'FD')
 
-      let metaY = 33
       doc.setFontSize(7.5)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(100, 116, 139) // Slate 500
-      doc.text('FECHA:', 8, metaY)
+      doc.text('FECHA:', 8, 33)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(15, 23, 42)
-      doc.text(format(ticketDate, 'dd/MM/yyyy - hh:mm:ss a', { locale: es }), 23, metaY)
+      doc.text(format(ticketDate, 'dd/MM/yyyy - hh:mm:ss a', { locale: es }), 23, 33)
 
       if (hasClient && ticket.client) {
-        metaY += 5
         doc.setFont('helvetica', 'bold')
         doc.setTextColor(100, 116, 139)
-        doc.text('CLIENTE:', 8, metaY)
+        doc.text('CLIENTE:', 8, 38)
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(15, 23, 42)
-        doc.text(ticket.client.toUpperCase(), 23, metaY)
+        doc.text(ticket.client.toUpperCase(), 23, 38)
       }
 
-      if (vendorName) {
-        metaY += 5
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(100, 116, 139)
-        doc.text('VENDEDOR:', 8, metaY)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(15, 23, 42)
-        doc.text(vendorName.toUpperCase(), 23, metaY)
-      }
-
-      if (terminalName) {
-        metaY += 5
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(100, 116, 139)
-        doc.text('PUESTO:', 8, metaY)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(15, 23, 42)
-        doc.text(terminalName.toUpperCase(), 23, metaY)
-      }
-
-      metaY += 5
+      const statusY = hasClient ? 43 : 38
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(100, 116, 139)
-      doc.text('ESTADO:', 8, metaY)
+      doc.text('ESTADO:', 8, statusY)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(5, 150, 105)
-      doc.text('COMPLETADO', 23, metaY)
+      doc.text('COMPLETADO', 23, statusY)
 
       // 5. Encabezado de Tabla de Jugadas
       let y = 32 + metaHeight
