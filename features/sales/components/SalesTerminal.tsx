@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { useSalesStore } from '../store/sales.store'
 import { useCheckout } from '../hooks/use-checkout'
+import { PurchaseVerification } from './PurchaseVerification'
 import { useGamesManager } from '@/features/games/hooks/use-games-manager'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { useCurrentSession } from '@/features/cash/hooks/use-cash-manager'
@@ -183,6 +184,37 @@ export function SalesTerminal() {
     }
   }
 
+  // Comparte una vista previa del boleto (sin crear la venta) desde la
+  // página de verificación. Solo construcción de presentación: no toca
+  // lógica de negocio ni el proceso de compra.
+  const handleSharePreview = async () => {
+    if (cart.length === 0) return
+    toast({ title: 'Generando PDF...' })
+
+    const previewTicket = {
+      id: 'preview',
+      ticketNumber: 'VERIFICACIÓN',
+      totalAmount: getCartTotal(),
+      status: 'active' as const,
+      client: client || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      items: cart.map((item) => ({
+        id: item.id,
+        ticketId: 'preview',
+        gameId: item.gameId,
+        number: item.number,
+        amount: item.amount,
+        schedule: item.schedule,
+        createdAt: new Date(),
+        game: { name: item.gameName, multiplier: item.multiplier },
+      })),
+    }
+
+    const result = await printerService.shareTicketPDF(previewTicket as any, settings as any)
+    if (!result.success) toast({ variant: 'destructive', title: 'Error al compartir ticket' })
+  }
+
   const handlePrint = async () => {
     if (!lastTicket) return
 
@@ -224,6 +256,23 @@ export function SalesTerminal() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Cargando Juegos...</p>
         </div>
+      </div>
+    )
+  }
+
+  // Página completa de verificación de compra (reemplaza el modal anterior):
+  // ocupa todo el viewport disponible y muestra las 15 jugadas sin scroll.
+  if (showConfirmDialog) {
+    return (
+      <div className="-m-4 h-[calc(100dvh-4rem-env(safe-area-inset-bottom,0px))]">
+        <PurchaseVerification
+          cart={cart}
+          currency={currency}
+          isProcessing={isProcessing}
+          onBack={() => setShowConfirmDialog(false)}
+          onShare={handleSharePreview}
+          onConfirm={handleConfirmSale}
+        />
       </div>
     )
   }
@@ -554,46 +603,6 @@ export function SalesTerminal() {
           </Card>
         </div>
       </div>
-
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-md p-0 overflow-hidden">
-          <div className="bg-primary/5 p-6 border-b border-primary/5">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
-                <Check className="h-5 w-5 text-primary" />
-                Confirmar Venta
-              </DialogTitle>
-              <DialogDescription className="text-xs font-bold uppercase tracking-widest mt-2">
-                Por favor, verifica el monto antes de generar el ticket.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-
-          <div className="p-6 space-y-4">
-            <div className="rounded-2xl border-2 border-dashed border-muted p-5 bg-muted/10 space-y-4">
-              <div className="flex justify-between items-center pb-4 border-b border-muted/50">
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Líneas de Jugada</span>
-                <Badge className="bg-primary/10 text-primary border-none rounded-xl font-black">{cart.length}</Badge>
-              </div>
-              <div className="flex justify-between items-end">
-                <span className="text-xs font-black uppercase tracking-widest">Total:</span>
-                <span className="text-4xl font-black text-primary">{currency}{getCartTotal().toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 pt-0">
-            <DialogFooter className="gap-3 sm:gap-0">
-              <Button variant="outline" onClick={() => setShowConfirmDialog(false)} className="h-12 rounded-xl font-black uppercase text-[10px] border-2">
-                Cancelar
-              </Button>
-              <Button onClick={handleConfirmSale} disabled={isProcessing} className="h-12 rounded-xl font-black uppercase text-[10px] shadow-lg">
-                {isProcessing ? 'Procesando...' : 'Confirmar e Imprimir'}
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-md p-0 overflow-hidden text-center">
