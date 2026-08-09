@@ -1,19 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   useSalesReport, 
@@ -29,7 +21,6 @@ import {
   TrendingUp, 
   Search,
   Calendar,
-  FileText,
   Printer,
   X,
   Gamepad2,
@@ -56,6 +47,7 @@ import { format, subDays, startOfDay, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { printerService } from '@/features/settings/services/printer.service'
+import { PurchaseVerification } from '@/features/sales/components/PurchaseVerification'
 import type { Ticket as TicketType, TicketItem, Game } from '@/lib/types'
 import { toast } from '@/components/ui/use-toast'
 import { useSalesStore } from '@/features/sales/store/sales.store'
@@ -132,9 +124,11 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
   
   const { getTicketByNumber: getTicket } = useTickets()
   const [foundTicket, setFoundTicket] = useState<TicketWithDetails | null>(null)
-  const [selectedTicket, setSelectedTicket] = useState<TicketWithDetails | null>(null)
-  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false)
   const [ticketNotFound, setTicketNotFound] = useState(false)
+  // Vista de página completa para ver/reimprimir un ticket vendido (reemplaza el modal)
+  const [viewingTicket, setViewingTicket] = useState<TicketWithDetails | null>(null)
+  const [isReprinting, setIsReprinting] = useState(false)
+  const captureRef = useRef<HTMLDivElement | null>(null)
 
   const handleSearchTicket = async () => {
     if (!searchTicket.trim()) return
@@ -151,7 +145,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
 
     try {
       await deleteTicket(ticket.id)
-      setIsTicketDialogOpen(false)
+      setViewingTicket(null)
       if (foundTicket?.id === ticket.id) setFoundTicket(null)
     } catch (error) {
       // Error ya manejado por el hook
@@ -159,20 +153,24 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
   }
 
   const openTicketDetails = (ticket: TicketWithDetails) => {
-    setSelectedTicket(ticket)
-    setIsTicketDialogOpen(true)
+    setViewingTicket(ticket)
   }
 
   const handleReprintTicket = async (ticket: TicketWithDetails) => {
-    const result = await printerService.printTicket(ticket as any, settings as any)
-    if (!result) toast({ variant: 'destructive', title: 'Error al imprimir' })
-    else toast({ title: 'Impresión iniciada' })
+    setIsReprinting(true)
+    try {
+      const result = await printerService.printTicket(ticket as any, settings as any)
+      if (!result) toast({ variant: 'destructive', title: 'Error al imprimir' })
+      else toast({ title: 'Impresión iniciada' })
+    } finally {
+      setIsReprinting(false)
+    }
   }
 
-  const handleSendTicketImage = async (ticket: TicketWithDetails) => {
-    toast({ title: 'Generando PDF...' })
-    const result = await printerService.shareTicketPDF(ticket as any, settings as any)
-    if (!result) toast({ variant: 'destructive', title: "Error al compartir ticket" })
+  const handleSendTicketImage = async (ticket: TicketWithDetails, element: HTMLElement | null) => {
+    toast({ title: 'Generando imagen...' })
+    const result = await printerService.shareTicketImage(ticket as any, settings as any, element)
+    if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
   const handleRepeatTicket = (ticket: TicketWithDetails) => {
@@ -644,77 +642,22 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Ticket Details Dialog */}
-      <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
-        <DialogContent className="max-w-lg rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
-          <DialogTitle className="sr-only">Detalles del ticket</DialogTitle>
-          {selectedTicket && (
-            <>
-              <div className="bg-primary p-6 text-white shrink-0">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex gap-2">
-                    <Badge className="bg-white/20 text-white border-none text-[10px] font-black rounded-full uppercase px-3">{selectedTicket.status}</Badge>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-white hover:bg-red-500 hover:text-white rounded-full" 
-                      onClick={() => handleDeleteTicket(selectedTicket)}
-                      title="Anular ticket"
-                    >
-                      <Trash2 className="h-3 w-3"/>
-                    </Button>
-                  </div>
-                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-full" onClick={() => setIsTicketDialogOpen(false)}><X className="h-5 w-5"/></Button>
-                </div>
-                <h3 className="text-2xl font-black font-mono tracking-tighter mb-1">{selectedTicket.ticketNumber}</h3>
-                <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{format(new Date(selectedTicket.createdAt), "PPPP hh:mm a", { locale: es })}</p>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Detalle de Jugadas</h4>
-                  <div className="grid gap-2">
-                    {(selectedTicket.items || []).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-muted/50 border border-muted-foreground/5">
-                        <div className="flex items-center gap-3">
-                           <div className="h-10 w-10 rounded-xl bg-background border font-black flex items-center justify-center text-primary">{item.number}</div>
-                           <div>
-                             <p className="text-[10px] font-black uppercase text-foreground leading-none mb-1">{item.game?.name || 'Juego'}</p>
-                             <p className="text-[9px] font-bold text-muted-foreground uppercase">{item.schedule}</p>
-                           </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-black text-foreground">{currency}{item.amount.toFixed(0)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 bg-background border-t border-dashed shrink-0 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Monto Total</span>
-                  <span className="text-3xl font-black text-primary tracking-tighter">{currency}{selectedTicket.totalAmount.toFixed(2)}</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <Button variant="outline" className="h-12 rounded-2xl font-black uppercase text-[10px] border-2" onClick={() => handleSendTicketImage(selectedTicket)}>
-                    Compartir
-                  </Button>
-                  <Button variant="secondary" className="h-12 rounded-2xl font-black uppercase text-[10px]" onClick={() => handleRepeatTicket(selectedTicket)}>
-                    Repetir
-                  </Button>
-                  <Button className="h-12 rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-primary/20" onClick={() => handleReprintTicket(selectedTicket)}>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Imprimir
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Ver ticket vendido: página completa (reutiliza la pantalla de verificación) */}
+      {viewingTicket && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <PurchaseVerification
+            ticket={viewingTicket as any}
+            currency={currency}
+            isProcessing={isReprinting}
+            onBack={() => setViewingTicket(null)}
+            onShare={(element) => handleSendTicketImage(viewingTicket, element)}
+            onReprint={() => handleReprintTicket(viewingTicket)}
+            onRepeat={() => handleRepeatTicket(viewingTicket)}
+            onDelete={() => handleDeleteTicket(viewingTicket)}
+            captureRef={captureRef}
+          />
+        </div>
+      )}
     </div>
   )
 }

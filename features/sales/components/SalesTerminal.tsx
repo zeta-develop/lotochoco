@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -67,6 +67,7 @@ export function SalesTerminal() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [lastTicket, setLastTicket] = useState<AppTicket | null>(null)
+  const captureRef = useRef<HTMLDivElement | null>(null)
 
   // Estado para juegos de fecha (4 dígitos)
   const [dateDay, setDateDay] = useState('')
@@ -181,15 +182,27 @@ export function SalesTerminal() {
       clearCart()
       setShowConfirmDialog(false)
       setShowSuccessDialog(true)
+
+      // Imprimir automáticamente el ticket generado (el botón de la página
+      // de verificación es "Imprimir"). Si falla, la venta ya quedó registrada.
+      try {
+        const printed = await printerService.printTicket(
+          ticket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
+          settings as any
+        )
+        if (!printed) toast({ variant: 'destructive', title: 'Error al imprimir' })
+      } catch (error) {
+        console.error('Error al imprimir tras confirmar venta:', error)
+        toast({ variant: 'destructive', title: 'Error al imprimir' })
+      }
     }
   }
 
-  // Comparte una vista previa del boleto (sin crear la venta) desde la
-  // página de verificación. Solo construcción de presentación: no toca
-  // lógica de negocio ni el proceso de compra.
-  const handleSharePreview = async () => {
+  // Comparte una vista previa del boleto como IMAGEN (no PDF) desde la
+  // página de verificación. Solo presentación: no toca lógica de negocio.
+  const handleSharePreview = async (element: HTMLElement | null) => {
     if (cart.length === 0) return
-    toast({ title: 'Generando PDF...' })
+    toast({ title: 'Generando imagen...' })
 
     const previewTicket = {
       id: 'preview',
@@ -211,33 +224,8 @@ export function SalesTerminal() {
       })),
     }
 
-    const result = await printerService.shareTicketPDF(previewTicket as any, settings as any)
+    const result = await printerService.shareTicketImage(previewTicket as any, settings as any, element)
     if (!result.success) toast({ variant: 'destructive', title: 'Error al compartir ticket' })
-  }
-
-  const handlePrint = async () => {
-    if (!lastTicket) return
-
-    const result = await printerService.printTicket(
-      lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
-      settings as any
-    )
-    if (!result) {
-      toast({ variant: 'destructive', title: 'Error al imprimir' })
-      return
-    }
-
-    toast({ title: 'Impresión iniciada' })
-  }
-
-  const handleShare = async () => {
-    if (!lastTicket) return
-    toast({ title: 'Generando PDF...' })
-    const result = await printerService.shareTicketPDF(
-      lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] },
-      settings as any
-    )
-    if (!result.success) toast({ variant: 'destructive', title: "Error al compartir ticket" })
   }
 
   const handleRemoveFromCart = (id: string) => {
@@ -272,6 +260,7 @@ export function SalesTerminal() {
           onBack={() => setShowConfirmDialog(false)}
           onShare={handleSharePreview}
           onConfirm={handleConfirmSale}
+          captureRef={captureRef}
         />
       </div>
     )
@@ -605,43 +594,22 @@ export function SalesTerminal() {
       </div>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-md p-0 overflow-hidden text-center">
+        <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-sm p-0 overflow-hidden text-center">
           <DialogTitle className="sr-only">Venta Exitosa</DialogTitle>
-          <div className="bg-green-500/10 p-8 border-b border-green-500/10 flex flex-col items-center justify-center gap-4">
+          <div className="p-10 flex flex-col items-center justify-center gap-4">
             <div className="h-16 w-16 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/30">
               <Check className="h-8 w-8" />
             </div>
             <DialogHeader className="text-center">
-              <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-green-700 dark:text-green-400">¡Venta Exitosa!</DialogTitle>
-              <DialogDescription className="text-xs font-bold uppercase tracking-widest mt-1">El ticket se generó en la base de datos.</DialogDescription>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-green-700 dark:text-green-400">Ticket generado</DialogTitle>
+              <DialogDescription className="text-xs font-bold uppercase tracking-widest mt-1">La venta se registró correctamente.</DialogDescription>
             </DialogHeader>
           </div>
 
-          {lastTicket && (
-            <div className="p-6">
-              <div className="rounded-2xl bg-muted/30 border border-muted-foreground/10 p-6 flex flex-col gap-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Número de Ticket</span>
-                <span className="font-mono text-3xl font-black tracking-widest text-foreground">{lastTicket.ticketNumber}</span>
-                <div className="mt-4 pt-4 border-t border-muted-foreground/10 flex justify-between items-center">
-                   <span className="text-[10px] font-black uppercase tracking-widest">Total</span>
-                   <span className="text-xl font-black text-primary">{currency}{lastTicket.totalAmount.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="p-6 pt-0 bg-background">
-            <DialogFooter className="flex-col gap-3 sm:flex-row sm:gap-2">
-              <Button variant="outline" onClick={() => setShowSuccessDialog(false)} className="w-full sm:w-1/3 h-12 rounded-xl font-black uppercase text-[10px] border-2">
+            <DialogFooter className="w-full">
+              <Button onClick={() => setShowSuccessDialog(false)} className="w-full h-12 rounded-xl font-black uppercase text-[10px] shadow-lg">
                 Cerrar
-              </Button>
-              <Button variant="secondary" onClick={handleShare} className="w-full sm:w-1/3 h-12 rounded-xl font-black uppercase text-[10px] bg-blue-500/10 text-blue-700 hover:bg-blue-500/20">
-                <Share2 className="mr-2 h-4 w-4" />
-                Compartir
-              </Button>
-              <Button onClick={handlePrint} className="w-full sm:w-1/3 h-12 rounded-xl font-black uppercase text-[10px] shadow-lg">
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir
               </Button>
             </DialogFooter>
           </div>
