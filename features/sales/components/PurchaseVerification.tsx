@@ -163,17 +163,6 @@ export function PurchaseVerification({
         <Badge className="ml-auto bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] rounded-full px-2.5">
           {items.length}
         </Badge>
-        {isViewMode && onDelete && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl text-red-500 hover:bg-red-500/10 active:scale-95 transition-all"
-            onClick={onDelete}
-            aria-label="Anular ticket"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
       </header>
 
       {/* Boleto capturable como imagen (ref) */}
@@ -219,28 +208,32 @@ export function PurchaseVerification({
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {items.map((item) => {
               const prize = (item.amount || 0) * (item.multiplier || 0)
+
               return (
                 <div
                   key={item.id}
-                  className="flex-1 grid grid-cols-12 items-center gap-1 px-2 border-b border-muted/30 min-h-0"
+                  className="grid grid-cols-12 items-center gap-0 px-1.5 py-0.5 border-b border-muted/30"
                 >
-                  <div className="col-span-4 flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-[15px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
+                  <div className="col-span-4 flex items-center gap-1 min-w-0">
+                    <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
                       {item.number}
                     </span>
+
                     {!showContext && (
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase truncate">
+                      <span className="text-[7px] font-bold text-muted-foreground uppercase truncate">
                         {item.gameName}
                       </span>
                     )}
                   </div>
+
                   <div className="col-span-3 text-right">
-                    <span className="text-[13px] font-black text-primary leading-none">
+                    <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
                       {currency}{item.amount.toFixed(0)}
                     </span>
                   </div>
-                  <div className="col-span-5 text-right pr-1">
-                    <span className="text-[11px] font-bold text-muted-foreground leading-none">
+
+                  <div className="col-span-5 text-right pr-0.5">
+                    <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
                       {currency}{prize.toLocaleString()}
                     </span>
                   </div>
@@ -262,54 +255,74 @@ export function PurchaseVerification({
       </div>
 
       {/* Acciones: Imprimir primaria, secundarias compactas */}
-      <div className="shrink-0 grid grid-cols-3 gap-2 pt-2 pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="shrink-0 grid grid-cols-4 gap-1.5 pt-2 pb-[env(safe-area-inset-bottom,0px)]">
         <Button
           variant="outline"
           onClick={() => onShare(captureRef?.current ?? null)}
           disabled={isProcessing}
-          className="h-11 rounded-xl font-black uppercase text-[9px] border-2 flex flex-col gap-0.5"
+          className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] border-2 flex flex-col gap-0.5 px-1"
         >
-          <Share2 className="h-4 w-4" />
-          Compartir
+          <Share2 className="h-4 w-4 shrink-0" />
+          <span className="truncate">Compartir</span>
         </Button>
+
         {isViewMode && onRepeat ? (
           <Button
             variant="secondary"
             onClick={onRepeat}
             disabled={isProcessing}
-            className="h-11 rounded-xl font-black uppercase text-[9px] flex flex-col gap-0.5"
+            className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] flex flex-col gap-0.5 px-1"
           >
-            <Repeat className="h-4 w-4" />
-            Repetir
+            <Repeat className="h-4 w-4 shrink-0" />
+            <span className="truncate">Repetir</span>
           </Button>
         ) : (
           <Button
             variant="secondary"
             onClick={onBack}
             disabled={isProcessing}
-            className="h-11 rounded-xl font-black uppercase text-[9px] flex flex-col gap-0.5"
+            className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] flex flex-col gap-0.5 px-1"
           >
-            <Repeat className="h-4 w-4" />
-            Repetir
+            <Repeat className="h-4 w-4 shrink-0" />
+            <span className="truncate">Repetir</span>
           </Button>
         )}
+
         <Button
           onClick={isViewMode ? onReprint : onConfirm}
           disabled={isProcessing || items.length === 0}
-          className="h-11 rounded-xl font-black uppercase text-[9px] bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-95 transition-all flex flex-col gap-0.5"
+          className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-95 transition-all flex flex-col gap-0.5 px-1"
         >
           {isProcessing ? (
             <>
               <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-              Procesando
+              <span className="truncate">Procesando</span>
             </>
           ) : (
             <>
-              <Printer className="h-4 w-4" />
-              {isViewMode ? 'Reimprimir' : 'Imprimir'}
+              <Printer className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {isViewMode ? 'Reimprimir' : 'Imprimir'}
+              </span>
             </>
           )}
         </Button>
+
+        {isViewMode && onDelete ? (
+          <Button
+            variant="ghost"
+            className="h-11 w-full min-w-0 rounded-xl text-red-500 hover:bg-red-500/10 active:scale-95 transition-all flex flex-col gap-0.5 px-1"
+            onClick={onDelete}
+            aria-label="Anular ticket"
+          >
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span className="text-[8px] font-black uppercase truncate">
+              Anular
+            </span>
+          </Button>
+        ) : (
+          <div />
+        )}
       </div>
 
       {/* Nota de confirmación */}
