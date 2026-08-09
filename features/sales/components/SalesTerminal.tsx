@@ -19,6 +19,7 @@ import { useGamesManager } from '@/features/games/hooks/use-games-manager'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { useCurrentSession } from '@/features/cash/hooks/use-cash-manager'
 import { printerService } from '@/features/settings/services/printer.service'
+import { TicketReceipt } from '@/features/tickets/components/ticket-receipt'
 import { formatTime12h, isDateGame, formatDateNumber, getDaysInMonth } from '@/lib/utils'
 import {
   AlertCircle,
@@ -616,6 +617,19 @@ export function SalesTerminal() {
                 <div className="mt-4 pt-4 border-t border-muted-foreground/10 flex justify-between items-center">
                    <span className="text-[10px] font-black uppercase tracking-widest">Total</span>
                    <span className="text-xl font-black text-primary">{currency}{lastTicket.totalAmount.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Factura completa (formato boleto) */}
+              <div className="mt-6">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-3">Vista previa de la factura</span>
+                <div className="max-h-72 overflow-y-auto rounded-xl border border-muted-foreground/10">
+                  <TicketReceipt
+                    ticket={lastTicket as AppTicket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] }}
+                    settings={settings as any}
+                    vendorName={settings?.vendorName}
+                    terminalName={settings?.terminalName}
+                  />
                 </div>
               </div>
             </div>

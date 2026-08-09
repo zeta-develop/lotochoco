@@ -2,15 +2,17 @@
 
 import { forwardRef } from "react";
 import type { Ticket, TicketItem } from "@/lib/types";
-import { formatTime12h } from '@/lib/utils';
+import { renderTicketTemplate, type TemplateTicket } from "@/lib/ticket-template";
 
 interface TicketReceiptProps {
   ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] };
   settings?: Record<string, string>;
+  vendorName?: string;
+  terminalName?: string;
 }
 
 export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
-  ({ ticket, settings }, ref) => {
+  ({ ticket, settings, vendorName, terminalName }, ref) => {
     const template = settings?.ticketTemplate || `# {{businessName}}
 RECIBO DE VENTA
 --------------------------------
@@ -29,40 +31,16 @@ JUEGO      NUM       MONTO
 *** CONSERVE ESTE TICKET ***`
 
     const renderTemplate = (tpl: string) => {
-      let rendered = tpl
-        .replace(/{{businessName}}/g, settings?.businessName || 'LOTOCHOCO')
-        .replace(/{{ticketNumber}}/g, ticket.ticketNumber)
-        .replace(/{{date}}/g, new Date(ticket.createdAt).toLocaleString('es-NI', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }))
-        .replace(/{{currency}}/g, settings?.currency || 'C$')
-        .replace(/{{total}}/g, ticket.totalAmount.toFixed(2))
-        .replace(/{{ticketMessage}}/g, settings?.ticketMessage || '')
-        .replace(/{{#if client}}.*?{{\/if}}/g, ticket.client ? `CLIENTE: ${ticket.client.toUpperCase()}` : '')
-
-      const itemsRegex = /{{#items}}([\\s\\S]*?){{\/items}}/g
-      rendered = rendered.replace(itemsRegex, (match, content) => {
-        return ticket.items.map(item => {
-          const multiplier = (item as any).game?.multiplier || 70
-          const prizePotential = item.amount * multiplier
-
-          return content
-            .replace(/{{game}}/g, (item as any).game?.name || 'JUEGO')
-            .replace(/{{number}}/g, item.number)
-            .replace(/{{amount}}/g, item.amount.toFixed(0))
-            .replace(/{{prize}}/g, prizePotential.toFixed(0))
-        }).join('\\n')
-      })
-
+      const rendered = renderTicketTemplate(
+        tpl,
+        ticket as TemplateTicket,
+        settings || {},
+        { vendorName, terminalName }
+      )
 
       return rendered.split('\n').map((line, i) => {
         let content = line
-          .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
           .replace(/_(.*?)_/g, '<em>$1</em>')
         
         let className = "text-[11px] font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"

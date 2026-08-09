@@ -128,8 +128,8 @@ export function GeneralSettingsTab() {
       .replace(/{{date}}/g, format(new Date(), 'dd-MM-yyyy hh:mm:ss a'))
       .replace(/{{gameName}}/g, 'Diaria')
       .replace(/{{scheduleName}}/g, '9:00 PM')
-      .replace(/{{vendorName}}/g, 'Yamileth')
-      .replace(/{{terminalName}}/g, '= J081 =')
+      .replace(/{{vendorName}}/g, settings.vendorName || 'Yamileth')
+      .replace(/{{terminalName}}/g, settings.terminalName || '= J081 =')
       .replace(/{{currency}}/g, settings.currency || 'C$')
       .replace(/{{total}}/g, '30')
       .replace(/{{ticketMessage}}/g, settings.ticketMessage || 'Gracias por su compra')
@@ -244,6 +244,28 @@ export function GeneralSettingsTab() {
                 value={settings.ticketMessage || ''}
                 onChange={(e) => updateSettings({ ticketMessage: e.target.value })}
                 placeholder="¡Gracias por su compra!"
+                className="bg-background/50 border-white/10 focus:border-primary/50 transition-all"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="vendorName">Vendedor (aparece en la factura)</Label>
+              <Input
+                id="vendorName"
+                value={settings.vendorName || ''}
+                onChange={(e) => updateSettings({ vendorName: e.target.value })}
+                placeholder="Ej. Yamileth"
+                className="bg-background/50 border-white/10 focus:border-primary/50 transition-all"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="terminalName">Puesto / Terminal</Label>
+              <Input
+                id="terminalName"
+                value={settings.terminalName || ''}
+                onChange={(e) => updateSettings({ terminalName: e.target.value })}
+                placeholder="Ej. Puesto J081"
                 className="bg-background/50 border-white/10 focus:border-primary/50 transition-all"
               />
             </div>
