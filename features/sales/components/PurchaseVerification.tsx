@@ -163,17 +163,6 @@ export function PurchaseVerification({
         <Badge className="ml-auto bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] rounded-full px-2.5">
           {items.length}
         </Badge>
-        {isViewMode && onDelete && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl text-red-500 hover:bg-red-500/10 active:scale-95 transition-all"
-            onClick={onDelete}
-            aria-label="Anular ticket"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
       </header>
 
       {/* Boleto capturable como imagen (ref) */}
