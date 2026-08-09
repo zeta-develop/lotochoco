@@ -14,7 +14,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'POS Loteria - Sistema de Ventas',
   description: 'Sistema POS completo para loteria local - Ventas, Sorteos, Reportes',
-  generator: 'v0.app',
   icons: {
     icon: [
       {

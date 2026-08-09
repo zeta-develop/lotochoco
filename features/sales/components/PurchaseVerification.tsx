@@ -178,25 +178,32 @@ export function PurchaseVerification({
 
       {/* Boleto capturable como imagen (ref) */}
       <div ref={captureRef} className="flex-1 min-h-0 flex flex-col bg-white">
-        
+
         {/* Header context y metadata ahora dentro de la captura */}
         <div className="px-2 pt-2 pb-1 shrink-0">
-          {showContext && (
-            <p className="text-[11px] font-black uppercase tracking-widest text-slate-800 leading-tight mb-1.5">
-              {allSameGame && <span className="text-primary">{gameName}</span>}
-              {allSameGame && allSameSchedule && <span className="mx-1">·</span>}
-              {allSameSchedule && <span>{scheduleName}</span>}
-            </p>
-          )}
           {isViewMode && purchaseMeta && (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] font-bold uppercase leading-none text-slate-600">
-              <div>JUEGO:</div><div className="text-slate-900 font-black">{purchaseMeta.gameName}</div>
-              <div>SORTEO:</div><div className="text-slate-900 font-black">{purchaseMeta.scheduleName}</div>
-              <div>FECHA/HORA:</div><div className="text-slate-900 font-black">{purchaseMeta.ticketDate}</div>
-              <div>VENTA #:</div><div className="text-slate-900 font-mono font-black">{purchaseMeta.ticketNumber}</div>
-              <div>CLIENTE:</div><div className="text-slate-900 font-black">{purchaseMeta.clientName}</div>
-              <div>VENDEDOR:</div><div className="text-slate-900 font-black">{purchaseMeta.vendorName}</div>
-              <div>PUESTO:</div><div className="text-slate-900 font-black">{purchaseMeta.terminalName}</div>
+            <div className="flex flex-col items-center gap-0.5 text-[9px] font-bold uppercase leading-tight text-slate-600">
+              <div>
+                JUEGO: <span className="text-slate-900 font-black">{purchaseMeta.gameName}</span>
+              </div>
+              <div>
+                SORTEO: <span className="text-slate-900 font-black">{purchaseMeta.scheduleName}</span>
+              </div>
+              <div>
+                FECHA/HORA: <span className="text-slate-900 font-black">{purchaseMeta.ticketDate}</span>
+              </div>
+              <div>
+                VENTA #: <span className="text-slate-900 font-mono font-black">{purchaseMeta.ticketNumber}</span>
+              </div>
+              <div>
+                CLIENTE: <span className="text-slate-900 font-black">{purchaseMeta.clientName}</span>
+              </div>
+              <div>
+                VENDEDOR: <span className="text-slate-900 font-black">{purchaseMeta.vendorName}</span>
+              </div>
+              <div>
+                PUESTO: <span className="text-slate-900 font-black">{purchaseMeta.terminalName}</span>
+              </div>
             </div>
           )}
         </div>
@@ -217,29 +224,29 @@ export function PurchaseVerification({
                   key={item.id}
                   className="flex-1 grid grid-cols-12 items-center gap-1 px-2 border-b border-muted/30 min-h-0"
                 >
-                    <div className="col-span-4 flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-[15px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
-                        {item.number}
+                  <div className="col-span-4 flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-[15px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
+                      {item.number}
+                    </span>
+                    {!showContext && (
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase truncate">
+                        {item.gameName}
                       </span>
-                      {!showContext && (
-                        <span className="text-[8px] font-bold text-muted-foreground uppercase truncate">
-                          {item.gameName}
-                        </span>
-                      )}
-                    </div>
-                    <div className="col-span-3 text-right">
-                      <span className="text-[13px] font-black text-primary leading-none">
-                        {currency}{item.amount.toFixed(0)}
-                      </span>
-                    </div>
-                    <div className="col-span-5 text-right pr-1">
-                      <span className="text-[11px] font-bold text-muted-foreground leading-none">
-                        {currency}{prize.toLocaleString()}
-                      </span>
-                    </div>
+                    )}
                   </div>
-                )
-              })}
+                  <div className="col-span-3 text-right">
+                    <span className="text-[13px] font-black text-primary leading-none">
+                      {currency}{item.amount.toFixed(0)}
+                    </span>
+                  </div>
+                  <div className="col-span-5 text-right pr-1">
+                    <span className="text-[11px] font-bold text-muted-foreground leading-none">
+                      {currency}{prize.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
