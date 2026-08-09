@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,9 @@ interface PurchaseVerificationProps {
   onDelete?: () => void
   /** Ref para capturar el boleto como imagen. */
   captureRef?: React.RefObject<HTMLDivElement | null>
+  /** Configuración para metadata de compra (vendedor, puesto) */
+  vendorName?: string
+  terminalName?: string
 }
 
 /**
@@ -64,6 +69,8 @@ export function PurchaseVerification({
   onRepeat,
   onDelete,
   captureRef,
+  vendorName,
+  terminalName,
 }: PurchaseVerificationProps) {
   const isViewMode = Boolean(ticket)
 
@@ -93,6 +100,20 @@ export function PurchaseVerification({
     () => (ticket ? ticket.totalAmount : (cart || []).reduce((sum, item) => sum + item.amount, 0)),
     [cart, ticket]
   )
+
+  // Metadata de compra (solo modo view con ticket)
+  const purchaseMeta = useMemo(() => {
+    if (!ticket) return null
+    const firstItem = ticket.items?.[0]
+    const gameName = firstItem?.game?.name || 'Juego'
+    const scheduleName = firstItem?.schedule || firstItem?.game?.schedules?.[0]?.name || 'Sorteo'
+    const ticketNumber = ticket.ticketNumber || 'N/A'
+    const ticketDate = format(new Date(ticket.createdAt), "dd/MM/yyyy '·' hh:mm a", { locale: es })
+    const clientName = ticket.client || '-'
+    const finalVendorName = vendorName || 'Yamileth'
+    const finalTerminalName = terminalName || '= J081 ='
+    return { gameName, scheduleName, ticketNumber, ticketDate, clientName, vendorName: finalVendorName, terminalName: finalTerminalName }
+  }, [ticket, vendorName, terminalName])
 
   // Información agrupada: si todas las jugadas comparten juego/sorteo, se
   // muestra una sola vez (no repetida en cada fila)
@@ -137,16 +158,10 @@ export function PurchaseVerification({
           <h1 className="text-[15px] font-black uppercase tracking-tighter text-foreground leading-tight truncate">
             {headerTitle}
           </h1>
-          {showContext && (
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight truncate">
-              {allSameGame && <span className="text-primary">{gameName}</span>}
-              {allSameGame && allSameSchedule && <span className="mx-1">·</span>}
-              {allSameSchedule && <span>{scheduleName}</span>}
-            </p>
-          )}
         </div>
+
         <Badge className="ml-auto bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] rounded-full px-2.5">
-          {items.length}/15
+          {items.length}
         </Badge>
         {isViewMode && onDelete && (
           <Button
@@ -163,25 +178,47 @@ export function PurchaseVerification({
 
       {/* Boleto capturable como imagen (ref) */}
       <div ref={captureRef} className="flex-1 min-h-0 flex flex-col bg-white">
-        {/* Lista compacta de jugadas: 15 filas visibles sin scroll */}
-        <div className="flex-1 min-h-0 overflow-hidden px-2 pt-1">
-          <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
-            <div className="col-span-4 pl-1">Número</div>
-            <div className="col-span-3 text-right">Monto</div>
-            <div className="col-span-5 text-right pr-1">Premio</div>
+        
+        {/* Header context y metadata ahora dentro de la captura */}
+        <div className="px-2 pt-2 pb-1 shrink-0">
+          {showContext && (
+            <p className="text-[11px] font-black uppercase tracking-widest text-slate-800 leading-tight mb-1.5">
+              {allSameGame && <span className="text-primary">{gameName}</span>}
+              {allSameGame && allSameSchedule && <span className="mx-1">·</span>}
+              {allSameSchedule && <span>{scheduleName}</span>}
+            </p>
+          )}
+          {isViewMode && purchaseMeta && (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px] font-bold uppercase leading-none text-slate-600">
+              <div>JUEGO:</div><div className="text-slate-900 font-black">{purchaseMeta.gameName}</div>
+              <div>SORTEO:</div><div className="text-slate-900 font-black">{purchaseMeta.scheduleName}</div>
+              <div>FECHA/HORA:</div><div className="text-slate-900 font-black">{purchaseMeta.ticketDate}</div>
+              <div>VENTA #:</div><div className="text-slate-900 font-mono font-black">{purchaseMeta.ticketNumber}</div>
+              <div>CLIENTE:</div><div className="text-slate-900 font-black">{purchaseMeta.clientName}</div>
+              <div>VENDEDOR:</div><div className="text-slate-900 font-black">{purchaseMeta.vendorName}</div>
+              <div>PUESTO:</div><div className="text-slate-900 font-black">{purchaseMeta.terminalName}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Lista compacta de jugadas: flex-1 para repartir el espacio vertical equitativamente */}
+        <div className="flex-1 min-h-0 overflow-hidden px-2 flex flex-col border-t border-muted/30 pt-1">
+          <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[9px] font-black uppercase tracking-wider text-muted-foreground shrink-0">
+            <div className="col-span-4 pl-1">NÚMERO</div>
+            <div className="col-span-3 text-right">MONTO</div>
+            <div className="col-span-5 text-right pr-1">PREMIO</div>
           </div>
 
-          <div className="h-[calc(100%-26px)] overflow-hidden">
-            <div className="flex flex-col">
-              {items.map((item) => {
-                const prize = (item.amount || 0) * (item.multiplier || 0)
-                return (
-                  <div
-                    key={item.id}
-                    className="grid grid-cols-12 items-center gap-1 px-2 py-[5px] border-b border-muted/30 min-h-[32px]"
-                  >
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {items.map((item) => {
+              const prize = (item.amount || 0) * (item.multiplier || 0)
+              return (
+                <div
+                  key={item.id}
+                  className="flex-1 grid grid-cols-12 items-center gap-1 px-2 border-b border-muted/30 min-h-0"
+                >
                     <div className="col-span-4 flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-[15px] font-black text-foreground leading-none tracking-tight">
+                      <span className="font-mono text-[15px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
                         {item.number}
                       </span>
                       {!showContext && (
@@ -203,7 +240,6 @@ export function PurchaseVerification({
                   </div>
                 )
               })}
-            </div>
           </div>
         </div>
 
