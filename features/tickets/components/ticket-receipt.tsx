@@ -65,12 +65,12 @@ JUEGO      NUM       MONTO
           .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
           .replace(/_(.*?)_/g, '<em>$1</em>')
         
-        let className = "text-[11px] font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"
+        let className = "text-xs font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"
         if (line.startsWith('# ')) {
-          className = "text-lg font-bold text-center uppercase mb-1"
+          className = "text-xl font-black text-center uppercase mb-1"
           content = content.replace('# ', '')
         } else if (line.startsWith('## ')) {
-          className = "text-sm font-bold text-center uppercase mb-1"
+          className = "text-base font-bold text-center uppercase mb-1"
           content = content.replace('## ', '')
         }
 

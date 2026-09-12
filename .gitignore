@@ -19,3 +19,4 @@ ignore
 *.log
 *.pem
 .env
+graphify-out/

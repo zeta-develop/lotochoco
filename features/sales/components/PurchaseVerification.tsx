@@ -169,29 +169,33 @@ export function PurchaseVerification({
       <div ref={captureRef} className="flex-1 min-h-0 flex flex-col bg-white">
 
         {/* Header context y metadata ahora dentro de la captura */}
-        <div className="px-2 pt-2 pb-1 shrink-0">
-          {isViewMode && purchaseMeta && (
-            <div className="flex flex-col items-center gap-0.5 text-[9px] font-bold uppercase leading-tight text-slate-600">
-              <div>
-                JUEGO: <span className="text-slate-900 font-black">{purchaseMeta.gameName}</span>
+        <div className="px-2 pt-2 pb-1.5 shrink-0">
+          {isViewMode && purchaseMeta ? (
+            <div className="flex flex-col items-center gap-0.5 text-xs font-bold uppercase leading-tight text-slate-700">
+              <div className="text-base font-black text-slate-950 tracking-tight">
+                {purchaseMeta.gameName} · {purchaseMeta.scheduleName}
               </div>
-              <div>
-                SORTEO: <span className="text-slate-900 font-black">{purchaseMeta.scheduleName}</span>
+              <div className="flex flex-wrap justify-center items-center gap-x-3 text-xs mt-0.5">
+                <span>FECHA: <strong className="text-slate-950 font-black">{purchaseMeta.ticketDate}</strong></span>
+                <span>VENTA #: <strong className="text-slate-950 font-mono font-black text-sm">#{purchaseMeta.ticketNumber}</strong></span>
               </div>
-              <div>
-                FECHA/HORA: <span className="text-slate-900 font-black">{purchaseMeta.ticketDate}</span>
+              {purchaseMeta.clientName && purchaseMeta.clientName !== '-' && (
+                <div className="text-xs">
+                  CLIENTE: <strong className="text-slate-950 font-black">{purchaseMeta.clientName}</strong>
+                </div>
+              )}
+              <div className="flex gap-3 text-[11px] text-slate-600 font-bold mt-0.5">
+                <span>VENDEDOR: <span className="text-slate-900 font-black">{purchaseMeta.vendorName}</span></span>
+                <span>PUESTO: <span className="text-slate-900 font-black">{purchaseMeta.terminalName}</span></span>
               </div>
-              <div>
-                VENTA #: <span className="text-slate-900 font-mono font-black">{purchaseMeta.ticketNumber}</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-0.5 text-slate-700">
+              <div className="text-base md:text-lg font-black text-slate-950 tracking-tight uppercase">
+                {gameName || 'LOTERIA'} {scheduleName ? `· ${scheduleName}` : ''}
               </div>
-              <div>
-                CLIENTE: <span className="text-slate-900 font-black">{purchaseMeta.clientName}</span>
-              </div>
-              <div>
-                VENDEDOR: <span className="text-slate-900 font-black">{purchaseMeta.vendorName}</span>
-              </div>
-              <div>
-                PUESTO: <span className="text-slate-900 font-black">{purchaseMeta.terminalName}</span>
+              <div className="text-[11px] font-bold text-slate-600 uppercase">
+                COMPROBANTE DE VENTA
               </div>
             </div>
           )}
@@ -199,41 +203,41 @@ export function PurchaseVerification({
 
         {/* Lista compacta de jugadas: flex-1 para repartir el espacio vertical equitativamente */}
         <div className="flex-1 min-h-0 overflow-hidden px-2 flex flex-col border-t border-muted/30 pt-1">
-          <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[9px] font-black uppercase tracking-wider text-muted-foreground shrink-0">
+          <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[11px] font-black uppercase tracking-wider text-slate-700 shrink-0">
             <div className="col-span-4 pl-1">NÚMERO</div>
             <div className="col-span-3 text-right">MONTO</div>
             <div className="col-span-5 text-right pr-1">PREMIO</div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
             {items.map((item) => {
               const prize = (item.amount || 0) * (item.multiplier || 0)
 
               return (
                 <div
                   key={item.id}
-                  className="grid grid-cols-12 items-center gap-0 px-1.5 py-0.5 border-b border-muted/30"
+                  className="grid grid-cols-12 items-center gap-0 px-2 py-1 border-b border-muted/30"
                 >
                   <div className="col-span-4 flex items-center gap-1 min-w-0">
-                    <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
+                    <span className="font-mono text-lg md:text-xl font-black text-slate-950 leading-none tracking-tight">
                       {item.number}
                     </span>
 
                     {!showContext && (
-                      <span className="text-[7px] font-bold text-muted-foreground uppercase truncate">
+                      <span className="text-[9px] font-bold text-slate-600 uppercase truncate">
                         {item.gameName}
                       </span>
                     )}
                   </div>
 
                   <div className="col-span-3 text-right">
-                    <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
+                    <span className="font-mono text-base md:text-lg font-black text-slate-950 leading-none tracking-tight">
                       {currency}{item.amount.toFixed(0)}
                     </span>
                   </div>
 
                   <div className="col-span-5 text-right pr-0.5">
-                    <span className="font-mono text-[13px] font-black text-slate-900 dark:text-slate-200 leading-none tracking-tight">
+                    <span className="font-mono text-base md:text-lg font-black text-slate-950 leading-none tracking-tight">
                       {currency}{prize.toLocaleString()}
                     </span>
                   </div>

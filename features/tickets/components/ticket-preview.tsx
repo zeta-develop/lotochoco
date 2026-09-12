@@ -99,19 +99,19 @@ export function TicketPreview({
             <div className="text-sm">
               {/* Header */}
               <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
-                <h2 className="text-xl font-bold uppercase leading-tight">{businessName}</h2>
-                <p className="text-sm mt-1">Ticket de Loteria</p>
+                <h2 className="text-2xl font-black uppercase leading-tight">{businessName}</h2>
+                <p className="text-sm font-bold mt-1">Ticket de Lotería</p>
               </div>
 
               {/* Ticket Info */}
-              <div className="space-y-1 mb-3">
+              <div className="space-y-1 mb-3 text-xs">
                 <div className="flex justify-between">
-                  <span>TICKET:</span>
-                  <span className="font-bold">#{ticket.ticketNumber}</span>
+                  <span className="font-bold">TICKET:</span>
+                  <span className="font-black text-sm">#{ticket.ticketNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>FECHA:</span>
-                  <span>{formatDate(ticket.createdAt)}</span>
+                  <span className="font-bold">FECHA:</span>
+                  <span className="font-semibold">{formatDate(ticket.createdAt)}</span>
                 </div>
               </div>
 
@@ -121,11 +121,11 @@ export function TicketPreview({
               {/* Items */}
               <table className="w-full text-left text-sm mb-2">
                 <thead>
-                  <tr className="border-b border-gray-300">
-                    <th className="py-1 w-1/4 font-semibold">JUEGO</th>
-                    <th className="py-1 w-1/4 text-center font-semibold">NUM</th>
-                    <th className="py-1 w-1/4 text-right font-semibold">MONTO</th>
-                    <th className="py-1 w-1/4 text-right font-semibold">PREMIO</th>
+                  <tr className="border-b border-gray-300 text-xs font-black">
+                    <th className="py-1 w-1/4">JUEGO</th>
+                    <th className="py-1 w-1/4 text-center">NUM</th>
+                    <th className="py-1 w-1/4 text-right">MONTO</th>
+                    <th className="py-1 w-1/4 text-right">PREMIO</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -133,18 +133,18 @@ export function TicketPreview({
                     const multiplier = item.game?.multiplier || 70;
                     const prize = item.amount * multiplier;
                     return (
-                      <tr key={index} className="align-top">
-                        <td className="py-1">
-                          <div className="truncate pr-1">{item.game?.name}</div>
+                      <tr key={index} className="align-top border-b border-gray-100">
+                        <td className="py-1.5">
+                          <div className="truncate pr-1 font-semibold text-xs">{item.game?.name}</div>
                           <div className="text-[10px] text-gray-600">{formatTime12h(item.schedule)}</div>
                         </td>
-                        <td className="py-1 text-center font-bold text-base">
+                        <td className="py-1.5 text-center font-black text-lg">
                           {item.number}
                         </td>
-                        <td className="py-1 text-right">
+                        <td className="py-1.5 text-right font-black text-base">
                           {currency}{item.amount.toFixed(0)}
                         </td>
-                        <td className="py-1 text-right font-semibold">
+                        <td className="py-1.5 text-right font-black text-base">
                           {currency}{prize.toFixed(0)}
                         </td>
                       </tr>
