@@ -81,12 +81,14 @@ class EscPosBuilder {
       const qr = QRCode.create(cleanData, { errorCorrectionLevel: 'M' })
       const size = qr.modules.size // e.g. 21
       const margin = 2
-      const scale = 5 // 25 modules * 5 = 125 dots (~15.6 mm en papel 58mm)
-      const qrPixelSize = (size + margin * 2) * scale // 125 dots
+      const totalModules = size + margin * 2 // 25 modules
+      // Escala ampliada para QR más grande y legible: ~200 puntos (~25 mm de ancho en papel 58mm)
+      const scale = Math.max(6, Math.min(8, Math.floor(216 / totalModules)))
+      const qrPixelSize = totalModules * scale // ~200 dots
       
       // Ancho imprimible estándar para impresoras térmicas portátiles (58mm = 384 puntos = 32 cols)
       const targetWidthDots = widthDots || 384
-      const defaultCenterDots = Math.max(0, Math.floor((targetWidthDots - qrPixelSize) / 2)) // 129 dots = centro exacto
+      const defaultCenterDots = Math.max(0, Math.floor((targetWidthDots - qrPixelSize) / 2))
 
       // Si el usuario especificó espacios manuales antes de [QR] en el editor, desplazamos proporcionalmente
       let leftPaddingDots = defaultCenterDots

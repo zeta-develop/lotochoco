@@ -32,7 +32,7 @@ export function TicketBodyView({
     if (!qrBlock) return
 
     QRCode.toDataURL(qrBlock.code || 'LOTERIA', {
-      width: 140,
+      width: 200,
       margin: 1,
       errorCorrectionLevel: 'M',
       color: {
@@ -155,7 +155,7 @@ export function TicketBodyView({
                 <img
                   src={effectiveQrUrl}
                   alt="Código QR del Ticket"
-                  className="w-24 h-24 object-contain mx-auto block"
+                  className="w-36 h-36 object-contain mx-auto block"
                 />
               </div>
             )

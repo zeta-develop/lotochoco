@@ -167,7 +167,7 @@ export function PurchaseVerification({
   useEffect(() => {
     const code = purchaseMeta.ticketNumber || 'LOTERIA'
     QRCode.toDataURL(code, {
-      width: 140,
+      width: 200,
       margin: 1,
       errorCorrectionLevel: 'M',
       color: {
