@@ -200,7 +200,18 @@ export function parseTemplateToBlocks(
   // 2. Extraer bloque de items si existe: {{#items}}...{{/items}}
   const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/i
   const itemsMatch = processed.match(itemsRegex)
-  const itemRowTemplate = itemsMatch ? itemsMatch[1].trim() : null
+  let itemRowTemplate: string | null = null
+  if (itemsMatch) {
+    // Quitar únicamente los saltos de línea iniciales y finales, PRESERVANDO los espacios horizontales (sangría)
+    const raw = itemsMatch[1].replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '')
+    // Si la plantilla tiene las variables pegadas sin separación de columnas (ej. {{number}}{{amount}}{{prize}}),
+    // formatear automáticamente con columnas centradas
+    if (raw.includes('{{number}}') && raw.includes('{{amount}}') && !raw.includes('  ')) {
+      itemRowTemplate = '  {{number}}    {{amount}}   {{prize}}'
+    } else {
+      itemRowTemplate = raw
+    }
+  }
 
   // Marcador temporal para la posición de los items
   const ITEMS_PLACEHOLDER = '___ITEMS_BLOCK_PLACEHOLDER___'

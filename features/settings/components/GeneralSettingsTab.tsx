@@ -65,26 +65,40 @@ export function GeneralSettingsTab() {
   }, [])
   
   // Estado local para el editor del ticket
-  const getInitialTemplate = () => {
-    const t = settings.ticketTemplate
+  const cleanTemplate = (t: string | undefined | null): string => {
     if (!t || !t.trim() || t.includes('RECIBO DE VENTA') || t.includes('JUEGO      NUM       MONTO')) {
       return DEFAULT_TICKET_TEMPLATE
     }
-    return t
+    let cleaned = t
+    if (cleaned.includes('{{number}}') && cleaned.includes('{{amount}}') && !cleaned.includes('  {{amount}}') && !cleaned.includes('    {{amount}}')) {
+      cleaned = cleaned.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n  {{number}}    {{amount}}   {{prize}}\n{{/items}}`)
+    }
+    if (/apuesta\s+monto\s+premio/i.test(cleaned) && !cleaned.includes('   Apuesta')) {
+      cleaned = cleaned.replace(/apuesta\s+monto\s+premio/i, '   Apuesta       Monto    Premio')
+    }
+    return cleaned
   }
 
-  const [localTemplate, setLocalTemplate] = useState(getInitialTemplate())
+  const [localTemplate, setLocalTemplate] = useState(cleanTemplate(settings.ticketTemplate))
   const [isSaving, setIsSaving] = useState(false)
 
   // Sincronizar cuando cambian los settings
   useEffect(() => {
     const t = settings.ticketTemplate
-    if (t && t.trim() && !t.includes('RECIBO DE VENTA') && !t.includes('JUEGO      NUM       MONTO')) {
-      setLocalTemplate(t)
-    } else if (!t || !t.trim()) {
+    if (t && t.trim()) {
+      setLocalTemplate(cleanTemplate(t))
+    } else {
       setLocalTemplate(DEFAULT_TICKET_TEMPLATE)
     }
   }, [settings.ticketTemplate])
+
+  const alignColumnsCenter = () => {
+    let t = localTemplate
+    t = t.replace(/.*apuesta.*monto.*premio.*/i, '   Apuesta       Monto    Premio')
+    t = t.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n  {{number}}    {{amount}}   {{prize}}\n{{/items}}`)
+    setLocalTemplate(t)
+    toast({ title: 'Columnas alineadas y centradas' })
+  }
 
   const handleSaveTemplate = async () => {
     try {
@@ -407,12 +421,26 @@ export function GeneralSettingsTab() {
 
                   {/* Area de Texto para editar la plantilla */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-mono font-bold text-[#dae2fd] flex items-center justify-between">
-                      <span>Editor de Plantilla</span>
-                      <span className="text-[10px] font-normal text-[#86948a]">
-                        {localTemplate.length} caracteres
-                      </span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-[#dae2fd]">
+                        Editor de Plantilla
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={alignColumnsCenter}
+                          className="h-6 text-[11px] px-2 font-mono text-[#10b981] hover:bg-[#10b981]/15 hover:text-[#10b981] border border-[#10b981]/30 rounded-lg font-bold"
+                          title="Alinea y centra los números de Apuesta, Monto y Premio"
+                        >
+                          Centrar Columnas
+                        </Button>
+                        <span className="text-[10px] font-normal text-[#86948a]">
+                          {localTemplate.length} caracteres
+                        </span>
+                      </div>
+                    </div>
                     <Textarea
                       id="ticketTemplate"
                       value={localTemplate}

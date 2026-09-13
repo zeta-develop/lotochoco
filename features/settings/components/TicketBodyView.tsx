@@ -98,10 +98,12 @@ export function TicketBodyView({
 
           case 'item_row':
             if (block.customText) {
+              const isDoubleWidth = block.customText.length <= 16
               return (
                 <div
                   key={idx}
                   className="font-mono text-sm font-black text-black leading-snug whitespace-pre px-1"
+                  style={isDoubleWidth ? { letterSpacing: '0.95ch' } : undefined}
                 >
                   {block.customText}
                 </div>
