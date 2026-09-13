@@ -74,12 +74,14 @@ export function TicketBodyView({
               </div>
             )
 
-          case 'items_header':
+          case 'items_header': {
+            const isBold = block.isBold !== false
+            const boldClass = isBold ? "font-bold text-black" : "font-normal text-black"
             if (block.rawText) {
               return (
                 <div
                   key={idx}
-                  className="font-mono text-xs font-bold text-black whitespace-pre px-1"
+                  className={`font-mono text-xs whitespace-pre px-1 ${boldClass}`}
                 >
                   {block.rawText}
                 </div>
@@ -88,13 +90,14 @@ export function TicketBodyView({
             return (
               <div
                 key={idx}
-                className="flex justify-between items-center text-xs font-bold text-black font-mono px-1"
+                className={`flex justify-between items-center text-xs font-mono px-1 ${boldClass}`}
               >
                 <span className="w-1/3 text-left">{block.col1}</span>
                 <span className="w-1/3 text-center">{block.col2}</span>
                 <span className="w-1/3 text-right">{block.col3}</span>
               </div>
             )
+          }
 
           case 'item_row':
             if (block.customText) {
@@ -120,27 +123,49 @@ export function TicketBodyView({
               </div>
             )
 
-          case 'total':
+          case 'total': {
+            const isBold = block.isBold !== false
             return (
               <div
                 key={idx}
-                className="text-center font-black text-base text-black font-mono my-1 tracking-wider"
+                className={`text-center font-mono my-1 tracking-wider text-black ${
+                  isBold ? "font-black text-base" : "font-medium text-sm"
+                }`}
               >
                 {block.text}
               </div>
             )
+          }
 
           case 'bold_text':
             return (
-              <div key={idx} className="text-center font-bold text-xs text-black font-mono">
-                {block.text}
+              <div key={idx} className="text-center font-bold text-xs text-black font-mono leading-tight">
+                {block.segments && block.segments.length > 0 ? (
+                  block.segments.map((seg, sIdx) => (
+                    <span key={sIdx} className={seg.bold ? "font-black" : "font-normal"}>
+                      {seg.text}
+                    </span>
+                  ))
+                ) : (
+                  block.text
+                )}
               </div>
             )
 
           case 'text':
             return (
               <div key={idx} className="text-center text-xs text-black font-mono leading-tight">
-                {block.text}
+                {block.segments && block.segments.length > 0 ? (
+                  block.segments.map((seg, sIdx) => (
+                    <span key={sIdx} className={seg.bold ? "font-black" : "font-normal"}>
+                      {seg.text}
+                    </span>
+                  ))
+                ) : (
+                  <span className={block.isBold ? "font-black" : "font-normal"}>
+                    {block.text}
+                  </span>
+                )}
               </div>
             )
 

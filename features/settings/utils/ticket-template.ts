@@ -165,15 +165,70 @@ export function resolveTicketData(
   }
 }
 
+export interface TextSegment {
+  text: string
+  bold: boolean
+}
+
+export function parseMarkdownLine(line: string): TextSegment[] {
+  let normalizedLine = line
+
+  // Si el usuario abrió con ** pero no cerró (número impar de **), auto-cerrar al final
+  const asteriskMatches = normalizedLine.match(/\*\*/g)
+  if (asteriskMatches && asteriskMatches.length % 2 !== 0 && normalizedLine.includes('**')) {
+    normalizedLine = normalizedLine + '**'
+  }
+
+  const segments: TextSegment[] = []
+  const regex = /\*\*(.*?)\*\*/g
+  let lastIdx = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(normalizedLine)) !== null) {
+    if (match.index > lastIdx) {
+      const text = normalizedLine.substring(lastIdx, match.index)
+      if (text) {
+        segments.push({ text, bold: false })
+      }
+    }
+    if (match[1]) {
+      segments.push({ text: match[1], bold: true })
+    }
+    lastIdx = regex.lastIndex
+  }
+
+  if (lastIdx < normalizedLine.length) {
+    const text = normalizedLine.substring(lastIdx)
+    if (text) {
+      segments.push({ text, bold: false })
+    }
+  }
+
+  // Limpiar cualquier asterisco residual suelto
+  const cleaned = segments
+    .map(s => ({
+      text: s.text.replace(/\*\*/g, ''),
+      bold: s.bold
+    }))
+    .filter(s => s.text.length > 0)
+
+  if (cleaned.length === 0) {
+    const fallbackText = normalizedLine.replace(/\*\*/g, '')
+    return fallbackText ? [{ text: fallbackText, bold: false }] : []
+  }
+
+  return cleaned
+}
+
 export type TicketBlock =
   | { type: 'header_big'; text: string }
   | { type: 'header_med'; text: string }
   | { type: 'separator' }
-  | { type: 'items_header'; col1: string; col2: string; col3: string; rawText?: string }
-  | { type: 'item_row'; number: string; amount: string; prize: string; customText?: string }
-  | { type: 'total'; text: string }
-  | { type: 'bold_text'; text: string }
-  | { type: 'text'; text: string }
+  | { type: 'items_header'; col1: string; col2: string; col3: string; rawText?: string; isBold?: boolean }
+  | { type: 'item_row'; number: string; amount: string; prize: string; customText?: string; isBold?: boolean }
+  | { type: 'total'; text: string; isBold?: boolean }
+  | { type: 'bold_text'; text: string; segments?: TextSegment[] }
+  | { type: 'text'; text: string; isBold?: boolean; segments?: TextSegment[] }
   | { type: 'qr'; code: string; leadingSpaces?: number }
   | { type: 'empty' }
 
@@ -304,7 +359,8 @@ export function parseTemplateToBlocks(
         col1: 'Apuesta',
         col2: 'Monto',
         col3: 'Premio',
-        rawText: line.replace(/\*\*/g, '').trimEnd()
+        rawText: line.replace(/\*\*/g, '').trimEnd(),
+        isBold: trimmed.includes('**')
       })
       continue
     }
@@ -327,50 +383,33 @@ export function parseTemplateToBlocks(
       continue
     }
 
-    // Total destacado
-    if (/total/i.test(trimmed) && (/\*\*/.test(trimmed) || /^total/i.test(trimmed))) {
+    // Total destacado (detecta si el usuario le puso ** o se lo quitó)
+    if (/total/i.test(trimmed)) {
+      const isBold = trimmed.includes('**')
       const cleanTotal = trimmed.replace(/\*\*/g, '').trim()
       blocks.push({
         type: 'total',
-        text: cleanTotal
+        text: cleanTotal,
+        isBold
       })
       continue
     }
 
-    // Texto en Negrita completa (**Texto**)
-    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-      const cleanBold = trimmed.slice(2, -2).replace(/\*\*/g, '').trim()
-      if (cleanBold) {
-        blocks.push({
-          type: 'bold_text',
-          text: cleanBold
-        })
-      }
-      continue
-    }
-
-    // Línea que empieza con ** sin cerrar (ej: "**Premio valido por 7 dias")
-    if (trimmed.startsWith('**')) {
-      const cleanBold = trimmed.replace(/\*\*/g, '').trim()
-      if (cleanBold) {
-        blocks.push({
-          type: 'bold_text',
-          text: cleanBold
-        })
-      }
-      continue
-    }
-
-    // Línea de texto general (ej: Folio, Fecha, Puesto, Valido para...)
-    // Limpiar asteriscos markdown internos o accidentales
-    const cleanText = trimmed.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*\*/g, '').trim()
+    // Línea de texto general (ej: Folio: **{{ticketNumber}}**, Fecha, Puesto, Valido para...)
+    // Soporta formato markdown **campo** para negritas parciales o completas
+    const segments = parseMarkdownLine(line.trimEnd())
+    const cleanText = segments.map(s => s.text).join('').trim()
     if (!cleanText) {
       continue
     }
 
+    const isAllBold = segments.length > 0 && segments.every(s => s.bold)
+
     blocks.push({
       type: 'text',
-      text: cleanText
+      text: cleanText,
+      isBold: isAllBold,
+      segments
     })
   }
 

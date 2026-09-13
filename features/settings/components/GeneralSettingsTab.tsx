@@ -9,7 +9,7 @@ import { useCompany } from '../hooks/use-company'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ShieldCheck, Info, Eye, Sun, Moon, Monitor, Printer, Receipt, Sliders, RefreshCw, QrCode } from 'lucide-react'
+import { ShieldCheck, Info, Eye, Sun, Moon, Monitor, Printer, Receipt, Sliders, RefreshCw, QrCode, Bold } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/use-toast'
@@ -98,6 +98,59 @@ export function GeneralSettingsTab() {
     t = t.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n  {{number}}    {{amount}}   {{prize}}\n{{/items}}`)
     setLocalTemplate(t)
     toast({ title: 'Columnas alineadas y centradas' })
+  }
+
+  const toggleBold = () => {
+    const textarea = document.getElementById('ticketTemplate') as HTMLTextAreaElement
+    if (!textarea) return
+
+    const start = textarea.selectionStart ?? 0
+    const end = textarea.selectionEnd ?? 0
+    const text = localTemplate
+
+    if (start === end) {
+      // Si no hay texto seleccionado, insertar **** y colocar el cursor en medio
+      const newText = text.substring(0, start) + '****' + text.substring(end)
+      setLocalTemplate(newText)
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + 2, start + 2)
+      }, 50)
+      return
+    }
+
+    const selectedText = text.substring(start, end)
+    let newText = ''
+    let newStart = start
+    let newEnd = end
+
+    if (selectedText.startsWith('**') && selectedText.endsWith('**') && selectedText.length >= 4) {
+      // Quitar negritas del texto seleccionado
+      const unwrapped = selectedText.slice(2, -2)
+      newText = text.substring(0, start) + unwrapped + text.substring(end)
+      newEnd = start + unwrapped.length
+    } else if (
+      start >= 2 &&
+      end <= text.length - 2 &&
+      text.substring(start - 2, start) === '**' &&
+      text.substring(end, end + 2) === '**'
+    ) {
+      // Quitar asteriscos exteriores
+      newText = text.substring(0, start - 2) + selectedText + text.substring(end + 2)
+      newStart = start - 2
+      newEnd = end - 2
+    } else {
+      // Poner negritas al texto seleccionado
+      const wrapped = `**${selectedText}**`
+      newText = text.substring(0, start) + wrapped + text.substring(end)
+      newEnd = start + wrapped.length
+    }
+
+    setLocalTemplate(newText)
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(newStart, newEnd)
+    }, 50)
   }
 
   const handleSaveTemplate = async () => {
@@ -426,6 +479,16 @@ export function GeneralSettingsTab() {
                         Editor de Plantilla
                       </label>
                       <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={toggleBold}
+                          className="h-6 text-[11px] px-2 font-mono text-[#f59e0b] hover:bg-[#f59e0b]/15 hover:text-[#f59e0b] border border-[#f59e0b]/30 rounded-lg font-bold flex items-center gap-1"
+                          title="Poner o quitar negrita (**) al campo o texto seleccionado"
+                        >
+                          <Bold className="h-3 w-3" /> ** Negrita **
+                        </Button>
                         <Button
                           type="button"
                           variant="ghost"

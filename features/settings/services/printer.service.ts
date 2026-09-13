@@ -183,11 +183,13 @@ export const printerService = {
             break
 
           case 'items_header':
+            if (block.isBold) builder.bold(true)
             if (block.rawText) {
               builder.alignLeft().text(block.rawText).newline()
             } else {
               builder.alignLeft().text(block.col1.padEnd(10) + block.col2.padEnd(10) + block.col3.padStart(12)).newline()
             }
+            if (block.isBold) builder.bold(false)
             break
 
           case 'item_row':
@@ -213,9 +215,14 @@ export const printerService = {
             break
 
           case 'total':
-            builder.alignCenter().bold(true).doubleWidth(true)
-            builder.text(block.text)
-            builder.doubleWidth(false).bold(false).newline()
+            if (block.isBold !== false) {
+              builder.alignCenter().bold(true).doubleWidth(true)
+              builder.text(block.text)
+              builder.doubleWidth(false).bold(false).newline()
+            } else {
+              builder.alignCenter().bold(false).doubleWidth(false)
+              builder.text(block.text).newline()
+            }
             break
 
           case 'bold_text':
@@ -223,7 +230,21 @@ export const printerService = {
             break
 
           case 'text':
-            builder.alignCenter().text(block.text).newline()
+            builder.alignCenter()
+            if (block.segments && block.segments.length > 0) {
+              for (const seg of block.segments) {
+                if (seg.bold) {
+                  builder.bold(true).text(seg.text).bold(false)
+                } else {
+                  builder.bold(false).text(seg.text)
+                }
+              }
+              builder.bold(false).newline()
+            } else if (block.isBold) {
+              builder.bold(true).text(block.text).bold(false).newline()
+            } else {
+              builder.bold(false).text(block.text).newline()
+            }
             break
 
           case 'qr':
