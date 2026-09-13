@@ -275,15 +275,15 @@ export function PurchaseVerification({
               --------------------------------
             </div>
 
-            {/* Items (Compactos y en Negrita) */}
+            {/* Items (Más anchos y en Negrita) */}
             <div className="space-y-0.5 my-1 px-1">
               {items.map((item) => {
                 const prize = (item.amount || 0) * (item.multiplier || 70)
                 return (
-                  <div key={item.id} className="flex justify-between items-center text-xs font-mono text-black font-bold">
-                    <span className="w-1/3 text-left">{item.number}</span>
-                    <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
-                    <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
+                  <div key={item.id} className="flex justify-between items-center text-sm font-mono text-black font-black">
+                    <span className="w-1/3 text-left tracking-widest">{item.number}</span>
+                    <span className="w-1/3 text-center tracking-wider">{item.amount.toFixed(0)}</span>
+                    <span className="w-1/3 text-right tracking-wider">{prize.toFixed(0)}</span>
                   </div>
                 )
               })}
@@ -294,8 +294,8 @@ export function PurchaseVerification({
               --------------------------------
             </div>
 
-            {/* Total */}
-            <div className="text-center font-bold text-sm text-black font-mono my-1 tracking-wide">
+            {/* Total (Más ancho y en Negrita) */}
+            <div className="text-center font-black text-base text-black font-mono my-1 tracking-wider">
               TOTAL: {currency} {total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
             </div>
 

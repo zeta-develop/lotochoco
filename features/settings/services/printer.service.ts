@@ -45,6 +45,11 @@ class EscPosBuilder {
     return this
   }
 
+  doubleWidth(on: boolean) {
+    this.buffer.push(0x1D, 0x21, on ? 0x10 : 0x00)
+    return this
+  }
+
   text(str: string) {
     const cleanStr = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     for (let i = 0; i < cleanStr.length; i++) {
@@ -164,13 +169,12 @@ export const printerService = {
       builder.text(`Vendedor: ${vendorName}`).newline()
       builder.text(separator).newline()
 
-      // 2. TABLA DE APUESTAS (Alineada a 32 columnas estándar de 58mm, Negrita compacta)
+      // 2. TABLA DE APUESTAS (Alineada a 32 columnas estándar de 58mm)
       builder.alignLeft()
-      builder.text('Apuesta'.padEnd(15) + 'Monto'.padEnd(8) + 'Premio'.padStart(9)).newline()
+      builder.text('Apuesta'.padEnd(10) + 'Monto'.padEnd(10) + 'Premio'.padStart(12)).newline()
       builder.text(separator).newline()
 
-      // Números en Negrita compacta (altura normal 1x para ahorrar papel como la muestra física)
-      builder.bold(true)
+      // Números, monto y premio MÁS ANCHOS (Doble Ancho ESC/POS: 16 columnas = 32 columnas de 58mm, altura normal 1x)
       for (const item of (ticket.items || [])) {
         const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
         const prize = item.amount * multiplier
@@ -178,24 +182,26 @@ export const printerService = {
         const amtStr = item.amount.toFixed(0)
         const prizeStr = prize.toFixed(0)
 
-        const col1 = numStr.padEnd(15)
-        const col2 = amtStr.padEnd(8)
-        const col3 = prizeStr.padStart(9)
+        // 5 columnas de doble ancho para Apuesta + 5 para Monto + 6 para Premio = 16 columnas
+        const col1 = numStr.padEnd(5)
+        const col2 = amtStr.padEnd(5)
+        const col3 = prizeStr.padStart(6)
 
-        builder.text(`${col1}${col2}${col3}`).newline()
+        builder.bold(true).doubleWidth(true)
+        builder.text(`${col1}${col2}${col3}`)
+        builder.doubleWidth(false).bold(false).newline()
       }
-      builder.bold(false)
 
       builder.text(separator).newline()
 
-      // 3. TOTAL (Centrado, Negrita, sin saltos extra)
+      // 3. TOTAL (Centrado, Doble Ancho y Negrita)
       const totalStr = ticket.totalAmount % 1 === 0 
         ? ticket.totalAmount.toFixed(0) 
         : ticket.totalAmount.toFixed(2)
 
-      builder.alignCenter().bold(true)
-      builder.text(`TOTAL: ${currency} ${totalStr}`).newline()
-      builder.bold(false)
+      builder.alignCenter().bold(true).doubleWidth(true)
+      builder.text(`TOTAL: ${currency} ${totalStr}`)
+      builder.doubleWidth(false).bold(false).newline()
 
       // 4. TEXTO LEGAL (Centrado, continuo)
       builder.text('Valido para 1 sorteo').newline()

@@ -151,16 +151,16 @@ export function TicketPreview({
               --------------------------------
             </div>
 
-            {/* Items */}
+            {/* Items (Más anchos y en Negrita) */}
             <div className="space-y-0.5 my-1 px-1">
               {ticket.items.map((item, index) => {
                 const multiplier = item.game?.multiplier || 70
                 const prize = item.amount * multiplier
                 return (
-                  <div key={index} className="flex justify-between items-center text-xs font-mono text-black font-bold">
-                    <span className="w-1/3 text-left">{item.number}</span>
-                    <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
-                    <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
+                  <div key={index} className="flex justify-between items-center text-sm font-mono text-black font-black">
+                    <span className="w-1/3 text-left tracking-widest">{item.number}</span>
+                    <span className="w-1/3 text-center tracking-wider">{item.amount.toFixed(0)}</span>
+                    <span className="w-1/3 text-right tracking-wider">{prize.toFixed(0)}</span>
                   </div>
                 )
               })}
@@ -171,8 +171,8 @@ export function TicketPreview({
               --------------------------------
             </div>
 
-            {/* Total */}
-            <div className="text-center font-bold text-sm text-black font-mono my-1 tracking-wide">
+            {/* Total (Más ancho y en Negrita) */}
+            <div className="text-center font-black text-base text-black font-mono my-1 tracking-wider">
               TOTAL: {currency} {ticket.totalAmount % 1 === 0 ? ticket.totalAmount.toFixed(0) : ticket.totalAmount.toFixed(2)}
             </div>
 

@@ -16,6 +16,7 @@ const COMMANDS = {
   BOLD_ON: `${ESC}E\x01`,
   BOLD_OFF: `${ESC}E\x00`,
   NORMAL_SIZE: `${GS}!\x00`,
+  DOUBLE_WIDTH: `${GS}!\x10`,
   DOUBLE_HEIGHT: `${GS}!\x01`,
   DOUBLE_SIZE: `${GS}!\x11`,
   FEED_LINE: '\x0A',
@@ -74,37 +75,38 @@ export function generateTicketReceipt(
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  // Tabla de Jugadas (32 caracteres de ancho, Negrita compacta)
+  // Tabla de Jugadas (32 caracteres de ancho)
   receipt += COMMANDS.ALIGN_LEFT
-  receipt += 'Apuesta'.padEnd(15) + 'Monto'.padEnd(8) + 'Premio'.padStart(9)
+  receipt += 'Apuesta'.padEnd(10) + 'Monto'.padEnd(10) + 'Premio'.padStart(12)
   receipt += COMMANDS.FEED_LINE
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  receipt += COMMANDS.BOLD_ON
   for (const item of ticket.items) {
     const number = (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number)
     const multiplier = item.game?.multiplier || 70
     const prize = item.amount * multiplier
 
-    const col1 = number.padEnd(15)
-    const col2 = item.amount.toFixed(0).padEnd(8)
-    const col3 = prize.toFixed(0).padStart(9)
-    receipt += `${col1}${col2}${col3}${COMMANDS.FEED_LINE}`
+    const col1 = number.padEnd(5)
+    const col2 = item.amount.toFixed(0).padEnd(5)
+    const col3 = prize.toFixed(0).padStart(6)
+    receipt += `${COMMANDS.BOLD_ON}${COMMANDS.DOUBLE_WIDTH}${col1}${col2}${col3}${COMMANDS.NORMAL_SIZE}${COMMANDS.BOLD_OFF}${COMMANDS.FEED_LINE}`
   }
-  receipt += COMMANDS.BOLD_OFF
   
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  // Total (Centrado, Negrita)
+  // Total (Centrado, Doble Ancho y Negrita)
   const totalStr = ticket.totalAmount % 1 === 0 
     ? ticket.totalAmount.toFixed(0) 
     : ticket.totalAmount.toFixed(2)
   receipt += COMMANDS.ALIGN_CENTER
   receipt += COMMANDS.BOLD_ON
-  receipt += `TOTAL: ${currency} ${totalStr}${COMMANDS.FEED_LINE}`
+  receipt += COMMANDS.DOUBLE_WIDTH
+  receipt += `TOTAL: ${currency} ${totalStr}`
+  receipt += COMMANDS.NORMAL_SIZE
   receipt += COMMANDS.BOLD_OFF
+  receipt += COMMANDS.FEED_LINE
   
   // Textos legales (Centrado, continuo)
   receipt += `Valido para 1 sorteo${COMMANDS.FEED_LINE}`
