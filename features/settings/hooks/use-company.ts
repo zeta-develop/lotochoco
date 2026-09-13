@@ -68,9 +68,11 @@ export function useCompany() {
   useEffect(() => {
     fetchCompany()
 
-    if (user) {
+    if (user?.id) {
+      // Usar un ID único para evitar error de colisión de canales en re-renders de React
+      const channelId = Math.random().toString(36).substring(7)
       const roleChannel = supabase
-        .channel(`user_role_sync_${user.id}`)
+        .channel(`user_role_sync_${user.id}_${channelId}`)
         .on(
           'postgres_changes',
           { 
@@ -90,7 +92,7 @@ export function useCompany() {
         supabase.removeChannel(roleChannel)
       }
     }
-  }, [user, fetchCompany])
+  }, [user?.id, fetchCompany])
 
   const updateCompanyName = async (newName: string) => {
     const userRole = company?.role?.toLowerCase()
