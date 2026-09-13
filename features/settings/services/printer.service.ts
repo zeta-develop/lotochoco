@@ -75,35 +75,31 @@ class EscPosBuilder {
     return this
   }
 
-  qrCode(data: string, widthDots: number = 384, leadingSpaces: number = 0) {
+  qrCode(data: string, widthDots: number = 384, _leadingSpaces: number = 0) {
     try {
       const cleanData = (data || 'LOTERIA').trim()
       const qr = QRCode.create(cleanData, { errorCorrectionLevel: 'M' })
-      const size = qr.modules.size // 21 modules para número de ticket
-      const margin = 2
-      const totalModules = size + margin * 2 // 25 modules
-      // Escala 6 (150 puntos / ~19mm) o 7 (175 puntos / ~22mm):
-      // Tamaño grande y nítido para escaneo rápido sin sobrecargar el cabezal ni trabar la impresora
-      const scale = Math.max(5, Math.min(7, Math.floor(175 / totalModules)))
-      const qrPixelSize = totalModules * scale // ~175 dots (~22 mm de ancho)
-      
-      // Ancho imprimible estándar para impresoras térmicas portátiles (58mm = 384 puntos = 32 cols)
+      const size = qr.modules.size // 25 modules para token de 32 chars
+      const margin = 1 // 1 módulo de quiet zone (óptimo en papel térmico blanco)
+      const totalModules = size + margin * 2 // 27 modules
+      // Escala 6: 27 * 6 = 162 dots (~20.25 mm), nítido, claro y de escaneo instantáneo
+      const scale = 6
+      const qrPixelSize = totalModules * scale // 162 dots
+
+      // Ancho imprimible estándar: 384 dots para 58mm (48 bytes), 576 dots para 80mm
       const targetWidthDots = widthDots || 384
-      const defaultCenterDots = Math.max(0, Math.floor((targetWidthDots - qrPixelSize) / 2))
+      // Centrado exacto: la mitad del espacio restante a cada lado
+      // En 58mm (384 dots): (384 - 162) / 2 = 111 puntos a la izquierda y 111 puntos a la derecha
+      const leftPaddingDots = Math.max(0, Math.floor((targetWidthDots - qrPixelSize) / 2))
 
-      // Si el usuario especificó espacios manuales antes de [QR] en el editor, desplazamos proporcionalmente
-      let leftPaddingDots = defaultCenterDots
-      if (leadingSpaces > 0) {
-        leftPaddingDots = Math.max(0, Math.min(targetWidthDots - qrPixelSize, leadingSpaces * 12))
-      }
-
-      // Asegurar modo alineado a la izquierda antes de la imagen raster para control exacto por coordenadas
+      // Forzar alineación izquierda antes del gráfico raster para coordenadas absolutas
       this.buffer.push(0x1B, 0x61, 0x00)
 
-      // Optimización de payload: No enviamos bytes de ceros innecesarios para el margen derecho
-      // El papel a la derecha ya es blanco, por lo que solo enviamos hasta el último dot del QR
-      const maxDotUsed = Math.min(targetWidthDots, leftPaddingDots + qrPixelSize)
-      const widthBytes = Math.ceil(maxDotUsed / 8) // ~35 bytes en vez de 48 bytes (ahorro de más del 27% de bytes)
+      // El raster ocupa el ancho total imprimible del papel (48 bytes = 384 dots para 58mm).
+      // Al enviar el ancho completo de la cabeza de impresión, dot 0 es el extremo izquierdo
+      // físico y dot 383 es el extremo derecho. Esto garantiza que el QR quede 100% centrado
+      // en cualquier modelo de impresora térmica sin sufrir desfases provocados por ESC a 1 del firmware.
+      const widthBytes = Math.ceil(targetWidthDots / 8) // 48 bytes
       const xL = widthBytes & 0xFF
       const xH = (widthBytes >> 8) & 0xFF
       const yL = qrPixelSize & 0xFF
@@ -122,7 +118,7 @@ class EscPosBuilder {
             if (modX >= 0 && modX < size) {
               if (qr.modules.get(modY, modX)) {
                 const targetDot = leftPaddingDots + x
-                if (targetDot < maxDotUsed) {
+                if (targetDot < targetWidthDots) {
                   const bIdx = Math.floor(targetDot / 8)
                   const bit = 7 - (targetDot % 8)
                   rowBytes[bIdx] |= (1 << bit)
@@ -136,6 +132,9 @@ class EscPosBuilder {
           this.buffer.push(rowBytes[b])
         }
       }
+
+      // Restaurar alineación centrada para los bloques posteriores (mensajes del pie)
+      this.buffer.push(0x1B, 0x61, 0x01)
     } catch (e) {
       console.error('Error generando QR ESC/POS universal:', e)
     }
