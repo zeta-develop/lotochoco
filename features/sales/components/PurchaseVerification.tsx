@@ -181,7 +181,7 @@ export function PurchaseVerification({
   const headerTitle = isViewMode ? `Ticket #${ticket?.ticketNumber || ''}` : 'Verificar compra'
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#0b1326] text-slate-100 overflow-y-auto">
+    <div className="flex h-full min-h-0 w-full max-w-[100vw] flex-col bg-[#0b1326] text-slate-100 overflow-y-auto overflow-x-hidden">
       {/* Top Header / Modal Navigation */}
       <header className="sticky top-0 z-30 bg-[#060e20]/95 backdrop-blur-md px-3 py-2 flex items-center justify-between border-b border-[#1e293b] shrink-0">
         <div className="flex items-center gap-2">

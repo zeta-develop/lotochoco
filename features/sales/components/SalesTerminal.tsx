@@ -269,11 +269,10 @@ export function SalesTerminal() {
     )
   }
 
-  // Página completa de verificación de compra (reemplaza el modal anterior):
-  // ocupa todo el viewport disponible y muestra las 15 jugadas sin scroll.
+  // Página completa de verificación de compra (modal pantalla completa limpio sin márgenes negativos)
   if (showConfirmDialog) {
     return (
-      <div className="-m-4 h-[calc(100dvh-4rem-env(safe-area-inset-bottom,0px))]">
+      <div className="fixed inset-0 z-50 bg-[#060e20] overflow-y-auto overflow-x-hidden">
         <PurchaseVerification
           cart={cart}
           currency={currency}
@@ -288,19 +287,19 @@ export function SalesTerminal() {
   }
 
   return (
-    <div className="space-y-4 pb-20 max-w-4xl mx-auto">
+    <div className="space-y-3 pb-24 max-w-4xl mx-auto w-full min-w-0 overflow-x-hidden">
       {/* Telemetry Status Bar */}
-      <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-[#10b981]">
+      <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 flex items-center justify-between shadow-lg min-w-0 w-full gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-[#10b981] shrink-0">
             <Gamepad2 className="h-4 w-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-xs text-slate-100 uppercase tracking-tight">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-xs text-slate-100 uppercase tracking-tight truncate">
                 {settings.businessName || 'LOTOCHOCO'} • {settings.terminalNumber || 'T-J081'}
               </span>
-              <span className="w-2 h-2 rounded-full bg-[#10b981] pulse-dot"></span>
+              <span className="w-2 h-2 rounded-full bg-[#10b981] pulse-dot shrink-0"></span>
             </div>
             <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
               <span>Terminal Activa</span>
@@ -310,7 +309,7 @@ export function SalesTerminal() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="bg-[#060e20] px-2.5 py-1 rounded-xl border border-[#1e293b] flex items-center gap-1.5">
             <span className="text-[10px] text-slate-400">Total:</span>
             <span className="font-mono text-xs text-[#10b981] font-bold">
@@ -321,7 +320,7 @@ export function SalesTerminal() {
       </div>
 
       {!isCashOpen && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3 animate-in fade-in">
+        <div className="p-3 sm:p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3 animate-in fade-in w-full min-w-0">
           <div className="bg-amber-500 text-slate-950 p-2 rounded-xl shrink-0">
             <AlertCircle className="h-5 w-5" />
           </div>
@@ -332,19 +331,19 @@ export function SalesTerminal() {
       )}
 
       {/* Main Operator Layout (2-cols on desktop, 1-col on mobile) */}
-      <div className="grid gap-4 lg:grid-cols-5">
+      <div className="grid gap-3 lg:gap-4 lg:grid-cols-5 w-full min-w-0">
         {/* Left Column: Game selection, schedules, readout & tactile keypad */}
-        <div className="lg:col-span-3 space-y-3">
+        <div className="lg:col-span-3 space-y-3 w-full min-w-0">
           {/* GAME SELECTOR PILLS */}
-          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modalidad de Juego</span>
-              <span className="text-[10px] font-mono text-cyan-400">
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2 w-full min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Modalidad de Juego</span>
+              <span className="text-[10px] font-mono text-cyan-400 truncate text-right">
                 {selectedGame?.name || 'Selecciona un juego'}
               </span>
             </div>
 
-            <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5 w-full min-w-0 touch-pan-x">
               {games.map((game) => {
                 const isSelected = selectedGame?.id === game.id
                 return (
@@ -354,14 +353,14 @@ export function SalesTerminal() {
                     disabled={isLocked}
                     onClick={() => handleGameSelect(game as any)}
                     className={cn(
-                      "flex-shrink-0 rounded-xl px-3 py-2 flex flex-col items-start border transition-all active:scale-95 text-left min-w-[100px]",
+                      "flex-shrink-0 rounded-xl px-3 py-2 flex flex-col items-start border transition-all active:scale-95 text-left min-w-[95px] max-w-[140px]",
                       isSelected
                         ? "bg-[#10b981] text-slate-950 border-[#10b981] active-glow font-bold shadow-md"
                         : "bg-[#060e20] text-slate-300 hover:bg-[#1e293b] border-[#1e293b] hover:text-white"
                     )}
                   >
                     <span className="text-xs font-black leading-tight truncate w-full">{game.name}</span>
-                    <span className={cn("text-[9px] font-mono mt-0.5", isSelected ? "text-slate-900" : "text-slate-400")}>
+                    <span className={cn("text-[9px] font-mono mt-0.5 truncate w-full", isSelected ? "text-slate-900" : "text-slate-400")}>
                       {isDateGame(game.digitCount) ? 'DÍA / MES' : `${game.digitCount} DÍGITO${game.digitCount > 1 ? 'S' : ''}`}
                     </span>
                   </button>
@@ -371,16 +370,16 @@ export function SalesTerminal() {
           </div>
 
           {/* DRAW SCHEDULE SELECTOR */}
-          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sorteos Programados</span>
-              <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {selectedSchedule ? `${selectedSchedule.name} (${formatTime12h(selectedSchedule.time)})` : 'Sin horario'}
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2 w-full min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Sorteos Programados</span>
+              <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1 truncate text-right">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span className="truncate">{selectedSchedule ? `${selectedSchedule.name} (${formatTime12h(selectedSchedule.time)})` : 'Sin horario'}</span>
               </span>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 w-full min-w-0">
               {selectedGame?.schedules && selectedGame.schedules.length > 0 ? (
                 selectedGame.schedules.map((schedule) => {
                   const isSelected = selectedSchedule?.id === schedule.id
@@ -395,21 +394,21 @@ export function SalesTerminal() {
                         toast({ title: `Horario: ${schedule.name}` })
                       }}
                       className={cn(
-                        "rounded-xl p-2 flex flex-col items-center border transition-all active:scale-95 text-center relative overflow-hidden",
+                        "rounded-xl p-2 flex flex-col items-center border transition-all active:scale-95 text-center relative overflow-hidden min-w-0 w-full",
                         isSelected
                           ? "bg-[#171f33] border-2 border-amber-400 amber-glow text-white font-bold"
                           : "bg-[#060e20] border-[#1e293b] text-slate-300 hover:bg-[#171f33] hover:text-white"
                       )}
                     >
-                      <span className="text-xs font-mono font-bold">{formatTime12h(schedule.time)}</span>
-                      <span className={cn("text-[9px] truncate mt-0.5", isSelected ? "text-amber-400 font-bold" : "text-slate-400")}>
+                      <span className="text-xs font-mono font-bold truncate w-full">{formatTime12h(schedule.time)}</span>
+                      <span className={cn("text-[9px] truncate w-full mt-0.5", isSelected ? "text-amber-400 font-bold" : "text-slate-400")}>
                         {schedule.name}
                       </span>
                     </button>
                   )
                 })
               ) : (
-                <div className="col-span-4 py-2 text-center text-xs text-slate-400 font-mono">
+                <div className="col-span-full py-2 text-center text-xs text-slate-400 font-mono">
                   Sin horarios asignados a este juego
                 </div>
               )}
@@ -533,7 +532,7 @@ export function SalesTerminal() {
               </div>
             </div>
 
-            <div className="grid grid-cols-6 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 w-full min-w-0">
               {quickAmounts.map((q) => {
                 const isSelected = amount === q
                 return (
@@ -542,7 +541,7 @@ export function SalesTerminal() {
                     type="button"
                     onClick={() => setAmount(q)}
                     className={cn(
-                      "py-2 rounded-xl font-mono text-xs font-bold border transition-all active:scale-95",
+                      "py-2 px-1 text-center rounded-xl font-mono text-xs font-bold border transition-all active:scale-95 min-w-0",
                       isSelected
                         ? "bg-[#10b981] text-slate-950 border-[#10b981] active-glow"
                         : "bg-[#060e20] text-slate-300 hover:bg-[#1e293b] border-[#1e293b]"
@@ -557,14 +556,14 @@ export function SalesTerminal() {
 
           {/* TACTILE 3x4 KEYPAD */}
           {!isCurrentGameDate && (
-            <div className="bg-[#131b2e] rounded-2xl p-2.5 border border-[#1e293b] space-y-1.5">
-              <div className="grid grid-cols-3 gap-1.5">
+            <div className="bg-[#131b2e] rounded-2xl p-2.5 border border-[#1e293b] space-y-1.5 w-full min-w-0 overflow-hidden">
+              <div className="grid grid-cols-3 gap-1.5 w-full min-w-0">
                 {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
                   <button
                     key={digit}
                     type="button"
                     onClick={() => handleKeypadPress(digit)}
-                    className="h-12 bg-[#060e20] hover:bg-[#171f33] active:bg-[#10b981]/20 text-white font-mono text-lg font-black rounded-xl border border-[#1e293b] flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                    className="h-12 bg-[#060e20] hover:bg-[#171f33] active:bg-[#10b981]/20 text-white font-mono text-lg font-black rounded-xl border border-[#1e293b] flex items-center justify-center active:scale-95 transition-all shadow-sm min-w-0"
                   >
                     {digit}
                   </button>
@@ -574,7 +573,7 @@ export function SalesTerminal() {
                 <button
                   type="button"
                   onClick={handleKeypadClear}
-                  className="h-12 bg-[#060e20] hover:bg-[#171f33] text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                  className="h-12 bg-[#060e20] hover:bg-[#171f33] text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-1 active:scale-95 transition-all min-w-0"
                 >
                   <RotateCcw className="h-4 w-4" />
                   <span>Limpiar</span>
@@ -584,7 +583,7 @@ export function SalesTerminal() {
                 <button
                   type="button"
                   onClick={() => handleKeypadPress('0')}
-                  className="h-12 bg-[#060e20] hover:bg-[#171f33] active:bg-[#10b981]/20 text-white font-mono text-lg font-black rounded-xl border border-[#1e293b] flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                  className="h-12 bg-[#060e20] hover:bg-[#171f33] active:bg-[#10b981]/20 text-white font-mono text-lg font-black rounded-xl border border-[#1e293b] flex items-center justify-center active:scale-95 transition-all shadow-sm min-w-0"
                 >
                   0
                 </button>
@@ -593,7 +592,7 @@ export function SalesTerminal() {
                 <button
                   type="button"
                   onClick={handleKeypadBackspace}
-                  className="h-12 bg-[#060e20] hover:bg-[#171f33] text-red-400 font-bold text-xs rounded-xl border border-red-500/30 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                  className="h-12 bg-[#060e20] hover:bg-[#171f33] text-red-400 font-bold text-xs rounded-xl border border-red-500/30 flex items-center justify-center gap-1 active:scale-95 transition-all min-w-0"
                 >
                   <Delete className="h-4 w-4" />
                   <span>Borrar</span>
@@ -603,20 +602,20 @@ export function SalesTerminal() {
           )}
 
           {/* Client Input */}
-          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-2.5 flex items-center gap-2">
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-2.5 flex items-center gap-2 w-full min-w-0">
             <User className="h-4 w-4 text-slate-400 ml-1 shrink-0" />
             <Input
               value={client}
               onChange={(e) => setClient(e.target.value)}
               placeholder="Cliente (opcional)..."
-              className="h-9 bg-[#060e20] border-[#1e293b] text-xs font-bold text-white placeholder:text-slate-500 rounded-xl"
+              className="h-9 bg-[#060e20] border-[#1e293b] text-xs font-bold text-white placeholder:text-slate-500 rounded-xl min-w-0 flex-1"
             />
           </div>
         </div>
 
         {/* Right Column: Live Ticket Drawer / Receipt Preview & Checkout */}
-        <div className="lg:col-span-2 space-y-3">
-          <Card className="border border-[#1e293b] shadow-xl bg-[#131b2e] rounded-2xl overflow-hidden flex flex-col h-full">
+        <div className="lg:col-span-2 space-y-3 w-full min-w-0">
+          <Card className="border border-[#1e293b] shadow-xl bg-[#131b2e] rounded-2xl overflow-hidden flex flex-col h-full w-full min-w-0">
             <CardHeader className="bg-[#060e20] py-3 px-4 border-b border-[#1e293b]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -655,17 +654,17 @@ export function SalesTerminal() {
                   return (
                     <div
                       key={item.id}
-                      className="group flex items-center justify-between p-2 rounded-xl bg-[#060e20] border border-[#1e293b] hover:border-[#10b981]/40 transition-colors"
+                      className="group flex items-center justify-between p-2 rounded-xl bg-[#060e20] border border-[#1e293b] hover:border-[#10b981]/40 transition-colors w-full min-w-0 gap-2"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-8 h-8 rounded-lg bg-[#10b981]/15 border border-[#10b981]/40 text-[#10b981] flex items-center justify-center font-mono text-sm font-black">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="w-8 h-8 rounded-lg bg-[#10b981]/15 border border-[#10b981]/40 text-[#10b981] flex items-center justify-center font-mono text-sm font-black shrink-0">
                           {item.number.length === 4 ? formatDateNumber(item.number, true) : item.number}
                         </span>
-                        <div>
-                          <div className="text-xs font-bold text-slate-200">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-slate-200 truncate">
                             {item.gameName} • <span className="font-mono text-[#10b981]">{currency}{item.amount.toFixed(0)}</span>
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
+                          <div className="text-[10px] text-slate-400 font-mono truncate">
                             {item.scheduleName} • Gana: {currency}{prize.toLocaleString()}
                           </div>
                         </div>
@@ -675,7 +674,7 @@ export function SalesTerminal() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleRemoveFromCart(item.id)}
-                        className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                        className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg shrink-0"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

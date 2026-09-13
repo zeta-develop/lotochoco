@@ -73,7 +73,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-background pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="flex min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-background pb-[env(safe-area-inset-bottom,0px)]">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div 
@@ -163,7 +163,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
       </aside>
 
       {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-hidden min-h-[100dvh]">
+      <div className="flex flex-1 flex-col min-w-0 w-full overflow-hidden min-h-[100dvh]">
         {/* Top bar */}
         <header className="flex h-14 items-center justify-between border-b border-[#1e293b] bg-[#0b1326] px-3 md:px-4 z-20">
           <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-2 sm:p-4 relative pb-20 lg:pb-4 bg-[#0b1326] text-slate-100">
+        <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden p-2 sm:p-4 relative pb-20 lg:pb-4 bg-[#0b1326] text-slate-100">
           {isRefreshing && (
             <div className="absolute top-0 left-0 right-0 h-1 bg-[#10b981]/20 overflow-hidden z-50">
               <div className="h-full bg-[#10b981] animate-pulse w-full" />
@@ -232,7 +232,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
         </main>
 
         {/* Mobile bottom navigation bar for 1-hand touch POS ergonomics */}
-        <nav className="fixed bottom-0 left-0 w-full z-40 flex lg:hidden justify-around items-center px-1 py-1.5 bg-[#060e20] border-t border-[#1e293b] backdrop-blur-lg">
+        <nav className="fixed bottom-0 left-0 w-full max-w-[100vw] z-40 flex lg:hidden justify-around items-center px-1 py-1.5 bg-[#060e20] border-t border-[#1e293b] backdrop-blur-lg">
           <button
             onClick={() => onModuleChange('pos')}
             type="button"
