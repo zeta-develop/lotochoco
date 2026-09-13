@@ -19,7 +19,7 @@ Apuesta   Monto           Premio
 --------------------------------
 **TOTAL: {{currency}} {{total}}**
 Valido para 1 sorteo
-Por favor revise su boleto
+Por favor revise su ticket
 Premio valido por 7 dias
 [QR]`
 
@@ -185,13 +185,16 @@ export function parseTemplateToBlocks(
   const template = (rawTemplate && rawTemplate.trim()) ? rawTemplate : DEFAULT_TICKET_TEMPLATE
   const data = resolveTicketData(ticket, settings, isReprint)
 
-  // 1. Manejar condicional {{#if client}}...{{/if}}
-  let processed = template.replace(/{{#if client}}([\s\S]*?){{\/if}}/gi, (_, content) => {
-    if (data.client) {
-      return content.replace(/{{client}}/gi, data.client)
-    }
-    return ''
-  })
+  // 1. Limpiar asteriscos accidentales pegados al bloque de items
+  let processed = template
+    .replace(/\*\*{{#items}}/gi, '{{#items}}')
+    .replace(/{{\/items}}\*\*/gi, '{{/items}}')
+    .replace(/{{#if client}}([\s\S]*?){{\/if}}/gi, (_, content) => {
+      if (data.client) {
+        return content.replace(/{{client}}/gi, data.client)
+      }
+      return ''
+    })
 
   // 2. Extraer bloque de items si existe: {{#items}}...{{/items}}
   const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/i
@@ -245,6 +248,7 @@ export function parseTemplateToBlocks(
             .replace(/{{amount}}/g, item.amount)
             .replace(/{{prize}}/g, item.prize)
             .replace(/{{currency}}/g, item.currency)
+            .replace(/\*\*/g, '')
           blocks.push({
             type: 'item_row',
             number: item.number,
@@ -264,14 +268,22 @@ export function parseTemplateToBlocks(
       continue
     }
 
+    // Si la línea contiene solo asteriscos sueltos (* o **), descartarla por completo
+    if (/^\*+$/.test(trimmed)) {
+      if (trimmed.length >= 3) {
+        blocks.push({ type: 'separator' })
+      }
+      continue
+    }
+
     // QR Code
-    if (trimmed === '[QR]' || trimmed === '{{qrCode}}') {
+    if (/^(\[QR\]|{{qrCode}})$/i.test(trimmed)) {
       blocks.push({ type: 'qr', code: data.ticketNumber })
       continue
     }
 
     // Separador
-    if (/^[-=_*]{3,}$/.test(trimmed)) {
+    if (/^[-=_]{3,}$/.test(trimmed)) {
       blocks.push({ type: 'separator' })
       continue
     }
@@ -291,7 +303,7 @@ export function parseTemplateToBlocks(
     if (trimmed.startsWith('# ')) {
       blocks.push({
         type: 'header_big',
-        text: trimmed.substring(2).trim()
+        text: trimmed.substring(2).replace(/\*\*/g, '').trim()
       })
       continue
     }
@@ -300,7 +312,7 @@ export function parseTemplateToBlocks(
     if (trimmed.startsWith('## ')) {
       blocks.push({
         type: 'header_med',
-        text: trimmed.substring(3).trim()
+        text: trimmed.substring(3).replace(/\*\*/g, '').trim()
       })
       continue
     }
@@ -315,22 +327,46 @@ export function parseTemplateToBlocks(
       continue
     }
 
-    // Texto en Negrita completa
+    // Texto en Negrita completa (**Texto**)
     if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-      blocks.push({
-        type: 'bold_text',
-        text: trimmed.slice(2, -2).trim()
-      })
+      const cleanBold = trimmed.slice(2, -2).replace(/\*\*/g, '').trim()
+      if (cleanBold) {
+        blocks.push({
+          type: 'bold_text',
+          text: cleanBold
+        })
+      }
+      continue
+    }
+
+    // Línea que empieza con ** sin cerrar (ej: "**Premio valido por 7 dias")
+    if (trimmed.startsWith('**')) {
+      const cleanBold = trimmed.replace(/\*\*/g, '').trim()
+      if (cleanBold) {
+        blocks.push({
+          type: 'bold_text',
+          text: cleanBold
+        })
+      }
       continue
     }
 
     // Línea de texto general (ej: Folio, Fecha, Puesto, Valido para...)
-    // Limpiar asteriscos markdown internos si los hay
-    const cleanText = trimmed.replace(/\*\*(.*?)\*\*/g, '$1')
+    // Limpiar asteriscos markdown internos o accidentales
+    const cleanText = trimmed.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*\*/g, '').trim()
+    if (!cleanText) {
+      continue
+    }
+
     blocks.push({
       type: 'text',
       text: cleanText
     })
+  }
+
+  // Asegurar que el ticket siempre tenga código QR al final para validación/escaneo
+  if (!blocks.some(b => b.type === 'qr')) {
+    blocks.push({ type: 'qr', code: data.ticketNumber })
   }
 
   return blocks

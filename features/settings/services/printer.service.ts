@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatTime12h, formatDateNumber } from '@/lib/utils'
 import { toPng } from 'html-to-image'
+import QRCode from 'qrcode'
 import { parseTemplateToBlocks, DEFAULT_TICKET_TEMPLATE } from '../utils/ticket-template'
 
 class EscPosBuilder {
@@ -74,30 +75,54 @@ class EscPosBuilder {
     return this
   }
 
-  qrCode(data: string, size: number = 6) {
-    // 1. GS ( k Function 165: Select QR model 2
-    this.buffer.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00)
+  qrCode(data: string, widthDots: number = 384) {
+    try {
+      const cleanData = (data || 'LOTERIA').trim()
+      const qr = QRCode.create(cleanData, { errorCorrectionLevel: 'M' })
+      const size = qr.modules.size // e.g. 21
+      const margin = 2
+      const scale = 5 // 25 modules * 5 = 125 dots (~16 mm en 58mm)
+      const qrPixelSize = (size + margin * 2) * scale
+      
+      const widthBytes = Math.ceil(widthDots / 8) // 48 bytes para 384 dots (58mm)
+      const leftPaddingDots = Math.max(0, Math.floor((widthDots - qrPixelSize) / 2))
 
-    // 2. GS ( k Function 167: Set QR module size (1-16, typical 5-6 for 58mm)
-    const moduleSize = Math.max(1, Math.min(16, size))
-    this.buffer.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize)
+      // Comando ESC/POS universal: GS v 0 (Print raster bit image)
+      // Soportado por el 100% de impresoras térmicas portátiles (Goojprt PT-210, MPT-II, etc.)
+      const xL = widthBytes & 0xFF
+      const xH = (widthBytes >> 8) & 0xFF
+      const yL = qrPixelSize & 0xFF
+      const yH = (qrPixelSize >> 8) & 0xFF
 
-    // 3. GS ( k Function 169: Set error correction level M (49 / 0x31)
-    this.buffer.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31)
+      this.buffer.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH)
 
-    // 4. GS ( k Function 180: Store data in symbol storage
-    const cleanData = (data || 'LOTERIA').normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    const len = cleanData.length + 3
-    const pL = len & 0xFF
-    const pH = (len >> 8) & 0xFF
-
-    this.buffer.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30)
-    for (let i = 0; i < cleanData.length; i++) {
-      this.buffer.push(cleanData.charCodeAt(i))
+      for (let y = 0; y < qrPixelSize; y++) {
+        const rowBytes = new Uint8Array(widthBytes)
+        const modY = Math.floor(y / scale) - margin
+        
+        if (modY >= 0 && modY < size) {
+          for (let x = 0; x < qrPixelSize; x++) {
+            const modX = Math.floor(x / scale) - margin
+            if (modX >= 0 && modX < size) {
+              if (qr.modules.get(modY, modX)) {
+                const targetDot = leftPaddingDots + x
+                if (targetDot < widthDots) {
+                  const bIdx = Math.floor(targetDot / 8)
+                  const bit = 7 - (targetDot % 8)
+                  rowBytes[bIdx] |= (1 << bit)
+                }
+              }
+            }
+          }
+        }
+        
+        for (let b = 0; b < widthBytes; b++) {
+          this.buffer.push(rowBytes[b])
+        }
+      }
+    } catch (e) {
+      console.error('Error generando QR ESC/POS universal:', e)
     }
-
-    // 5. GS ( k Function 181: Print symbol data in storage
-    this.buffer.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30)
     return this
   }
 
@@ -127,6 +152,7 @@ export const printerService = {
 
       const template = settings.ticketTemplate || DEFAULT_TICKET_TEMPLATE
       const blocks = parseTemplateToBlocks(template, ticket, settings, isReprint)
+      const paperDots = settings.ticketWidth === '80mm' ? 576 : 384
 
       for (const block of blocks) {
         switch (block.type) {
@@ -175,7 +201,7 @@ export const printerService = {
             break
 
           case 'qr':
-            builder.qrCode(block.code || ticket.ticketNumber || 'LOTERIA', 4)
+            builder.qrCode(block.code || ticket.ticketNumber || 'LOTERIA', paperDots)
             break
 
           case 'empty':
@@ -184,7 +210,7 @@ export const printerService = {
         }
       }
 
-      builder.feed(2)
+      builder.feed(3)
 
       console.log('Conectando a impresora:', deviceId);
       await bluetoothService.connect(deviceId)
