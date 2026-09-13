@@ -75,37 +75,32 @@ class EscPosBuilder {
     return this
   }
 
-  qrCode(data: string, widthDots: number = 384, _leadingSpaces: number = 0) {
+  qrCode(data: string, _widthDots: number = 384, _leadingSpaces: number = 0) {
     try {
       const cleanData = (data || 'LOTERIA').trim()
       const qr = QRCode.create(cleanData, { errorCorrectionLevel: 'M' })
       const size = qr.modules.size // 25 modules para token de 32 chars
       const margin = 1 // 1 módulo de quiet zone (óptimo en papel térmico blanco)
       const totalModules = size + margin * 2 // 27 modules
-      // Escala 6: 27 * 6 = 162 dots (~20.25 mm), nítido, claro y de escaneo instantáneo
-      const scale = 6
-      const qrPixelSize = totalModules * scale // 162 dots
+      // Escala 5: 27 * 5 = 135 dots (~16.87 mm de ancho), tamaño óptimo para escaneo rápido
+      // y transmisión ultra-ligera por Bluetooth
+      const scale = 5
+      const qrPixelSize = totalModules * scale // 135 dots
 
-      // Ancho imprimible estándar: 384 dots para 58mm (48 bytes), 576 dots para 80mm
-      const targetWidthDots = widthDots || 384
-      // Centrado exacto: la mitad del espacio restante a cada lado
-      // En 58mm (384 dots): (384 - 162) / 2 = 111 puntos a la izquierda y 111 puntos a la derecha
-      const leftPaddingDots = Math.max(0, Math.floor((targetWidthDots - qrPixelSize) / 2))
-
-      // Forzar alineación izquierda antes del gráfico raster para coordenadas absolutas
-      this.buffer.push(0x1B, 0x61, 0x00)
-
-      // El raster ocupa el ancho total imprimible del papel (48 bytes = 384 dots para 58mm).
-      // Al enviar el ancho completo de la cabeza de impresión, dot 0 es el extremo izquierdo
-      // físico y dot 383 es el extremo derecho. Esto garantiza que el QR quede 100% centrado
-      // en cualquier modelo de impresora térmica sin sufrir desfases provocados por ESC a 1 del firmware.
-      const widthBytes = Math.ceil(targetWidthDots / 8) // 48 bytes
+      // Ancho exacto del QR en bytes: 135 puntos / 8 = 17 bytes por fila
+      // Sin ceros laterales manuales para reducir el payload a solo 2,295 bytes (más de 70% de ahorro)
+      // Esto elimina por completo el retraso/parones en la impresora y hace que salga "de un solo".
+      const widthBytes = Math.ceil(qrPixelSize / 8) // 17 bytes
       const xL = widthBytes & 0xFF
       const xH = (widthBytes >> 8) & 0xFF
       const yL = qrPixelSize & 0xFF
       const yH = (qrPixelSize >> 8) & 0xFF
 
+      // Asegurar modo centrado en la impresora para el gráfico raster
+      this.buffer.push(0x1B, 0x61, 0x01)
+
       // Comando ESC/POS universal: GS v 0 (Print raster bit image)
+      // La impresora térmica PT-210 centra automáticamente la imagen de 17 bytes con ESC a 1
       this.buffer.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH)
 
       for (let y = 0; y < qrPixelSize; y++) {
@@ -117,12 +112,9 @@ class EscPosBuilder {
             const modX = Math.floor(x / scale) - margin
             if (modX >= 0 && modX < size) {
               if (qr.modules.get(modY, modX)) {
-                const targetDot = leftPaddingDots + x
-                if (targetDot < targetWidthDots) {
-                  const bIdx = Math.floor(targetDot / 8)
-                  const bit = 7 - (targetDot % 8)
-                  rowBytes[bIdx] |= (1 << bit)
-                }
+                const bIdx = Math.floor(x / 8)
+                const bit = 7 - (x % 8)
+                rowBytes[bIdx] |= (1 << bit)
               }
             }
           }
@@ -133,7 +125,9 @@ class EscPosBuilder {
         }
       }
 
-      // Restaurar alineación centrada para los bloques posteriores (mensajes del pie)
+      // Salto de línea después del gráfico raster
+      this.buffer.push(0x0A)
+      // Mantener alineación centrada para los mensajes del pie
       this.buffer.push(0x1B, 0x61, 0x01)
     } catch (e) {
       console.error('Error generando QR ESC/POS universal:', e)
