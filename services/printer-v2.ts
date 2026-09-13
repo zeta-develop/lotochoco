@@ -16,6 +16,7 @@ const COMMANDS = {
   BOLD_ON: `${ESC}E\x01`,
   BOLD_OFF: `${ESC}E\x00`,
   NORMAL_SIZE: `${GS}!\x00`,
+  DOUBLE_HEIGHT: `${GS}!\x01`,
   DOUBLE_SIZE: `${GS}!\x11`,
   FEED_LINE: '\x0A',
   FEED_PAPER: `${ESC}d\x04`,
@@ -97,7 +98,7 @@ export function generateTicketReceipt(
     const col1 = number.padEnd(16)
     const col2 = item.amount.toFixed(0).padEnd(8)
     const col3 = prize.toFixed(0).padStart(8)
-    receipt += `${col1}${col2}${col3}${COMMANDS.FEED_LINE}`
+    receipt += `${COMMANDS.BOLD_ON}${COMMANDS.DOUBLE_HEIGHT}${col1}${col2}${col3}${COMMANDS.NORMAL_SIZE}${COMMANDS.BOLD_OFF}${COMMANDS.FEED_LINE}`
   }
   
   receipt += separator
@@ -109,7 +110,9 @@ export function generateTicketReceipt(
     : ticket.totalAmount.toFixed(2)
   receipt += COMMANDS.ALIGN_CENTER
   receipt += COMMANDS.BOLD_ON
+  receipt += COMMANDS.DOUBLE_HEIGHT
   receipt += `TOTAL: ${currency} ${totalStr}`
+  receipt += COMMANDS.NORMAL_SIZE
   receipt += COMMANDS.BOLD_OFF
   receipt += COMMANDS.FEED_LINE
   receipt += COMMANDS.FEED_LINE

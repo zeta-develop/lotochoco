@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,9 +52,14 @@ export function SettingsManager() {
   const [ticketMessage, setTicketMessage] = useState(settings.ticketMessage || '¡Gracias por su compra! Conserve su ticket.')
   const [terminalId, setTerminalId] = useState(settings.terminalId || 'POS-081')
   const [currency, setCurrency] = useState(settings.currency || 'C$')
+  const [ticketFontSize, setTicketFontSize] = useState(settings.ticketFontSize || 'large')
   const [showBarcode, setShowBarcode] = useState(settings.showBarcode !== 'false')
   const [autoSync, setAutoSync] = useState(true)
   const [forcedOffline, setForcedOffline] = useState(false)
+
+  useEffect(() => {
+    if (settings.ticketFontSize) setTicketFontSize(settings.ticketFontSize)
+  }, [settings.ticketFontSize])
 
   const handleSaveField = async (field: Record<string, string>) => {
     try {
@@ -480,6 +485,25 @@ export function SettingsManager() {
                     <Check className="h-4 w-4" />
                   </Button>
                 </div>
+              </div>
+
+              {/* Field 4: Ticket Font Size / Numbers Size */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-[#86948a] uppercase font-bold">
+                  Tamaño de Números en Boleto Térmico
+                </label>
+                <select
+                  className="w-full bg-[#0b1326] border border-[#3c4a42] text-xs font-mono text-[#dae2fd] h-10 rounded-lg px-3 focus:outline-none focus:border-[#10b981]"
+                  value={ticketFontSize}
+                  onChange={(e) => {
+                    setTicketFontSize(e.target.value)
+                    handleSaveField({ ticketFontSize: e.target.value })
+                  }}
+                >
+                  <option value="large">Grande - Doble Altura y Negrita (Estándar Lotería)</option>
+                  <option value="extra-large">Extra Grande - Doble Tamaño (16 columnas)</option>
+                  <option value="normal">Normal - Altura Estándar</option>
+                </select>
               </div>
 
               {/* Toggle: Barcode */}

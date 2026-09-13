@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   businessName: 'LOTERIA',
   currency: 'C$',
   ticketMessage: '¡Buena suerte! Gracias por su compra.',
-  ticketFontSize: 'normal',
+  ticketFontSize: 'large',
   ticketFontType: 'A',
   ticketDensity: '1',
   ticketWidth: '58mm',

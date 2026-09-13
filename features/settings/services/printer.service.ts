@@ -171,6 +171,11 @@ export const printerService = {
       builder.bold(false)
       builder.text(separator).newline()
 
+      // Soporte para números más grandes según configuración (por defecto 'large' / doble altura)
+      const fontSize = settings.ticketFontSize || 'large'
+      const isExtraLarge = fontSize === 'extra-large' || fontSize === 'double'
+      const isLarge = fontSize === 'large' || isExtraLarge || !settings.ticketFontSize
+
       for (const item of (ticket.items || [])) {
         const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
         const prize = item.amount * multiplier
@@ -181,18 +186,30 @@ export const printerService = {
         const col1 = numStr.padEnd(16)
         const col2 = amtStr.padEnd(8)
         const col3 = prizeStr.padStart(8)
-        builder.text(`${col1}${col2}${col3}`).newline()
+
+        if (isExtraLarge) {
+          builder.bold(true).doubleSize(true)
+          builder.text(`${numStr.padEnd(8)}${amtStr.padStart(8)}`).newline()
+          builder.doubleSize(false).bold(false)
+        } else if (isLarge) {
+          // Doble altura (mantiene 32 columnas pero números el doble de altos y en negrita)
+          builder.bold(true).doubleHeight(true)
+          builder.text(`${col1}${col2}${col3}`)
+          builder.doubleHeight(false).bold(false).newline()
+        } else {
+          builder.text(`${col1}${col2}${col3}`).newline()
+        }
       }
 
       builder.text(separator).newline()
 
-      // 4. TOTAL (Centrado)
+      // 4. TOTAL (Centrado, Doble Altura y Negrita)
       const totalStr = ticket.totalAmount % 1 === 0 
         ? ticket.totalAmount.toFixed(0) 
         : ticket.totalAmount.toFixed(2)
 
-      builder.alignCenter().bold(true)
-      builder.text(`TOTAL: ${currency} ${totalStr}`).bold(false).newline()
+      builder.alignCenter().bold(true).doubleHeight(true)
+      builder.text(`TOTAL: ${currency} ${totalStr}`).doubleHeight(false).bold(false).newline()
       builder.newline()
 
       // 5. TEXTO LEGAL (Centrado)
