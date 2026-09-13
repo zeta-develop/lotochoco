@@ -75,6 +75,16 @@ export function TicketBodyView({
             )
 
           case 'items_header':
+            if (block.rawText) {
+              return (
+                <div
+                  key={idx}
+                  className="font-mono text-xs font-bold text-black whitespace-pre px-1"
+                >
+                  {block.rawText}
+                </div>
+              )
+            }
             return (
               <div
                 key={idx}
@@ -89,7 +99,10 @@ export function TicketBodyView({
           case 'item_row':
             if (block.customText) {
               return (
-                <div key={idx} className="text-xs text-black font-mono text-center">
+                <div
+                  key={idx}
+                  className="font-mono text-sm font-black text-black leading-snug whitespace-pre px-1"
+                >
                   {block.customText}
                 </div>
               )
@@ -132,11 +145,11 @@ export function TicketBodyView({
           case 'qr':
             if (!effectiveQrUrl) return null
             return (
-              <div key={idx} className="flex justify-center my-2">
+              <div key={idx} className="flex flex-col items-center justify-center my-3 w-full text-center">
                 <img
                   src={effectiveQrUrl}
                   alt="Código QR del Ticket"
-                  className="w-24 h-24 object-contain"
+                  className="w-24 h-24 object-contain mx-auto block"
                 />
               </div>
             )

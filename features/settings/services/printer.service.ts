@@ -84,11 +84,18 @@ class EscPosBuilder {
       const scale = 5 // 25 modules * 5 = 125 dots (~16 mm en 58mm)
       const qrPixelSize = (size + margin * 2) * scale
       
-      const widthBytes = Math.ceil(widthDots / 8) // 48 bytes para 384 dots (58mm)
-      const leftPaddingDots = Math.max(0, Math.floor((widthDots - qrPixelSize) / 2))
+      // En impresoras de 58mm (PT-210), el cabezal de impresión físico de 384 puntos está desplazado
+      // ~2.5mm a la izquierda del papel de 58mm, mientras que el borde derecho tiene ~7.5mm de margen.
+      // Para centrar el QR exactamente en el medio físico de la tira de papel de 58mm (a 29mm),
+      // añadimos 16 puntos (2 bytes) de compensación hacia la derecha:
+      const leftPaddingDots = Math.max(0, Math.floor((widthDots - qrPixelSize) / 2) + 16)
+
+      // Garantizar alineación a la izquierda antes de la imagen raster para que no interfiera ESC a 1
+      this.buffer.push(0x1B, 0x61, 0x00)
 
       // Comando ESC/POS universal: GS v 0 (Print raster bit image)
       // Soportado por el 100% de impresoras térmicas portátiles (Goojprt PT-210, MPT-II, etc.)
+      const widthBytes = Math.ceil(widthDots / 8) // 48 bytes para 384 dots (58mm)
       const xL = widthBytes & 0xFF
       const xH = (widthBytes >> 8) & 0xFF
       const yL = qrPixelSize & 0xFF
@@ -169,12 +176,24 @@ export const printerService = {
             break
 
           case 'items_header':
-            builder.alignLeft().text(block.col1.padEnd(10) + block.col2.padEnd(10) + block.col3.padStart(12)).newline()
+            if (block.rawText) {
+              builder.alignLeft().text(block.rawText).newline()
+            } else {
+              builder.alignLeft().text(block.col1.padEnd(10) + block.col2.padEnd(10) + block.col3.padStart(12)).newline()
+            }
             break
 
           case 'item_row':
             if (block.customText) {
-              builder.alignCenter().text(block.customText).newline()
+              builder.alignLeft().bold(true)
+              if (block.customText.length <= 16) {
+                builder.doubleWidth(true)
+                builder.text(block.customText)
+                builder.doubleWidth(false)
+              } else {
+                builder.text(block.customText)
+              }
+              builder.bold(false).newline()
             } else {
               // 5 columnas doble ancho para apuesta + 5 para monto + 6 para premio = 16 columnas doble ancho (32 cols 58mm)
               const col1 = block.number.padEnd(5)

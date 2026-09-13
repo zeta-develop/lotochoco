@@ -11,10 +11,10 @@ Sorteo: {{scheduleName}}
 {{/if}}Puesto: {{terminalName}}
 Vendedor: {{vendorName}}
 --------------------------------
-Apuesta   Monto           Premio
+   Apuesta       Monto    Premio
 --------------------------------
 {{#items}}
-{{number}}      {{amount}}             {{prize}}
+  {{number}}    {{amount}}   {{prize}}
 {{/items}}
 --------------------------------
 **TOTAL: {{currency}} {{total}}**
@@ -168,7 +168,7 @@ export type TicketBlock =
   | { type: 'header_big'; text: string }
   | { type: 'header_med'; text: string }
   | { type: 'separator' }
-  | { type: 'items_header'; col1: string; col2: string; col3: string }
+  | { type: 'items_header'; col1: string; col2: string; col3: string; rawText?: string }
   | { type: 'item_row'; number: string; amount: string; prize: string; customText?: string }
   | { type: 'total'; text: string }
   | { type: 'bold_text'; text: string }
@@ -230,33 +230,29 @@ export function parseTemplateToBlocks(
     const line = rawLine.trimEnd()
 
     if (line.trim() === ITEMS_PLACEHOLDER) {
-      // Expandir items
+      // Expandir items respetando exactamente el espaciado que el usuario configure en la plantilla
       for (const item of data.items) {
-        if (!itemRowTemplate || (itemRowTemplate.includes('{{number}}') && itemRowTemplate.includes('{{amount}}'))) {
-          // Formato estándar con columnas bien alineadas
-          blocks.push({
-            type: 'item_row',
-            number: item.number,
-            amount: item.amount,
-            prize: item.prize
-          })
-        } else {
-          // Formato personalizado por el usuario
-          const custom = itemRowTemplate
+        let rowText = ''
+        if (itemRowTemplate) {
+          rowText = itemRowTemplate
             .replace(/{{game}}/g, item.game)
             .replace(/{{number}}/g, item.number)
             .replace(/{{amount}}/g, item.amount)
             .replace(/{{prize}}/g, item.prize)
             .replace(/{{currency}}/g, item.currency)
             .replace(/\*\*/g, '')
-          blocks.push({
-            type: 'item_row',
-            number: item.number,
-            amount: item.amount,
-            prize: item.prize,
-            customText: custom
-          })
+            .trimEnd()
+        } else {
+          rowText = `  ${item.number.padEnd(4)}${item.amount.padEnd(5)}${item.prize}`
         }
+
+        blocks.push({
+          type: 'item_row',
+          number: item.number,
+          amount: item.amount,
+          prize: item.prize,
+          customText: rowText
+        })
       }
       continue
     }
@@ -288,13 +284,14 @@ export function parseTemplateToBlocks(
       continue
     }
 
-    // Encabezado de columnas de items
+    // Encabezado de columnas de items (preservar los espacios que el usuario configure)
     if (/apuesta/i.test(trimmed) && (/monto/i.test(trimmed) || /premio/i.test(trimmed))) {
       blocks.push({
         type: 'items_header',
         col1: 'Apuesta',
         col2: 'Monto',
-        col3: 'Premio'
+        col3: 'Premio',
+        rawText: line.replace(/\*\*/g, '').trimEnd()
       })
       continue
     }
