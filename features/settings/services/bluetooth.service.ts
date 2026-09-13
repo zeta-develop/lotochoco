@@ -106,7 +106,7 @@ export const bluetoothService = {
       throw new Error('La impresora no tiene servicios de escritura compatibles.')
     }
 
-    // Dividimos en chunks pequeños (20 bytes es el estándar seguro para BLE sin negociación de MTU)
+    // Dividimos en chunks de 20 bytes (estándar universal BLE)
     const CHUNK_SIZE = 20
     for (let i = 0; i < data.length; i += CHUNK_SIZE) {
       const chunk = data.slice(i, i + CHUNK_SIZE)
@@ -121,14 +121,19 @@ export const bluetoothService = {
       try {
         await BleClient.writeWithoutResponse(deviceId, targetService, targetCharacteristic, view)
       } catch (e) {
-        // Si falla sin respuesta, intentar con respuesta (algunas impresoras lo requieren)
-        await BleClient.write(deviceId, targetService, targetCharacteristic, view)
+        // Si hay congestión en la cola BLE de Android, pausar brevemente y reintentar sin respuesta
+        await new Promise(resolve => setTimeout(resolve, 15))
+        try {
+          await BleClient.writeWithoutResponse(deviceId, targetService, targetCharacteristic, view)
+        } catch {
+          // Último recurso: escribir con respuesta
+          await BleClient.write(deviceId, targetService, targetCharacteristic, view)
+        }
       }
       
-      // Pequeña pausa para no saturar el buffer de la impresora
-      if (i % 100 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10))
-      }
+      // Pausa constante de 4ms entre paquetes para permitir que el microcontrolador de la impresora
+      // procese los datos térmicos sin saturar su buffer serial interno ni provocar congestión GATT en Android
+      await new Promise(resolve => setTimeout(resolve, 4))
     }
   }
 }

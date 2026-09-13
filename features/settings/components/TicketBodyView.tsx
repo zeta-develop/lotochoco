@@ -180,7 +180,7 @@ export function TicketBodyView({
                 <img
                   src={effectiveQrUrl}
                   alt="Código QR del Ticket"
-                  className="w-36 h-36 object-contain mx-auto block"
+                  className="w-32 h-32 object-contain mx-auto block"
                 />
               </div>
             )

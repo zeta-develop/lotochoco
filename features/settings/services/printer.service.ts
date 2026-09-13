@@ -79,12 +79,13 @@ class EscPosBuilder {
     try {
       const cleanData = (data || 'LOTERIA').trim()
       const qr = QRCode.create(cleanData, { errorCorrectionLevel: 'M' })
-      const size = qr.modules.size // e.g. 21
+      const size = qr.modules.size // 21 modules para número de ticket
       const margin = 2
       const totalModules = size + margin * 2 // 25 modules
-      // Escala ampliada para QR más grande y legible: ~200 puntos (~25 mm de ancho en papel 58mm)
-      const scale = Math.max(6, Math.min(8, Math.floor(216 / totalModules)))
-      const qrPixelSize = totalModules * scale // ~200 dots
+      // Escala 6 (150 puntos / ~19mm) o 7 (175 puntos / ~22mm):
+      // Tamaño grande y nítido para escaneo rápido sin sobrecargar el cabezal ni trabar la impresora
+      const scale = Math.max(5, Math.min(7, Math.floor(175 / totalModules)))
+      const qrPixelSize = totalModules * scale // ~175 dots (~22 mm de ancho)
       
       // Ancho imprimible estándar para impresoras térmicas portátiles (58mm = 384 puntos = 32 cols)
       const targetWidthDots = widthDots || 384
@@ -93,21 +94,22 @@ class EscPosBuilder {
       // Si el usuario especificó espacios manuales antes de [QR] en el editor, desplazamos proporcionalmente
       let leftPaddingDots = defaultCenterDots
       if (leadingSpaces > 0) {
-        // En fuente monoespaciada estándar, cada espacio equivale a 12 puntos de ancho
         leftPaddingDots = Math.max(0, Math.min(targetWidthDots - qrPixelSize, leadingSpaces * 12))
       }
 
       // Asegurar modo alineado a la izquierda antes de la imagen raster para control exacto por coordenadas
       this.buffer.push(0x1B, 0x61, 0x00)
 
-      // Comando ESC/POS universal: GS v 0 (Print raster bit image)
-      // Soportado por el 100% de impresoras térmicas portátiles (Goojprt PT-210, MPT-II, etc.)
-      const widthBytes = Math.ceil(targetWidthDots / 8) // 48 bytes para 384 dots (58mm)
+      // Optimización de payload: No enviamos bytes de ceros innecesarios para el margen derecho
+      // El papel a la derecha ya es blanco, por lo que solo enviamos hasta el último dot del QR
+      const maxDotUsed = Math.min(targetWidthDots, leftPaddingDots + qrPixelSize)
+      const widthBytes = Math.ceil(maxDotUsed / 8) // ~35 bytes en vez de 48 bytes (ahorro de más del 27% de bytes)
       const xL = widthBytes & 0xFF
       const xH = (widthBytes >> 8) & 0xFF
       const yL = qrPixelSize & 0xFF
       const yH = (qrPixelSize >> 8) & 0xFF
 
+      // Comando ESC/POS universal: GS v 0 (Print raster bit image)
       this.buffer.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH)
 
       for (let y = 0; y < qrPixelSize; y++) {
@@ -120,7 +122,7 @@ class EscPosBuilder {
             if (modX >= 0 && modX < size) {
               if (qr.modules.get(modY, modX)) {
                 const targetDot = leftPaddingDots + x
-                if (targetDot < targetWidthDots) {
+                if (targetDot < maxDotUsed) {
                   const bIdx = Math.floor(targetDot / 8)
                   const bit = 7 - (targetDot % 8)
                   rowBytes[bIdx] |= (1 << bit)
