@@ -75,27 +75,32 @@ class EscPosBuilder {
     return this
   }
 
-  qrCode(data: string, widthDots: number = 384) {
+  qrCode(data: string, widthDots: number = 384, leadingSpaces: number = 0) {
     try {
       const cleanData = (data || 'LOTERIA').trim()
       const qr = QRCode.create(cleanData, { errorCorrectionLevel: 'M' })
       const size = qr.modules.size // e.g. 21
       const margin = 2
-      const scale = 5 // 25 modules * 5 = 125 dots (~16 mm en 58mm)
-      const qrPixelSize = (size + margin * 2) * scale
+      const scale = 5 // 25 modules * 5 = 125 dots (~15.6 mm en papel 58mm)
+      const qrPixelSize = (size + margin * 2) * scale // 125 dots
       
-      // En impresoras de 58mm (PT-210), el cabezal de impresión físico de 384 puntos está desplazado
-      // ~2.5mm a la izquierda del papel de 58mm, mientras que el borde derecho tiene ~7.5mm de margen.
-      // Para centrar el QR exactamente en el medio físico de la tira de papel de 58mm (a 29mm),
-      // añadimos 16 puntos (2 bytes) de compensación hacia la derecha:
-      const leftPaddingDots = Math.max(0, Math.floor((widthDots - qrPixelSize) / 2) + 16)
+      // Ancho imprimible estándar para impresoras térmicas portátiles (58mm = 384 puntos = 32 cols)
+      const targetWidthDots = widthDots || 384
+      const defaultCenterDots = Math.max(0, Math.floor((targetWidthDots - qrPixelSize) / 2)) // 129 dots = centro exacto
 
-      // Garantizar alineación a la izquierda antes de la imagen raster para que no interfiera ESC a 1
+      // Si el usuario especificó espacios manuales antes de [QR] en el editor, desplazamos proporcionalmente
+      let leftPaddingDots = defaultCenterDots
+      if (leadingSpaces > 0) {
+        // En fuente monoespaciada estándar, cada espacio equivale a 12 puntos de ancho
+        leftPaddingDots = Math.max(0, Math.min(targetWidthDots - qrPixelSize, leadingSpaces * 12))
+      }
+
+      // Asegurar modo alineado a la izquierda antes de la imagen raster para control exacto por coordenadas
       this.buffer.push(0x1B, 0x61, 0x00)
 
       // Comando ESC/POS universal: GS v 0 (Print raster bit image)
       // Soportado por el 100% de impresoras térmicas portátiles (Goojprt PT-210, MPT-II, etc.)
-      const widthBytes = Math.ceil(widthDots / 8) // 48 bytes para 384 dots (58mm)
+      const widthBytes = Math.ceil(targetWidthDots / 8) // 48 bytes para 384 dots (58mm)
       const xL = widthBytes & 0xFF
       const xH = (widthBytes >> 8) & 0xFF
       const yL = qrPixelSize & 0xFF
@@ -113,7 +118,7 @@ class EscPosBuilder {
             if (modX >= 0 && modX < size) {
               if (qr.modules.get(modY, modX)) {
                 const targetDot = leftPaddingDots + x
-                if (targetDot < widthDots) {
+                if (targetDot < targetWidthDots) {
                   const bIdx = Math.floor(targetDot / 8)
                   const bit = 7 - (targetDot % 8)
                   rowBytes[bIdx] |= (1 << bit)
@@ -220,7 +225,7 @@ export const printerService = {
             break
 
           case 'qr':
-            builder.qrCode(block.code || ticket.ticketNumber || 'LOTERIA', paperDots)
+            builder.qrCode(block.code || ticket.ticketNumber || 'LOTERIA', 384, block.leadingSpaces || 0)
             break
 
           case 'empty':

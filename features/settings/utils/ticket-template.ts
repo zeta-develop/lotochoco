@@ -18,10 +18,11 @@ Vendedor: {{vendorName}}
 {{/items}}
 --------------------------------
 **TOTAL: {{currency}} {{total}}**
-Valido para 1 sorteo
-Por favor revise su ticket
+--------------------------------
+[QR]
 Premio valido por 7 dias
-[QR]`
+Valido para 1 sorteo
+Por favor revise su ticket`
 
 export const MOCK_PREVIEW_TICKET: Ticket = {
   id: 'preview-ticket-001',
@@ -173,7 +174,7 @@ export type TicketBlock =
   | { type: 'total'; text: string }
   | { type: 'bold_text'; text: string }
   | { type: 'text'; text: string }
-  | { type: 'qr'; code: string }
+  | { type: 'qr'; code: string; leadingSpaces?: number }
   | { type: 'empty' }
 
 export function parseTemplateToBlocks(
@@ -273,8 +274,9 @@ export function parseTemplateToBlocks(
     }
 
     // QR Code
-    if (/^(\[QR\]|{{qrCode}})$/i.test(trimmed)) {
-      blocks.push({ type: 'qr', code: data.ticketNumber })
+    if (/(\[QR\]|{{qrCode}})/i.test(trimmed)) {
+      const leadingSpaces = line.match(/^(\s*)/)?.[1].length || 0
+      blocks.push({ type: 'qr', code: data.ticketNumber, leadingSpaces })
       continue
     }
 

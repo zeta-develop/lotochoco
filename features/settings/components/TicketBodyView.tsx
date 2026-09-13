@@ -145,7 +145,11 @@ export function TicketBodyView({
           case 'qr':
             if (!effectiveQrUrl) return null
             return (
-              <div key={idx} className="flex flex-col items-center justify-center my-3 w-full text-center">
+              <div
+                key={idx}
+                className="flex flex-col items-center justify-center my-3 w-full text-center"
+                style={block.leadingSpaces ? { paddingLeft: `${block.leadingSpaces * 7}px` } : undefined}
+              >
                 <img
                   src={effectiveQrUrl}
                   alt="Código QR del Ticket"
