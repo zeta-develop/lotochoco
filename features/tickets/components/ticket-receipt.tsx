@@ -63,21 +63,8 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
           style={{ width: paperWidth }}
           className="p-3 bg-white text-black mx-auto print:p-0 print:w-full font-mono text-[12px] leading-snug"
         >
-          {/* Header */}
-          <div className="text-center font-bold text-base tracking-wider uppercase text-black">
-            {businessName}
-          </div>
-
-          {/* Separator */}
-          <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-            --------------------------------
-          </div>
-
-          {/* Metadata (Centrado) */}
-          <div className="text-center space-y-0.5 text-xs text-black font-mono">
-            <div className="font-bold text-[13px]">
-              RECIBO DE VENTA
-            </div>
+          {/* Metadata (Centrado, directo al Folio) */}
+          <div className="text-center space-y-0.5 text-xs text-black font-mono pt-1">
             <div>Folio: {ticket.ticketNumber}</div>
             <div>Fecha: {formattedDate}</div>
             <div>Juego: {gameName}</div>
@@ -85,6 +72,7 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
             {ticket.client ? (
               <div>Cliente: {ticket.client}</div>
             ) : null}
+            <div>Puesto: {(settings?.terminalId || settings?.terminalName || 'J081').replace(/^=\s*|\s*=$/g, '')}</div>
             <div>Vendedor: {settings?.vendorName || 'Yamileth'}</div>
           </div>
 
@@ -106,13 +94,13 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
           </div>
 
           {/* Items */}
-          <div className="space-y-1.5 my-1.5 px-1">
+          <div className="space-y-0.5 my-1 px-1">
             {ticket.items.map((item, index) => {
               const multiplier = item.game?.multiplier || 70
               const prize = item.amount * multiplier
               return (
-                <div key={index} className="flex justify-between items-center text-sm font-mono text-black font-bold">
-                  <span className="w-1/3 text-left font-black text-base tracking-wide">{item.number}</span>
+                <div key={index} className="flex justify-between items-center text-xs font-mono text-black font-bold">
+                  <span className="w-1/3 text-left">{item.number}</span>
                   <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
                   <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
                 </div>
@@ -126,12 +114,12 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
           </div>
 
           {/* Total */}
-          <div className="text-center font-black text-lg text-black font-mono my-2.5 tracking-wide">
+          <div className="text-center font-bold text-sm text-black font-mono my-1 tracking-wide">
             TOTAL: {currency} {ticket.totalAmount % 1 === 0 ? ticket.totalAmount.toFixed(0) : ticket.totalAmount.toFixed(2)}
           </div>
 
           {/* Legal / Disclaimers */}
-          <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-3">
+          <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-1">
             <div>Valido para 1 sorteo</div>
             <div>Por favor revise su boleto</div>
             <div>Premio valido por 7 dias</div>
@@ -139,8 +127,8 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
 
           {/* Native QR Code Display */}
           {qrCodeUrl && (
-            <div className="flex justify-center my-3">
-              <img src={qrCodeUrl} alt="QR Code" className="w-28 h-28 object-contain" />
+            <div className="flex justify-center my-2">
+              <img src={qrCodeUrl} alt="QR Code" className="w-24 h-24 object-contain" />
             </div>
           )}
         </div>

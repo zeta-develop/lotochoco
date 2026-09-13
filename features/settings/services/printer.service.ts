@@ -131,13 +131,13 @@ export const printerService = {
       }
 
       const currency = settings.currency || 'C$'
-      const businessName = (settings.businessName || 'LOTERIA').toUpperCase()
       const vendorName = settings.vendorName || 'Yamileth'
+      const terminalId = settings.terminalId || settings.terminalName || 'J081'
       const formattedDate = format(ticketDate, 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
       
       const firstItem = ticket.items?.[0] as any
-      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Tica'
-      const rawSchedule = firstItem?.scheduleName || firstItem?.schedule || '7:30 pm'
+      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
+      const rawSchedule = firstItem?.scheduleName || firstItem?.schedule || '11:00 am'
       let scheduleName = rawSchedule
       try {
         const formattedSch = formatTime12h(rawSchedule)
@@ -146,15 +146,10 @@ export const printerService = {
         scheduleName = rawSchedule
       }
 
-      const receiptType = isReprint ? 'RECIBO DE COPIA' : 'RECIBO DE VENTA'
       const separator = '--------------------------------'
 
-      // 1. ENCABEZADO
-      builder.alignCenter().bold(true).doubleHeight(true).text(businessName).doubleHeight(false).bold(false).newline()
-      builder.text(separator).newline()
-
-      // 2. METADATA (Centrado)
-      builder.text(receiptType).newline()
+      // 1. METADATA COMPACTA (Directo al folio, sin cabecera redundante para ahorrar papel)
+      builder.alignCenter()
       builder.text(`Folio: ${ticket.ticketNumber || 'N/A'}`).newline()
       builder.text(`Fecha: ${formattedDate}`).newline()
       builder.text(`Juego: ${gameName}`).newline()
@@ -162,20 +157,20 @@ export const printerService = {
       if (ticket.client && ticket.client.trim()) {
         builder.text(`Cliente: ${ticket.client.trim()}`).newline()
       }
+      if (terminalId && terminalId.trim()) {
+        const cleanTerminal = terminalId.trim().replace(/^=\s*|\s*=$/g, '')
+        builder.text(`Puesto: ${cleanTerminal}`).newline()
+      }
       builder.text(`Vendedor: ${vendorName}`).newline()
       builder.text(separator).newline()
 
-      // 3. TABLA DE APUESTAS (32 columnas estándar para 58mm)
-      builder.alignLeft().bold(true)
-      builder.text('Apuesta'.padEnd(16) + 'Monto'.padEnd(8) + 'Premio'.padStart(8)).newline()
-      builder.bold(false)
+      // 2. TABLA DE APUESTAS (Alineada a 32 columnas estándar de 58mm, Negrita compacta)
+      builder.alignLeft()
+      builder.text('Apuesta'.padEnd(15) + 'Monto'.padEnd(8) + 'Premio'.padStart(9)).newline()
       builder.text(separator).newline()
 
-      // Soporte para números más grandes según configuración (por defecto 'large' / doble altura)
-      const fontSize = settings.ticketFontSize || 'large'
-      const isExtraLarge = fontSize === 'extra-large' || fontSize === 'double'
-      const isLarge = fontSize === 'large' || isExtraLarge || !settings.ticketFontSize
-
+      // Números en Negrita compacta (altura normal 1x para ahorrar papel como la muestra física)
+      builder.bold(true)
       for (const item of (ticket.items || [])) {
         const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
         const prize = item.amount * multiplier
@@ -183,44 +178,33 @@ export const printerService = {
         const amtStr = item.amount.toFixed(0)
         const prizeStr = prize.toFixed(0)
 
-        const col1 = numStr.padEnd(16)
+        const col1 = numStr.padEnd(15)
         const col2 = amtStr.padEnd(8)
-        const col3 = prizeStr.padStart(8)
+        const col3 = prizeStr.padStart(9)
 
-        if (isExtraLarge) {
-          builder.bold(true).doubleSize(true)
-          builder.text(`${numStr.padEnd(8)}${amtStr.padStart(8)}`).newline()
-          builder.doubleSize(false).bold(false)
-        } else if (isLarge) {
-          // Doble altura (mantiene 32 columnas pero números el doble de altos y en negrita)
-          builder.bold(true).doubleHeight(true)
-          builder.text(`${col1}${col2}${col3}`)
-          builder.doubleHeight(false).bold(false).newline()
-        } else {
-          builder.text(`${col1}${col2}${col3}`).newline()
-        }
+        builder.text(`${col1}${col2}${col3}`).newline()
       }
+      builder.bold(false)
 
       builder.text(separator).newline()
 
-      // 4. TOTAL (Centrado, Doble Altura y Negrita)
+      // 3. TOTAL (Centrado, Negrita, sin saltos extra)
       const totalStr = ticket.totalAmount % 1 === 0 
         ? ticket.totalAmount.toFixed(0) 
         : ticket.totalAmount.toFixed(2)
 
-      builder.alignCenter().bold(true).doubleHeight(true)
-      builder.text(`TOTAL: ${currency} ${totalStr}`).doubleHeight(false).bold(false).newline()
-      builder.newline()
+      builder.alignCenter().bold(true)
+      builder.text(`TOTAL: ${currency} ${totalStr}`).newline()
+      builder.bold(false)
 
-      // 5. TEXTO LEGAL (Centrado)
+      // 4. TEXTO LEGAL (Centrado, continuo)
       builder.text('Valido para 1 sorteo').newline()
       builder.text('Por favor revise su boleto').newline()
       builder.text('Premio valido por 7 dias').newline()
-      builder.newline()
 
-      // 6. CÓDIGO QR NATIVO ESC/POS
-      builder.qrCode(ticket.ticketNumber || 'LOTERIA', 6)
-      builder.feed(4)
+      // 5. CÓDIGO QR COMPACTO (Tamaño módulo 4 para ~22mm en vez de 6)
+      builder.qrCode(ticket.ticketNumber || 'LOTERIA', 4)
+      builder.feed(2)
 
       console.log('Conectando a impresora:', deviceId);
       await bluetoothService.connect(deviceId)

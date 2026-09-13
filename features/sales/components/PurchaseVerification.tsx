@@ -244,22 +244,9 @@ export function PurchaseVerification({
           <div className="w-full h-2.5 thermal-rip-top -mb-[1px]"></div>
 
           {/* Ticket Body matching exact user photo */}
-          <div ref={captureRef} className="bg-[#ffffff] text-[#000000] px-4 py-4 font-mono text-[12px] leading-snug select-text">
-            {/* Header */}
-            <div className="text-center font-bold text-base tracking-wider uppercase text-black">
-              LOTERIA
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Metadata (Centered) */}
-            <div className="text-center space-y-0.5 text-xs text-black font-mono">
-              <div className="font-bold text-[13px]">
-                {isViewMode ? 'RECIBO DE COPIA' : 'RECIBO DE VENTA'}
-              </div>
+          <div ref={captureRef} className="bg-[#ffffff] text-[#000000] px-4 py-3 font-mono text-[12px] leading-tight select-text">
+            {/* Metadata (Centered, directo al Folio como en el ticket corto) */}
+            <div className="text-center space-y-0.5 text-xs text-black font-mono pt-1">
               <div>Folio: {purchaseMeta.ticketNumber}</div>
               <div>Fecha: {purchaseMeta.ticketDate}</div>
               <div>Juego: {purchaseMeta.gameName}</div>
@@ -267,6 +254,7 @@ export function PurchaseVerification({
               {purchaseMeta.clientName ? (
                 <div>Cliente: {purchaseMeta.clientName}</div>
               ) : null}
+              <div>Puesto: {purchaseMeta.terminalName.replace(/^=\s*|\s*=$/g, '') || 'J081'}</div>
               <div>Vendedor: {purchaseMeta.vendorName}</div>
             </div>
 
@@ -287,13 +275,13 @@ export function PurchaseVerification({
               --------------------------------
             </div>
 
-            {/* Items */}
-            <div className="space-y-1.5 my-1.5 px-1">
+            {/* Items (Compactos y en Negrita) */}
+            <div className="space-y-0.5 my-1 px-1">
               {items.map((item) => {
                 const prize = (item.amount || 0) * (item.multiplier || 70)
                 return (
-                  <div key={item.id} className="flex justify-between items-center text-sm font-mono text-black font-bold">
-                    <span className="w-1/3 text-left font-black text-base tracking-wide">{item.number}</span>
+                  <div key={item.id} className="flex justify-between items-center text-xs font-mono text-black font-bold">
+                    <span className="w-1/3 text-left">{item.number}</span>
                     <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
                     <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
                   </div>
@@ -307,24 +295,24 @@ export function PurchaseVerification({
             </div>
 
             {/* Total */}
-            <div className="text-center font-black text-lg text-black font-mono my-2.5 tracking-wide">
+            <div className="text-center font-bold text-sm text-black font-mono my-1 tracking-wide">
               TOTAL: {currency} {total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
             </div>
 
             {/* Legal / Disclaimers */}
-            <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-3">
+            <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-1">
               <div>Valido para 1 sorteo</div>
               <div>Por favor revise su boleto</div>
               <div>Premio valido por 7 dias</div>
             </div>
 
-            {/* Native QR Code Display */}
+            {/* Native QR Code Display (Compacto) */}
             {qrCodeUrl ? (
-              <div className="flex justify-center my-3">
-                <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32 object-contain" />
+              <div className="flex justify-center my-2">
+                <img src={qrCodeUrl} alt="QR Code" className="w-24 h-24 object-contain" />
               </div>
             ) : (
-              <div className="w-32 h-32 mx-auto my-3 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">
+              <div className="w-24 h-24 mx-auto my-2 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">
                 Cargando QR...
               </div>
             )}

@@ -53,23 +53,12 @@ export function generateTicketReceipt(
 
   const formattedDate = format(new Date(ticket.createdAt), "dd/MM/yyyy h:mm a", { locale: es }).toLowerCase()
   
+  const terminalId = settings.terminalId || settings.terminalName || 'J081'
   let receipt = ''
   receipt += COMMANDS.INIT
   
-  // Encabezado
+  // Metadata (Centrado, directo a Folio sin cabeceras extra)
   receipt += COMMANDS.ALIGN_CENTER
-  receipt += COMMANDS.BOLD_ON
-  receipt += COMMANDS.DOUBLE_SIZE
-  receipt += businessName
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.NORMAL_SIZE
-  receipt += COMMANDS.BOLD_OFF
-  receipt += separator
-  receipt += COMMANDS.FEED_LINE
-  
-  // Metadata (Centrado)
-  receipt += 'RECIBO DE VENTA'
-  receipt += COMMANDS.FEED_LINE
   receipt += `Folio: ${ticket.ticketNumber}${COMMANDS.FEED_LINE}`
   receipt += `Fecha: ${formattedDate}${COMMANDS.FEED_LINE}`
   receipt += `Juego: ${gameName}${COMMANDS.FEED_LINE}`
@@ -77,57 +66,54 @@ export function generateTicketReceipt(
   if (ticket.client) {
     receipt += `Cliente: ${ticket.client}${COMMANDS.FEED_LINE}`
   }
+  if (terminalId) {
+    const cleanTerminal = terminalId.trim().replace(/^=\s*|\s*=$/g, '')
+    receipt += `Puesto: ${cleanTerminal}${COMMANDS.FEED_LINE}`
+  }
   receipt += `Vendedor: ${vendorName}${COMMANDS.FEED_LINE}`
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  // Tabla de Jugadas (32 caracteres de ancho)
+  // Tabla de Jugadas (32 caracteres de ancho, Negrita compacta)
   receipt += COMMANDS.ALIGN_LEFT
-  receipt += COMMANDS.BOLD_ON
-  receipt += 'Apuesta'.padEnd(16) + 'Monto'.padEnd(8) + 'Premio'.padStart(8)
-  receipt += COMMANDS.BOLD_OFF
+  receipt += 'Apuesta'.padEnd(15) + 'Monto'.padEnd(8) + 'Premio'.padStart(9)
   receipt += COMMANDS.FEED_LINE
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
+  receipt += COMMANDS.BOLD_ON
   for (const item of ticket.items) {
     const number = (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number)
     const multiplier = item.game?.multiplier || 70
     const prize = item.amount * multiplier
 
-    const col1 = number.padEnd(16)
+    const col1 = number.padEnd(15)
     const col2 = item.amount.toFixed(0).padEnd(8)
-    const col3 = prize.toFixed(0).padStart(8)
-    receipt += `${COMMANDS.BOLD_ON}${COMMANDS.DOUBLE_HEIGHT}${col1}${col2}${col3}${COMMANDS.NORMAL_SIZE}${COMMANDS.BOLD_OFF}${COMMANDS.FEED_LINE}`
+    const col3 = prize.toFixed(0).padStart(9)
+    receipt += `${col1}${col2}${col3}${COMMANDS.FEED_LINE}`
   }
+  receipt += COMMANDS.BOLD_OFF
   
   receipt += separator
   receipt += COMMANDS.FEED_LINE
   
-  // Total (Centrado)
+  // Total (Centrado, Negrita)
   const totalStr = ticket.totalAmount % 1 === 0 
     ? ticket.totalAmount.toFixed(0) 
     : ticket.totalAmount.toFixed(2)
   receipt += COMMANDS.ALIGN_CENTER
   receipt += COMMANDS.BOLD_ON
-  receipt += COMMANDS.DOUBLE_HEIGHT
-  receipt += `TOTAL: ${currency} ${totalStr}`
-  receipt += COMMANDS.NORMAL_SIZE
+  receipt += `TOTAL: ${currency} ${totalStr}${COMMANDS.FEED_LINE}`
   receipt += COMMANDS.BOLD_OFF
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.FEED_LINE
   
-  // Textos legales (Centrado)
-  receipt += 'Valido para 1 sorteo'
-  receipt += COMMANDS.FEED_LINE
-  receipt += 'Por favor revise su boleto'
-  receipt += COMMANDS.FEED_LINE
-  receipt += 'Premio valido por 7 dias'
-  receipt += COMMANDS.FEED_LINE
-  receipt += COMMANDS.FEED_LINE
+  // Textos legales (Centrado, continuo)
+  receipt += `Valido para 1 sorteo${COMMANDS.FEED_LINE}`
+  receipt += `Por favor revise su boleto${COMMANDS.FEED_LINE}`
+  receipt += `Premio valido por 7 dias${COMMANDS.FEED_LINE}`
   
-  // Espacio para corte manual
-  receipt += COMMANDS.FEED_PAPER
+  // Espacio para corte manual mínimo
+  receipt += COMMANDS.FEED_LINE
+  receipt += COMMANDS.FEED_LINE
   
   return receipt
 }
