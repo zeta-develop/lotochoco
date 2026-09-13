@@ -66,13 +66,15 @@ export function useSettingsManager() {
 
       // 1. Actualizar remotos en Supabase (si hay alguno)
       if (Object.keys(remoteUpdates).length > 0) {
-        await settingsService.update(remoteUpdates)
+        try {
+          await settingsService.update(remoteUpdates)
+        } catch (remoteError) {
+          console.warn('Aviso: Falló la sincronización con Supabase (los ajustes se mantuvieron localmente):', remoteError)
+        }
       }
 
-      // Si hubo cambios locales, disparar evento interno para refrescar UI
-      if (Object.keys(localUpdates).length > 0) {
-        dbEvents.emit('settings:changed')
-      }
+      // Disparar evento interno para refrescar UI en toda la app
+      dbEvents.emit('settings:changed')
     } catch (error) {
       console.error('Error al actualizar ajustes:', error)
       throw error

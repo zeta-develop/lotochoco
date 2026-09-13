@@ -9,17 +9,18 @@ import { useCompany } from '../hooks/use-company'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ShieldCheck, Info, Bold, Italic, Eye, FileText, Sun, Moon, Monitor } from 'lucide-react'
+import { ShieldCheck, Info, Eye, Sun, Moon, Monitor, Printer, Receipt, Sliders, RefreshCw, QrCode } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/use-toast'
-import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useTheme } from 'next-themes'
+import { DEFAULT_TICKET_TEMPLATE, MOCK_PREVIEW_TICKET } from '../utils/ticket-template'
+import { TicketBodyView } from './TicketBodyView'
 
 export function GeneralSettingsTab() {
   const { settings, updateSettings } = useSettingsManager()
-  const { isOwner, role, company, updateCompanyName } = useCompany()
+  const { isOwner, role, updateCompanyName } = useCompany()
 
   // Estado local para evitar latencia al escribir
   const [localBusinessName, setLocalBusinessName] = useState(settings.businessName || '')
@@ -50,26 +51,40 @@ export function GeneralSettingsTab() {
       if (isOwner) {
         await updateCompanyName(name)
       }
-    }, 1000) // 1 segundo de calma
+    }, 1000)
   }
 
   const { theme, setTheme } = useTheme()
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  const [activeEditorTab, setActiveTab] = useState<'info' | 'template'>('info')
+  // Por defecto abrimos directamente en 'template' para que el usuario acceda de inmediato al editor
+  const [activeEditorTab, setActiveTab] = useState<'info' | 'template'>('template')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
   
-  // Estado local simple y rápido para el editor
-  const [localTemplate, setLocalTemplate] = useState(settings.ticketTemplate || '')
+  // Estado local para el editor del ticket
+  const getInitialTemplate = () => {
+    const t = settings.ticketTemplate
+    if (!t || !t.trim() || t.includes('RECIBO DE VENTA') || t.includes('JUEGO      NUM       MONTO')) {
+      return DEFAULT_TICKET_TEMPLATE
+    }
+    return t
+  }
+
+  const [localTemplate, setLocalTemplate] = useState(getInitialTemplate())
   const [isSaving, setIsSaving] = useState(false)
 
-  // Sincronizar solo cuando cargamos por primera vez o cambiamos de pestaña
+  // Sincronizar cuando cambian los settings
   useEffect(() => {
-    setLocalTemplate(settings.ticketTemplate || '')
-  }, [activeEditorTab, settings.ticketTemplate])
+    const t = settings.ticketTemplate
+    if (t && t.trim() && !t.includes('RECIBO DE VENTA') && !t.includes('JUEGO      NUM       MONTO')) {
+      setLocalTemplate(t)
+    } else if (!t || !t.trim()) {
+      setLocalTemplate(DEFAULT_TICKET_TEMPLATE)
+    }
+  }, [settings.ticketTemplate])
 
   const handleSaveTemplate = async () => {
     try {
@@ -77,6 +92,7 @@ export function GeneralSettingsTab() {
       await updateSettings({ ticketTemplate: localTemplate })
       toast({ title: 'Diseño guardado correctamente' })
     } catch (error) {
+      console.error('Error al guardar diseño de ticket:', error)
       toast({ variant: 'destructive', title: 'Error al guardar diseño' })
     } finally {
       setIsSaving(false)
@@ -85,32 +101,38 @@ export function GeneralSettingsTab() {
 
   const insertVariable = (variable: string) => {
     const textarea = document.getElementById('ticketTemplate') as HTMLTextAreaElement
-    if (!textarea) return
+    let insertText = variable
+    if (!variable.startsWith('[') && !variable.startsWith('{{')) {
+      insertText = `{{${variable}}}`
+    }
 
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
+    if (!textarea) {
+      setLocalTemplate(prev => prev + '\n' + insertText)
+      return
+    }
+
+    const start = textarea.selectionStart ?? textarea.value.length
+    const end = textarea.selectionEnd ?? textarea.value.length
     const text = localTemplate
     const before = text.substring(0, start)
-    const after = text.substring(end, text.length)
+    const after = text.substring(end)
 
-    const newText = `${before}{{${variable}}}${after}`
+    const newText = `${before}${insertText}${after}`
     setLocalTemplate(newText)
     
     setTimeout(() => {
       textarea.focus()
-      const newPos = start + variable.length + 4
+      const newPos = start + insertText.length
       textarea.setSelectionRange(newPos, newPos)
     }, 10)
   }
 
   const resetTemplate = async () => {
-    if (!confirm('¿Estás seguro de restablecer el diseño? Perderás los cambios actuales.')) return
+    if (!confirm('¿Estás seguro de restablecer el diseño? Volverá al formato corto compacto optimizado.')) return
 
-    const defaultTemplate = `# {{businessName}}\nRECIBO DE VENTA\n--------------------------------\nTICKET: #{{ticketNumber}}\nFECHA: {{date}}\n{{#if client}}CLIENTE: {{client}}{{/if}}\n--------------------------------\nJUEGO      NUM       MONTO\n--------------------------------\n{{#items}}\n{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}\n{{/items}}\n--------------------------------\n**TOTAL: {{currency}}{{total}}**\n\n{{ticketMessage}}\n*** CONSERVE ESTE TICKET ***`
-    
-    setLocalTemplate(defaultTemplate)
-    await updateSettings({ ticketTemplate: defaultTemplate })
-    toast({ title: 'Plantilla restablecida' })
+    setLocalTemplate(DEFAULT_TICKET_TEMPLATE)
+    await updateSettings({ ticketTemplate: DEFAULT_TICKET_TEMPLATE })
+    toast({ title: 'Plantilla restablecida al formato compacto' })
   }
 
   const handleThemeChange = (newTheme: string) => {
@@ -118,152 +140,109 @@ export function GeneralSettingsTab() {
     updateSettings({ theme: newTheme })
   }
 
-  const renderTemplatePreview = (template: string) => {
-    if (!template) return null
-
-    // Simular valores para la previsualización
-    let preview = template
-      .replace(/{{businessName}}/g, settings.businessName || 'MI NEGOCIO')
-      .replace(/{{ticketNumber}}/g, '2100305')
-      .replace(/{{date}}/g, format(new Date(), 'dd-MM-yyyy hh:mm:ss a'))
-      .replace(/{{gameName}}/g, 'Diaria')
-      .replace(/{{scheduleName}}/g, '9:00 PM')
-      .replace(/{{vendorName}}/g, 'Yamileth')
-      .replace(/{{terminalName}}/g, '= J081 =')
-      .replace(/{{currency}}/g, settings.currency || 'C$')
-      .replace(/{{total}}/g, '30')
-      .replace(/{{ticketMessage}}/g, settings.ticketMessage || 'Gracias por su compra')
-      .replace(/{{#if client}}([\s\S]*?){{\/if}}/g, '* **Cliente:** Anielka')
-      .replace(/{{client}}/g, 'Anielka')
-    
-    // Simular items
-    const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
-    preview = preview.replace(itemsRegex, (match, content) => {
-      return content
-        .replace(/{{game}}/g, 'Diaria')
-        .replace(/{{number}}/g, '08')
-        .replace(/{{amount}}/g, '15')
-        .replace(/{{prize}}/g, '1200')
-        .replace(/{{currency}}/g, settings.currency || 'C$') +
-        content
-        .replace(/{{game}}/g, 'Diaria')
-        .replace(/{{number}}/g, '80')
-        .replace(/{{amount}}/g, '15')
-        .replace(/{{prize}}/g, '1200')
-        .replace(/{{currency}}/g, settings.currency || 'C$')
-    })
-
-    return preview.split('\n').map((line, i) => {
-      let content = line
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/_(.*?)_/g, '<em>$1</em>')
-      
-      let className = "text-[11px] font-mono leading-tight whitespace-pre-wrap min-h-[1em] break-all"
-      if (line.trim().startsWith('# ')) {
-        className = "text-lg font-bold text-center uppercase mb-1 whitespace-pre-wrap"
-        content = content.replace('# ', '')
-      } else if (line.trim().startsWith('## ')) {
-        className = "text-sm font-bold text-center uppercase mb-1 whitespace-pre-wrap"
-        content = content.replace('## ', '')
-      }
-
-      return (
-        <div key={i} className={className} dangerouslySetInnerHTML={{ __html: content || '&nbsp;' }} />
-      )
-    })
-  }
-
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex overflow-x-auto no-scrollbar bg-card/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/5 shadow-sm w-full sm:w-fit mx-auto sm:mx-0 whitespace-nowrap">
-        <Button 
-          variant={activeEditorTab === 'info' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => setActiveTab('info')}
-          className="rounded-md px-4"
-        >
-          Información
-        </Button>
+      {/* Subtabs Switcher */}
+      <div className="flex bg-[#131b2e] p-1 rounded-xl border border-[#3c4a42]/50 shadow-sm w-full sm:w-fit">
         <Button 
           variant={activeEditorTab === 'template' ? 'secondary' : 'ghost'} 
           size="sm" 
           onClick={() => setActiveTab('template')}
-          className="rounded-md px-4"
+          className={cn(
+            "rounded-lg px-4 font-mono text-xs font-bold gap-1.5",
+            activeEditorTab === 'template' 
+              ? "bg-[#4cd7f6] text-[#001f26] hover:bg-[#4cd7f6]/90" 
+              : "text-[#bbcabf] hover:text-[#dae2fd]"
+          )}
         >
-          Diseño del Recibo
+          <Receipt className="h-3.5 w-3.5" />
+          Editor del Ticket
+        </Button>
+        <Button 
+          variant={activeEditorTab === 'info' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => setActiveTab('info')}
+          className={cn(
+            "rounded-lg px-4 font-mono text-xs font-bold gap-1.5",
+            activeEditorTab === 'info' 
+              ? "bg-[#10b981] text-[#003824] hover:bg-[#10b981]/90" 
+              : "text-[#bbcabf] hover:text-[#dae2fd]"
+          )}
+        >
+          <Sliders className="h-3.5 w-3.5" />
+          Información del Negocio
         </Button>
       </div>
 
       {activeEditorTab === 'info' ? (
-        <Card className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
+        <Card className="bg-[#131b2e] border border-[#3c4a42]/50 shadow-2xl overflow-hidden relative">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Información del Negocio</CardTitle>
+              <CardTitle className="font-mono text-[#dae2fd]">Información del Negocio</CardTitle>
               <Badge variant="outline" className={cn(
-                "gap-1",
-                isOwner ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                "gap-1 font-mono text-xs",
+                isOwner ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"
               )}>
                 <ShieldCheck className="h-3 w-3" /> {role.toUpperCase()}
               </Badge>
             </div>
-            <CardDescription>
-              Configuración global de la empresa visible para todos los terminales.
+            <CardDescription className="text-[#bbcabf] text-xs font-mono">
+              Configuración general de la empresa visible en los recibos y reportes.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-5 relative">
             <div className="space-y-2">
-              <Label htmlFor="businessName">Nombre del Negocio</Label>
+              <Label htmlFor="businessName" className="text-xs font-mono text-[#dae2fd]">Nombre del Negocio</Label>
               <Input
                 id="businessName"
                 value={localBusinessName}
                 onChange={(e) => handleUpdateBusinessName(e.target.value)}
-                placeholder="Ej. Lotería La Fortuna"
+                placeholder="Ej. LOTERIA LA FORTUNA"
                 disabled={!isOwner}
-                className={!isOwner ? "bg-muted opacity-80" : "bg-background/50 border-white/10 focus:border-primary/50 transition-all"}
+                className={!isOwner ? "bg-muted opacity-80" : "bg-[#0b1326] border-[#3c4a42] text-[#dae2fd] font-mono focus:border-[#10b981] transition-all"}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="currency">Moneda</Label>
+              <Label htmlFor="currency" className="text-xs font-mono text-[#dae2fd]">Símbolo de Moneda</Label>
               <Input
                 id="currency"
                 value={settings.currency || ''}
                 onChange={(e) => updateSettings({ currency: e.target.value })}
                 placeholder="Ej. C$"
                 disabled={!isOwner}
-                className="bg-background/50 border-white/10 focus:border-primary/50 transition-all"
+                className="bg-[#0b1326] border-[#3c4a42] text-[#dae2fd] font-mono focus:border-[#10b981] transition-all"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ticketMessage">Mensaje Global de Pie</Label>
+              <Label htmlFor="ticketMessage" className="text-xs font-mono text-[#dae2fd]">Mensaje de Pie de Recibo</Label>
               <Input
                 id="ticketMessage"
                 value={settings.ticketMessage || ''}
                 onChange={(e) => updateSettings({ ticketMessage: e.target.value })}
                 placeholder="¡Gracias por su compra!"
-                className="bg-background/50 border-white/10 focus:border-primary/50 transition-all"
+                className="bg-[#0b1326] border-[#3c4a42] text-[#dae2fd] font-mono focus:border-[#10b981] transition-all"
               />
             </div>
 
-            <div className="space-y-3 pt-4 border-t border-white/5">
+            <div className="space-y-3 pt-4 border-t border-[#3c4a42]/40">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Apariencia del Sistema</Label>
+                <Label className="text-xs font-bold uppercase tracking-wider text-[#86948a] font-mono">Apariencia del Sistema</Label>
                 {mounted && (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 opacity-50 uppercase">
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 opacity-50 uppercase font-mono">
                     Actual: {theme === 'system' ? 'Sistema' : theme === 'dark' ? 'Oscuro' : 'Claro'}
                   </Badge>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2 p-1 bg-background/30 rounded-xl border border-white/5">
+              <div className="grid grid-cols-3 gap-2 p-1 bg-[#0b1326] rounded-xl border border-[#3c4a42]">
                 <Button 
                   variant="ghost"
                   size="sm" 
                   className={cn(
-                    "gap-2 h-10 rounded-lg transition-all", 
-                    mounted && theme === 'light' ? "bg-white text-black shadow-lg shadow-black/10 scale-105" : "text-muted-foreground opacity-60 hover:opacity-100"
+                    "gap-2 h-10 rounded-lg transition-all font-mono", 
+                    mounted && theme === 'light' ? "bg-white text-black shadow-lg" : "text-[#bbcabf] hover:text-[#dae2fd]"
                   )}
                   onClick={() => handleThemeChange('light')}
                 >
@@ -273,8 +252,8 @@ export function GeneralSettingsTab() {
                   variant="ghost"
                   size="sm" 
                   className={cn(
-                    "gap-2 h-10 rounded-lg transition-all", 
-                    mounted && theme === 'dark' ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105" : "text-muted-foreground opacity-60 hover:opacity-100"
+                    "gap-2 h-10 rounded-lg transition-all font-mono", 
+                    mounted && theme === 'dark' ? "bg-[#10b981] text-[#003824] font-bold" : "text-[#bbcabf] hover:text-[#dae2fd]"
                   )}
                   onClick={() => handleThemeChange('dark')}
                 >
@@ -284,8 +263,8 @@ export function GeneralSettingsTab() {
                   variant="ghost"
                   size="sm" 
                   className={cn(
-                    "gap-2 h-10 rounded-lg transition-all", 
-                    mounted && theme === 'system' ? "bg-muted text-foreground border border-white/10 scale-105" : "text-muted-foreground opacity-60 hover:opacity-100"
+                    "gap-2 h-10 rounded-lg transition-all font-mono", 
+                    mounted && theme === 'system' ? "bg-[#171f33] text-[#dae2fd] border border-[#3c4a42]" : "text-[#bbcabf] hover:text-[#dae2fd]"
                   )}
                   onClick={() => handleThemeChange('system')}
                 >
@@ -294,155 +273,220 @@ export function GeneralSettingsTab() {
               </div>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-white/5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ancho del Papel (Impresora)</Label>
+            <div className="space-y-2 pt-2 border-t border-[#3c4a42]/40">
+              <Label className="text-xs font-bold uppercase tracking-wider text-[#86948a] font-mono">Ancho del Papel Térmico</Label>
               <Select 
                 value={settings.ticketWidth || '58mm'} 
                 onValueChange={(v) => updateSettings({ ticketWidth: v })}
               >
-                <SelectTrigger className="w-full h-9 bg-background/50 border-white/10 focus:border-primary/50 transition-all">
+                <SelectTrigger className="w-full h-9 bg-[#0b1326] border-[#3c4a42] text-[#dae2fd] font-mono focus:border-[#10b981] transition-all">
                   <SelectValue placeholder="Seleccionar ancho" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="58mm">58mm (Estándar Portátil)</SelectItem>
+                <SelectContent className="bg-[#131b2e] border-[#3c4a42] text-[#dae2fd] font-mono">
+                  <SelectItem value="58mm">58mm (Estándar PT-210 Portátil)</SelectItem>
                   <SelectItem value="80mm">80mm (Estándar Punto de Venta)</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground italic">
-                * Ajusta el ancho real de la impresión y la previsualización.
-              </p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
-          <CardHeader className="pb-4 relative">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <CardTitle>Estructura del Recibo</CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleSaveTemplate}
-                  disabled={isSaving || localTemplate === settings.ticketTemplate}
-                  className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 h-8"
-                >
-                  {isSaving ? 'Guardando...' : 'Guardar Diseño'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={resetTemplate}
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20 h-8"
-                >
-                  Restablecer
-                </Button>
-                <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 h-8">
-                      <Eye className="h-4 w-4" /> Ver Ticket Final
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className={cn(
-                    "p-0 bg-white border-none shadow-2xl rounded-none transition-all duration-300 w-[95vw]",
-                    settings.ticketWidth === '80mm' ? "max-w-[380px]" : "max-w-[300px]"
-                  )}>
-                    <div className="p-6 bg-white text-black font-mono leading-tight">
-                      <div className={cn(
-                        "border-2 border-black/5 p-4 rounded-sm shadow-inner bg-slate-50/50 mx-auto",
-                        settings.ticketWidth === '80mm' ? "w-full max-w-[280px]" : "w-full max-w-[200px]"
-                      )}>
-                        {renderTemplatePreview(localTemplate || '')}
+        /* TAB 2: EDITOR DE PLANTILLA DEL TICKET */
+        <div className="space-y-6">
+          <Card className="bg-[#131b2e] border border-[#3c4a42]/50 shadow-2xl overflow-hidden relative">
+            <CardHeader className="pb-3 relative border-b border-[#3c4a42]/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="font-mono text-[#dae2fd] text-base flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-[#4cd7f6]" />
+                    Estructura y Diseño del Ticket
+                  </CardTitle>
+                  <CardDescription className="text-xs font-mono text-[#bbcabf] mt-1">
+                    Edita el texto del recibo. La vista previa a la derecha muestra exactamente cómo se imprimirá.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveTemplate}
+                    disabled={isSaving}
+                    className="bg-[#10b981] text-[#003824] hover:bg-[#10b981]/90 font-mono text-xs font-bold h-9 px-4 active:scale-95 transition-all shadow-md"
+                  >
+                    {isSaving ? 'Guardando...' : 'Guardar Diseño'}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={resetTemplate}
+                    className="text-red-400 hover:bg-red-500/10 hover:text-red-300 border-red-500/30 font-mono text-xs h-9 px-3"
+                  >
+                    Restablecer
+                  </Button>
+                  <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1.5 h-9 font-mono text-xs bg-[#171f33] border-[#3c4a42] text-[#dae2fd] hover:text-white">
+                        <Eye className="h-3.5 w-3.5 text-[#4cd7f6]" /> Pantalla Completa
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="p-4 bg-[#060e20] border-[#3c4a42] shadow-2xl rounded-2xl max-w-sm">
+                      <div className="text-center font-mono text-xs text-[#bbcabf] mb-2 font-bold">
+                        VISTA PREVIA DEL RECIBO (PT-210)
+                      </div>
+                      <div className="w-full max-w-[270px] mx-auto shadow-2xl relative filter drop-shadow-[0_8px_20px_rgba(0,0,0,0.8)]">
+                        <div className="w-full h-2.5 thermal-rip-top -mb-[1px]" />
+                        <div className="bg-white p-4 font-mono text-[12px] text-black">
+                          <TicketBodyView 
+                            template={localTemplate}
+                            ticket={MOCK_PREVIEW_TICKET}
+                            settings={settings}
+                          />
+                        </div>
+                        <div className="w-full h-2.5 thermal-rip-bottom -mt-[1px]" />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 pt-5">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* COLUMNA 1: EDITOR DE TEXTO Y VARIABLES (7 cols) */}
+                <div className="lg:col-span-7 space-y-4">
+                  {/* Selector de Variables para Insertar */}
+                  <div className="bg-[#0b1326] p-3 rounded-xl border border-[#3c4a42] space-y-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#86948a]">
+                        Datos del Recibo
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['ticketNumber', 'date', 'gameName', 'scheduleName', 'terminalName', 'vendorName', 'client'].map(v => (
+                          <Button 
+                            key={v} 
+                            type="button"
+                            variant="outline" 
+                            size="sm" 
+                            className="h-6 text-[11px] px-2 font-mono bg-[#171f33] border-[#3c4a42] text-[#dae2fd] hover:bg-[#4cd7f6]/20 hover:border-[#4cd7f6]/40 hover:text-[#4cd7f6] transition-all"
+                            onClick={() => insertVariable(v)}
+                          >
+                            {`{{${v}}}`}
+                          </Button>
+                        ))}
                       </div>
                     </div>
-                  </DialogContent>
 
-                </Dialog>
-              </div>
-            </div>
-            <CardDescription>
-              Personaliza cada línea de tu recibo usando variables entre llaves.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">General</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['businessName', 'date', 'currency', 'terminalName'].map(v => (
-                    <Button 
-                      key={v} 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-7 text-[10px] px-2 font-mono bg-muted/50 border-white/5 hover:bg-primary/20 hover:border-primary/30 transition-all"
-                      onClick={() => insertVariable(v)}
-                    >
-                      {`{{${v}}}`}
-                    </Button>
-                  ))}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#86948a]">
+                        Jugadas y Totales
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['number', 'amount', 'prize', 'total', 'currency'].map(v => (
+                          <Button 
+                            key={v} 
+                            type="button"
+                            variant="outline" 
+                            size="sm" 
+                            className="h-6 text-[11px] px-2 font-mono bg-[#10b981]/10 border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 transition-all"
+                            onClick={() => insertVariable(v)}
+                          >
+                            {`{{${v}}}`}
+                          </Button>
+                        ))}
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm" 
+                          className="h-6 text-[11px] px-2 font-mono bg-[#4cd7f6]/10 border-[#4cd7f6]/30 text-[#4cd7f6] hover:bg-[#4cd7f6]/20 transition-all"
+                          onClick={() => insertVariable('[QR]')}
+                        >
+                          [QR]
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Area de Texto para editar la plantilla */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-[#dae2fd] flex items-center justify-between">
+                      <span>Editor de Plantilla</span>
+                      <span className="text-[10px] font-normal text-[#86948a]">
+                        {localTemplate.length} caracteres
+                      </span>
+                    </label>
+                    <Textarea
+                      id="ticketTemplate"
+                      value={localTemplate}
+                      onChange={(e) => setLocalTemplate(e.target.value)}
+                      className="font-mono text-xs min-h-[380px] bg-[#0b1326] text-[#dae2fd] border-[#3c4a42] focus-visible:ring-[#4cd7f6] focus-visible:ring-1 selection:bg-[#10b981]/30 leading-relaxed rounded-xl shadow-inner p-3.5"
+                      rows={18}
+                      spellCheck={false}
+                    />
+                  </div>
+
+                  {/* Guía Rápida de Formato */}
+                  <div className="bg-[#0b1326]/60 p-3 rounded-xl text-[11px] font-mono space-y-1.5 border border-[#3c4a42]/40 text-[#bbcabf]">
+                    <p className="font-bold text-[#dae2fd] uppercase flex items-center gap-1.5 text-[10px]">
+                      <Info className="h-3 w-3 text-[#4cd7f6]" /> Guía de Formato Térmico
+                    </p>
+                    <ul className="grid grid-cols-2 gap-x-4 gap-y-1 list-disc list-inside">
+                      <li><code># Texto</code>: Grande / Centrado</li>
+                      <li><code>## Texto</code>: Centrado</li>
+                      <li><code>**Texto**</code>: Negrita / Ancho</li>
+                      <li><code>[QR]</code>: Código QR</li>
+                      <li><code>{`{{#items}}...{{/items}}`}</code>: Jugadas</li>
+                      <li><code>{`{{#if client}}...{{/if}}`}</code>: Cliente</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* COLUMNA 2: VISTA PREVIA EN VIVO EN TIEMPO REAL (5 cols) */}
+                <div className="lg:col-span-5 space-y-3 lg:sticky lg:top-4">
+                  <div className="bg-[#0b1326] rounded-2xl border border-[#3c4a42] p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-[#3c4a42]/60 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Printer className="h-4 w-4 text-[#10b981]" />
+                        <h3 className="font-mono text-xs font-bold text-[#dae2fd] uppercase tracking-wider">
+                          Vista Previa en Vivo
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30 font-bold">
+                        PT-210 (58mm)
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] font-mono text-[#86948a] leading-tight">
+                      Se actualiza automáticamente en tiempo real mientras editas.
+                    </p>
+
+                    {/* Simulación Realista de Papel Térmico */}
+                    <div className="w-full max-w-[270px] mx-auto shadow-2xl relative filter drop-shadow-[0_10px_24px_rgba(0,0,0,0.85)] my-2">
+                      <div className="w-full h-2.5 thermal-rip-top -mb-[1px]" />
+                      <div className="bg-white px-4 py-3 font-mono text-[12px] text-black min-h-[350px]">
+                        <TicketBodyView 
+                          template={localTemplate}
+                          ticket={MOCK_PREVIEW_TICKET}
+                          settings={settings}
+                        />
+                      </div>
+                      <div className="w-full h-2.5 thermal-rip-bottom -mt-[1px]" />
+                    </div>
+
+                    <div className="pt-2 flex justify-center">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveTemplate}
+                        disabled={isSaving}
+                        className="w-full bg-[#10b981] text-[#003824] hover:bg-[#10b981]/90 font-mono text-xs font-bold h-9 shadow-lg"
+                      >
+                        {isSaving ? 'Guardando...' : 'Guardar y Aplicar al Punto de Venta'}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Venta / Ticket</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['ticketNumber', 'gameName', 'scheduleName', 'client', 'vendorName', 'total', 'ticketMessage'].map(v => (
-                    <Button 
-                      key={v} 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-7 text-[10px] px-2 font-mono bg-muted/50 border-white/5 hover:bg-primary/20 hover:border-primary/30 transition-all"
-                      onClick={() => insertVariable(v)}
-                    >
-                      {`{{${v}}}`}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Dentro de {`{{#items}}`}</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['game', 'number', 'amount', 'prize'].map(v => (
-                    <Button 
-                      key={v} 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-7 text-[10px] px-2 font-mono bg-primary/5 border-primary/10 hover:bg-primary/20 hover:border-primary/30 transition-all"
-                      onClick={() => insertVariable(v)}
-                    >
-                      {`{{${v}}}`}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Textarea
-                id="ticketTemplate"
-                value={localTemplate}
-                onChange={(e) => setLocalTemplate(e.target.value)}
-                className="font-mono text-[13px] min-h-[450px] bg-[#0d1117]/80 backdrop-blur-md text-[#c9d1d9] border-white/10 shadow-inner focus-visible:ring-primary focus-visible:ring-offset-0 selection:bg-primary/30 leading-relaxed rounded-xl"
-                rows={18}
-                spellCheck={false}
-              />
-            </div>
-
-            <div className="bg-muted/30 p-3 rounded-lg text-[11px] space-y-1.5 border border-dashed">
-              <p className="font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                <Info className="h-3 w-3" /> Guía de Formato
-              </p>
-              <ul className="grid grid-cols-2 gap-x-4 list-disc list-inside opacity-70">
-                <li><code># Texto</code>: Grande / Centrado</li>
-                <li><code>## Texto</code>: Centrado</li>
-                <li><code>**Texto**</code>: Negrita</li>
-                <li><code>{`{{#items}}...{{/items}}`}</code>: Jugadas</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

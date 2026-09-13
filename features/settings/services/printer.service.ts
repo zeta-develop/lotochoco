@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatTime12h, formatDateNumber } from '@/lib/utils'
 import { toPng } from 'html-to-image'
+import { parseTemplateToBlocks, DEFAULT_TICKET_TEMPLATE } from '../utils/ticket-template'
 
 class EscPosBuilder {
   private buffer: number[] = []
@@ -124,92 +125,65 @@ export const printerService = {
       const builder = new EscPosBuilder()
       builder.init()
 
-      // Validar fecha
-      let ticketDate = new Date();
-      try {
-        if (ticket.createdAt) {
-          ticketDate = new Date(ticket.createdAt);
-          if (isNaN(ticketDate.getTime())) ticketDate = new Date();
+      const template = settings.ticketTemplate || DEFAULT_TICKET_TEMPLATE
+      const blocks = parseTemplateToBlocks(template, ticket, settings, isReprint)
+
+      for (const block of blocks) {
+        switch (block.type) {
+          case 'header_big':
+            builder.alignCenter().bold(true).doubleSize(true).text(block.text).doubleSize(false).bold(false).newline()
+            break
+
+          case 'header_med':
+            builder.alignCenter().bold(true).text(block.text).bold(false).newline()
+            break
+
+          case 'separator':
+            builder.alignCenter().text('--------------------------------').newline()
+            break
+
+          case 'items_header':
+            builder.alignLeft().text(block.col1.padEnd(10) + block.col2.padEnd(10) + block.col3.padStart(12)).newline()
+            break
+
+          case 'item_row':
+            if (block.customText) {
+              builder.alignCenter().text(block.customText).newline()
+            } else {
+              // 5 columnas doble ancho para apuesta + 5 para monto + 6 para premio = 16 columnas doble ancho (32 cols 58mm)
+              const col1 = block.number.padEnd(5)
+              const col2 = block.amount.padEnd(5)
+              const col3 = block.prize.padStart(6)
+              builder.bold(true).doubleWidth(true)
+              builder.text(`${col1}${col2}${col3}`)
+              builder.doubleWidth(false).bold(false).newline()
+            }
+            break
+
+          case 'total':
+            builder.alignCenter().bold(true).doubleWidth(true)
+            builder.text(block.text)
+            builder.doubleWidth(false).bold(false).newline()
+            break
+
+          case 'bold_text':
+            builder.alignCenter().bold(true).text(block.text).bold(false).newline()
+            break
+
+          case 'text':
+            builder.alignCenter().text(block.text).newline()
+            break
+
+          case 'qr':
+            builder.qrCode(block.code || ticket.ticketNumber || 'LOTERIA', 4)
+            break
+
+          case 'empty':
+            builder.newline()
+            break
         }
-      } catch (e) {
-        console.warn('Error al procesar fecha del ticket:', e);
       }
 
-      const currency = settings.currency || 'C$'
-      const vendorName = settings.vendorName || 'Yamileth'
-      const terminalId = settings.terminalId || settings.terminalName || 'J081'
-      const formattedDate = format(ticketDate, 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
-      
-      const firstItem = ticket.items?.[0] as any
-      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
-      const rawSchedule = firstItem?.scheduleName || firstItem?.schedule || '11:00 am'
-      let scheduleName = rawSchedule
-      try {
-        const formattedSch = formatTime12h(rawSchedule)
-        if (formattedSch) scheduleName = formattedSch.toLowerCase()
-      } catch {
-        scheduleName = rawSchedule
-      }
-
-      const separator = '--------------------------------'
-
-      // 1. METADATA COMPACTA (Directo al folio, sin cabecera redundante para ahorrar papel)
-      builder.alignCenter()
-      builder.text(`Folio: ${ticket.ticketNumber || 'N/A'}`).newline()
-      builder.text(`Fecha: ${formattedDate}`).newline()
-      builder.text(`Juego: ${gameName}`).newline()
-      builder.text(`Sorteo: ${scheduleName}`).newline()
-      if (ticket.client && ticket.client.trim()) {
-        builder.text(`Cliente: ${ticket.client.trim()}`).newline()
-      }
-      if (terminalId && terminalId.trim()) {
-        const cleanTerminal = terminalId.trim().replace(/^=\s*|\s*=$/g, '')
-        builder.text(`Puesto: ${cleanTerminal}`).newline()
-      }
-      builder.text(`Vendedor: ${vendorName}`).newline()
-      builder.text(separator).newline()
-
-      // 2. TABLA DE APUESTAS (Alineada a 32 columnas estándar de 58mm)
-      builder.alignLeft()
-      builder.text('Apuesta'.padEnd(10) + 'Monto'.padEnd(10) + 'Premio'.padStart(12)).newline()
-      builder.text(separator).newline()
-
-      // Números, monto y premio MÁS ANCHOS (Doble Ancho ESC/POS: 16 columnas = 32 columnas de 58mm, altura normal 1x)
-      for (const item of (ticket.items || [])) {
-        const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
-        const prize = item.amount * multiplier
-        const numStr = (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number)
-        const amtStr = item.amount.toFixed(0)
-        const prizeStr = prize.toFixed(0)
-
-        // 5 columnas de doble ancho para Apuesta + 5 para Monto + 6 para Premio = 16 columnas
-        const col1 = numStr.padEnd(5)
-        const col2 = amtStr.padEnd(5)
-        const col3 = prizeStr.padStart(6)
-
-        builder.bold(true).doubleWidth(true)
-        builder.text(`${col1}${col2}${col3}`)
-        builder.doubleWidth(false).bold(false).newline()
-      }
-
-      builder.text(separator).newline()
-
-      // 3. TOTAL (Centrado, Doble Ancho y Negrita)
-      const totalStr = ticket.totalAmount % 1 === 0 
-        ? ticket.totalAmount.toFixed(0) 
-        : ticket.totalAmount.toFixed(2)
-
-      builder.alignCenter().bold(true).doubleWidth(true)
-      builder.text(`TOTAL: ${currency} ${totalStr}`)
-      builder.doubleWidth(false).bold(false).newline()
-
-      // 4. TEXTO LEGAL (Centrado, continuo)
-      builder.text('Valido para 1 sorteo').newline()
-      builder.text('Por favor revise su boleto').newline()
-      builder.text('Premio valido por 7 dias').newline()
-
-      // 5. CÓDIGO QR COMPACTO (Tamaño módulo 4 para ~22mm en vez de 6)
-      builder.qrCode(ticket.ticketNumber || 'LOTERIA', 4)
       builder.feed(2)
 
       console.log('Conectando a impresora:', deviceId);

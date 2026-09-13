@@ -1,5 +1,6 @@
 import { dbEvents } from '@/lib/events'
 import { settingsRepository } from '../repositories/settings.repository'
+import { DEFAULT_TICKET_TEMPLATE } from '../utils/ticket-template'
 
 const DEFAULT_SETTINGS: Record<string, string> = {
   businessName: 'LOTERIA',
@@ -10,29 +11,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   ticketDensity: '1',
   ticketWidth: '58mm',
   vendorName: 'Yamileth',
-  ticketTemplate: `# {{businessName}}
---------------------------------
-{{receiptType}}
-Folio: {{ticketNumber}}
-Fecha: {{date}}
-Juego: {{gameName}}
-Sorteo: {{scheduleName}}
-{{#if client}}Cliente: {{client}}
-{{/if}}Vendedor: {{vendorName}}
---------------------------------
-Apuesta         Monto     Premio
---------------------------------
-{{#items}}
-{{number}}               {{amount}}         {{prize}}
-{{/items}}
---------------------------------
-**TOTAL: {{currency}} {{total}}**
-
-Valido para 1 sorteo
-Por favor revise su boleto
-Premio valido por 7 dias
-
-[QR]`
+  ticketTemplate: DEFAULT_TICKET_TEMPLATE
 }
 
 export const settingsService = {

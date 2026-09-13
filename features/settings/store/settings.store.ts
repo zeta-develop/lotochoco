@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { DEFAULT_TICKET_TEMPLATE } from '../utils/ticket-template'
 
 export interface SettingsState {
   settings: Record<string, string>
@@ -23,29 +24,7 @@ export const useSettingsStore = create<SettingsState>()(
         bluetoothDeviceName: '',
         ticketWidth: '58mm',
         vendorName: 'Yamileth',
-        ticketTemplate: `# {{businessName}}
---------------------------------
-{{receiptType}}
-Folio: {{ticketNumber}}
-Fecha: {{date}}
-Juego: {{gameName}}
-Sorteo: {{scheduleName}}
-{{#if client}}Cliente: {{client}}
-{{/if}}Vendedor: {{vendorName}}
---------------------------------
-Apuesta         Monto     Premio
---------------------------------
-{{#items}}
-{{number}}               {{amount}}         {{prize}}
-{{/items}}
---------------------------------
-**TOTAL: {{currency}} {{total}}**
-
-Valido para 1 sorteo
-Por favor revise su boleto
-Premio valido por 7 dias
-
-[QR]`
+        ticketTemplate: DEFAULT_TICKET_TEMPLATE
       },
       setSettings: (settings) => set({ settings }),
       updateSetting: (key, value) => {

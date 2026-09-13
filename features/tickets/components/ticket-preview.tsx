@@ -9,6 +9,8 @@ import { toast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import QRCode from "qrcode"
+import { useSettingsManager } from "@/features/settings/hooks/use-settings-manager"
+import { TicketBodyView } from "@/features/settings/components/TicketBodyView"
 
 interface TicketPreviewProps {
   ticket: Ticket & { items: (TicketItem & { game: Game })[] }
@@ -27,6 +29,7 @@ export function TicketPreview({
   onPrint,
   onClose 
 }: TicketPreviewProps) {
+  const { settings } = useSettingsManager()
   const [isSharing, setIsSharing] = useState(false)
   const ticketRef = useRef<HTMLDivElement | null>(null)
 
@@ -119,80 +122,19 @@ export function TicketPreview({
     >
       <Card className="w-full max-w-[310px] bg-white text-black shadow-2xl border-0 overflow-hidden" onClick={(event) => event.stopPropagation()}>
         <CardContent className="p-0 flex flex-col max-h-[85vh]">
-          {/* Ticket Content - Réplica exacta de papel térmico */}
+          {/* Ticket Content - Réplica exacta de papel térmico usando la plantilla configurada */}
           <div ref={ticketRef} className="p-4 overflow-y-auto font-mono text-[12px] leading-tight bg-white text-black select-text">
-            {/* Metadata (Centrado, directo al Folio) */}
-            <div className="text-center space-y-0.5 text-xs text-black font-mono pt-1">
-              <div>Folio: {ticket.ticketNumber}</div>
-              <div>Fecha: {formattedDate}</div>
-              <div>Juego: {gameName}</div>
-              <div>Sorteo: {scheduleName}</div>
-              {ticket.client ? (
-                <div>Cliente: {ticket.client}</div>
-              ) : null}
-              <div>Puesto: J081</div>
-              <div>Vendedor: Yamileth</div>
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Column Header */}
-            <div className="flex justify-between items-center text-xs font-bold text-black font-mono px-1">
-              <span className="w-1/3 text-left">Apuesta</span>
-              <span className="w-1/3 text-center">Monto</span>
-              <span className="w-1/3 text-right">Premio</span>
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Items (Más anchos y en Negrita) */}
-            <div className="space-y-0.5 my-1 px-1">
-              {ticket.items.map((item, index) => {
-                const multiplier = item.game?.multiplier || 70
-                const prize = item.amount * multiplier
-                return (
-                  <div key={index} className="flex justify-between items-center text-sm font-mono text-black font-black">
-                    <span className="w-1/3 text-left tracking-widest">{item.number}</span>
-                    <span className="w-1/3 text-center tracking-wider">{item.amount.toFixed(0)}</span>
-                    <span className="w-1/3 text-right tracking-wider">{prize.toFixed(0)}</span>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Total (Más ancho y en Negrita) */}
-            <div className="text-center font-black text-base text-black font-mono my-1 tracking-wider">
-              TOTAL: {currency} {ticket.totalAmount % 1 === 0 ? ticket.totalAmount.toFixed(0) : ticket.totalAmount.toFixed(2)}
-            </div>
-
-            {/* Legal / Disclaimers */}
-            <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-1">
-              <div>Valido para 1 sorteo</div>
-              <div>Por favor revise su boleto</div>
-              <div>Premio valido por 7 dias</div>
-            </div>
-
-            {/* Native QR Code Display */}
-            {qrCodeUrl ? (
-              <div className="flex justify-center my-2">
-                <img src={qrCodeUrl} alt="QR Code" className="w-24 h-24 object-contain" />
-              </div>
-            ) : (
-              <div className="w-24 h-24 mx-auto my-2 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">
-                Cargando QR...
-              </div>
-            )}
+            <TicketBodyView 
+              template={settings.ticketTemplate}
+              ticket={ticket}
+              settings={{
+                ...settings,
+                businessName,
+                currency,
+                ticketMessage
+              }}
+              qrCodeUrl={qrCodeUrl}
+            />
           </div>
 
           {/* Actions */}

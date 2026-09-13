@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Check, Printer, Repeat, Share2, Trash2, ShieldCheck } from 'lucide-react'
 import { formatTime12h } from '@/lib/utils'
+import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
+import { TicketBodyView } from '@/features/settings/components/TicketBodyView'
 import type { CartItem } from '../domain/types'
 import type { Ticket, TicketItem, Game } from '@/lib/types'
 
@@ -140,6 +142,28 @@ export function PurchaseVerification({
     return { gameName, scheduleName, ticketNumber, ticketDate, clientName, vendorName: finalVendorName, terminalName: finalTerminalName }
   }, [ticket, items, vendorName, terminalName])
 
+  const { settings } = useSettingsManager()
+
+  const currentTicketForView = useMemo(() => {
+    return {
+      id: ticket?.id || 'preview',
+      ticketNumber: purchaseMeta.ticketNumber,
+      createdAt: ticket?.createdAt || new Date().toISOString(),
+      totalAmount: total,
+      client: purchaseMeta.clientName,
+      status: ticket?.status || 'active',
+      items: items.map((i) => ({
+        id: i.id,
+        number: i.number,
+        amount: i.amount,
+        multiplier: i.multiplier || 70,
+        gameName: i.gameName,
+        scheduleName: i.scheduleName,
+        game: { name: i.gameName, multiplier: i.multiplier || 70 } as any
+      }))
+    }
+  }, [ticket, purchaseMeta, total, items])
+
   useEffect(() => {
     const code = purchaseMeta.ticketNumber || 'LOTERIA'
     QRCode.toDataURL(code, {
@@ -243,79 +267,19 @@ export function PurchaseVerification({
           {/* Serrated Top Edge */}
           <div className="w-full h-2.5 thermal-rip-top -mb-[1px]"></div>
 
-          {/* Ticket Body matching exact user photo */}
+          {/* Ticket Body matching exact user photo and template */}
           <div ref={captureRef} className="bg-[#ffffff] text-[#000000] px-4 py-3 font-mono text-[12px] leading-tight select-text">
-            {/* Metadata (Centered, directo al Folio como en el ticket corto) */}
-            <div className="text-center space-y-0.5 text-xs text-black font-mono pt-1">
-              <div>Folio: {purchaseMeta.ticketNumber}</div>
-              <div>Fecha: {purchaseMeta.ticketDate}</div>
-              <div>Juego: {purchaseMeta.gameName}</div>
-              <div>Sorteo: {purchaseMeta.scheduleName}</div>
-              {purchaseMeta.clientName ? (
-                <div>Cliente: {purchaseMeta.clientName}</div>
-              ) : null}
-              <div>Puesto: {purchaseMeta.terminalName.replace(/^=\s*|\s*=$/g, '') || 'J081'}</div>
-              <div>Vendedor: {purchaseMeta.vendorName}</div>
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Column Header */}
-            <div className="flex justify-between items-center text-xs font-bold text-black font-mono px-1">
-              <span className="w-1/3 text-left">Apuesta</span>
-              <span className="w-1/3 text-center">Monto</span>
-              <span className="w-1/3 text-right">Premio</span>
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Items (Más anchos y en Negrita) */}
-            <div className="space-y-0.5 my-1 px-1">
-              {items.map((item) => {
-                const prize = (item.amount || 0) * (item.multiplier || 70)
-                return (
-                  <div key={item.id} className="flex justify-between items-center text-sm font-mono text-black font-black">
-                    <span className="w-1/3 text-left tracking-widest">{item.number}</span>
-                    <span className="w-1/3 text-center tracking-wider">{item.amount.toFixed(0)}</span>
-                    <span className="w-1/3 text-right tracking-wider">{prize.toFixed(0)}</span>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Separator */}
-            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
-              --------------------------------
-            </div>
-
-            {/* Total (Más ancho y en Negrita) */}
-            <div className="text-center font-black text-base text-black font-mono my-1 tracking-wider">
-              TOTAL: {currency} {total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
-            </div>
-
-            {/* Legal / Disclaimers */}
-            <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-1">
-              <div>Valido para 1 sorteo</div>
-              <div>Por favor revise su boleto</div>
-              <div>Premio valido por 7 dias</div>
-            </div>
-
-            {/* Native QR Code Display (Compacto) */}
-            {qrCodeUrl ? (
-              <div className="flex justify-center my-2">
-                <img src={qrCodeUrl} alt="QR Code" className="w-24 h-24 object-contain" />
-              </div>
-            ) : (
-              <div className="w-24 h-24 mx-auto my-2 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">
-                Cargando QR...
-              </div>
-            )}
+            <TicketBodyView 
+              template={settings.ticketTemplate}
+              ticket={currentTicketForView}
+              settings={{
+                ...settings,
+                terminalId: purchaseMeta.terminalName,
+                vendorName: purchaseMeta.vendorName,
+                currency
+              }}
+              qrCodeUrl={qrCodeUrl}
+            />
           </div>
 
           {/* Serrated Bottom Edge */}
