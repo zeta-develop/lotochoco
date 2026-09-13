@@ -86,8 +86,21 @@ export async function getTicketById(id: string): Promise<Ticket | null> {
 }
 
 export async function searchTicket(searchNumber: string): Promise<Ticket | null> {
-  if (!searchNumber.startsWith('#')) { searchNumber = `#${searchNumber}` }
-  const { data: ticket, error } = await supabase.from('tickets').select(`*, ticket_items (*, games (*, draw_schedules (*)))`).eq('ticket_number', searchNumber).single()
+  const cleanSearch = searchNumber.trim()
+
+  // 1. Si el texto escaneado es un UUID (32 caracteres sin guiones o 36 con guiones)
+  if (cleanSearch.length === 32 || cleanSearch.length === 36) {
+    const formattedId = cleanSearch.length === 32
+      ? `${cleanSearch.slice(0, 8)}-${cleanSearch.slice(8, 12)}-${cleanSearch.slice(12, 16)}-${cleanSearch.slice(16, 20)}-${cleanSearch.slice(20)}`.toLowerCase()
+      : cleanSearch.toLowerCase()
+    const ticketById = await getTicketById(formattedId)
+    if (ticketById) return ticketById
+  }
+
+  // 2. Búsqueda por folio (#00000001, etc.)
+  let formattedNumber = cleanSearch
+  if (!formattedNumber.startsWith('#')) { formattedNumber = `#${formattedNumber}` }
+  const { data: ticket, error } = await supabase.from('tickets').select(`*, ticket_items (*, games (*, draw_schedules (*)))`).eq('ticket_number', formattedNumber).single()
   if (error || !ticket) return null
   return mapTicket(ticket)
 }

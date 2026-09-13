@@ -12,6 +12,7 @@ import { ArrowLeft, Check, Printer, Repeat, Share2, Trash2, ShieldCheck } from '
 import { formatTime12h } from '@/lib/utils'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { TicketBodyView } from '@/features/settings/components/TicketBodyView'
+import { generateTicketQrHash } from '@/features/settings/utils/ticket-template'
 import type { CartItem } from '../domain/types'
 import type { Ticket, TicketItem, Game } from '@/lib/types'
 
@@ -165,7 +166,7 @@ export function PurchaseVerification({
   }, [ticket, purchaseMeta, total, items])
 
   useEffect(() => {
-    const code = purchaseMeta.ticketNumber || 'LOTERIA'
+    const code = generateTicketQrHash(currentTicketForView)
     QRCode.toDataURL(code, {
       width: 200,
       margin: 1,
@@ -177,7 +178,7 @@ export function PurchaseVerification({
     })
       .then(setQrCodeUrl)
       .catch((err) => console.error('Error generating QR code:', err))
-  }, [purchaseMeta.ticketNumber])
+  }, [currentTicketForView])
 
   // Información agrupada: si todas las jugadas comparten juego/sorteo
   const gameName = items[0]?.gameName || 'LOTERIA'

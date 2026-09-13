@@ -11,6 +11,7 @@ import { es } from "date-fns/locale"
 import QRCode from "qrcode"
 import { useSettingsManager } from "@/features/settings/hooks/use-settings-manager"
 import { TicketBodyView } from "@/features/settings/components/TicketBodyView"
+import { generateTicketQrHash } from "@/features/settings/utils/ticket-template"
 
 interface TicketPreviewProps {
   ticket: Ticket & { items: (TicketItem & { game: Game })[] }
@@ -80,7 +81,7 @@ export function TicketPreview({
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('')
 
   useEffect(() => {
-    const code = ticket?.ticketNumber || 'LOTERIA'
+    const code = generateTicketQrHash(ticket)
     QRCode.toDataURL(code, {
       width: 200,
       margin: 1,
@@ -92,7 +93,7 @@ export function TicketPreview({
     })
       .then(setQrCodeUrl)
       .catch((err) => console.error('Error generating QR code in preview:', err))
-  }, [ticket?.ticketNumber])
+  }, [ticket])
 
   const firstItem = ticket.items?.[0]
   const gameName = firstItem?.game?.name || 'Tica'

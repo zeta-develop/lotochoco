@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale'
 import { formatTime12h, formatDateNumber } from '@/lib/utils'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
-import { parseTemplateToBlocks, DEFAULT_TICKET_TEMPLATE } from '../utils/ticket-template'
+import { parseTemplateToBlocks, DEFAULT_TICKET_TEMPLATE, generateTicketQrHash } from '../utils/ticket-template'
 
 class EscPosBuilder {
   private buffer: number[] = []
@@ -250,7 +250,7 @@ export const printerService = {
             break
 
           case 'qr':
-            builder.qrCode(block.code || ticket.ticketNumber || 'LOTERIA', 384, block.leadingSpaces || 0)
+            builder.qrCode(block.code || generateTicketQrHash(ticket) || 'LOTERIA', paperDots, block.leadingSpaces || 0)
             break
 
           case 'empty':

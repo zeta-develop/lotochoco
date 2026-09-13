@@ -19,10 +19,10 @@ Vendedor: {{vendorName}}
 --------------------------------
 **TOTAL: {{currency}} {{total}}**
 --------------------------------
-[QR]
-Premio valido por 7 dias
 Valido para 1 sorteo
-Por favor revise su ticket`
+Por favor revise su boleto
+Premio valido por 7 dias
+[QR]`
 
 export const MOCK_PREVIEW_TICKET: Ticket = {
   id: 'preview-ticket-001',
@@ -86,6 +86,7 @@ export interface ResolvedTicketData {
     game: string
     currency: string
   }>
+  qrCode?: string
 }
 
 export type TicketLike = {
@@ -148,6 +149,8 @@ export function resolveTicketData(
     }
   })
 
+  const qrCode = generateTicketQrHash(ticket)
+
   return {
     businessName,
     ticketNumber,
@@ -161,8 +164,38 @@ export function resolveTicketData(
     client,
     ticketMessage,
     receiptType: isReprint || (ticket as any).isReprint ? '*** COPIA REIMPRESA ***' : '',
-    items: resolvedItems
+    items: resolvedItems,
+    qrCode
   }
+}
+
+export function generateTicketQrHash(ticket: TicketLike): string {
+  if ((ticket as any).qrCode) {
+    return (ticket as any).qrCode
+  }
+
+  if (ticket.id) {
+    const cleanId = ticket.id.replace(/-/g, '').toUpperCase()
+    if (cleanId.length === 32 && /^[0-9A-F]{32}$/i.test(cleanId)) {
+      return cleanId
+    }
+  }
+
+  // Generar un hash determinista de 32 caracteres hexadecimales estilo token de lotería
+  const seed = `${ticket.ticketNumber || 'PREVIEW'}-${ticket.createdAt ? new Date(ticket.createdAt).getTime() : '0'}-${ticket.totalAmount || 0}`
+  let h1 = 0x5ba088ec, h2 = 0xfb584764, h3 = 0x8be07b22, h4 = 0xc9543667
+  for (let i = 0; i < seed.length; i++) {
+    const ch = seed.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+    h3 = Math.imul(h3 ^ ch, 3812015801)
+    h4 = Math.imul(h4 ^ ch, 2718281829)
+  }
+  const hex1 = (h1 >>> 0).toString(16).padStart(8, '0').toUpperCase()
+  const hex2 = (h2 >>> 0).toString(16).padStart(8, '0').toUpperCase()
+  const hex3 = (h3 >>> 0).toString(16).padStart(8, '0').toUpperCase()
+  const hex4 = (h4 >>> 0).toString(16).padStart(8, '0').toUpperCase()
+  return `${hex1}${hex2}${hex3}${hex4}`
 }
 
 export interface TextSegment {
@@ -342,7 +375,7 @@ export function parseTemplateToBlocks(
     // QR Code
     if (/(\[QR\]|{{qrCode}})/i.test(trimmed)) {
       const leadingSpaces = line.match(/^(\s*)/)?.[1].length || 0
-      blocks.push({ type: 'qr', code: data.ticketNumber, leadingSpaces })
+      blocks.push({ type: 'qr', code: data.qrCode || data.ticketNumber, leadingSpaces })
       continue
     }
 
@@ -415,7 +448,7 @@ export function parseTemplateToBlocks(
 
   // Asegurar que el ticket siempre tenga código QR al final para validación/escaneo
   if (!blocks.some(b => b.type === 'qr')) {
-    blocks.push({ type: 'qr', code: data.ticketNumber })
+    blocks.push({ type: 'qr', code: data.qrCode || data.ticketNumber })
   }
 
   return blocks
