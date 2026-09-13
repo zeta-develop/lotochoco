@@ -20,3 +20,4 @@ ignore
 *.pem
 .env
 graphify-out/
+.stitch_designs/

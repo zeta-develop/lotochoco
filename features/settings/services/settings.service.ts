@@ -2,35 +2,37 @@ import { dbEvents } from '@/lib/events'
 import { settingsRepository } from '../repositories/settings.repository'
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  businessName: 'Lotería La Fortuna',
+  businessName: 'LOTERIA',
   currency: 'C$',
   ticketMessage: '¡Buena suerte! Gracias por su compra.',
   ticketFontSize: 'normal',
   ticketFontType: 'A',
   ticketDensity: '1',
   ticketWidth: '58mm',
+  vendorName: 'Yamileth',
   ticketTemplate: `# {{businessName}}
-**Juego:** {{gameName}}
-**Venta No:** {{ticketNumber}}
-**Fecha:** {{date}}
-**Sorteo:** {{scheduleName}}
-
-{{#if client}}* **Cliente:** {{client}}{{/if}}
-* **Vendedor:** {{vendorName}}
-* **Puesto:** {{terminalName}}
-
 --------------------------------
-APUESTA    MONTO    PREMIO
+{{receiptType}}
+Folio: {{ticketNumber}}
+Fecha: {{date}}
+Juego: {{gameName}}
+Sorteo: {{scheduleName}}
+{{#if client}}Cliente: {{client}}
+{{/if}}Vendedor: {{vendorName}}
+--------------------------------
+Apuesta         Monto     Premio
 --------------------------------
 {{#items}}
-{{number}}         {{amount}}       {{prize}}
+{{number}}               {{amount}}         {{prize}}
 {{/items}}
 --------------------------------
-**Total: {{currency}}{{total}}**
+**TOTAL: {{currency}} {{total}}**
 
-*Válido para 1 sorteo*
-*Por favor revise su ticket*
-*Premio válido por 7 días*`
+Valido para 1 sorteo
+Por favor revise su boleto
+Premio valido por 7 dias
+
+[QR]`
 }
 
 export const settingsService = {

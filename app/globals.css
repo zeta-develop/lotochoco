@@ -163,3 +163,53 @@
     line-height: 1.3;
   }
 }
+
+/* ================= LOTOCHOCO POS STITCH DESIGN ENHANCEMENTS ================= */
+.active-glow {
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+}
+.amber-glow {
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.28);
+}
+.cyan-glow {
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.25);
+}
+
+/* Serrated thermal paper edges */
+.thermal-rip-top {
+  background-image: radial-gradient(circle at 6px -2px, transparent 6px, #ffffff 6px);
+  background-size: 12px 10px;
+  background-repeat: repeat-x;
+}
+
+.thermal-rip-bottom {
+  background-image: radial-gradient(circle at 6px 12px, transparent 6px, #ffffff 6px);
+  background-size: 12px 10px;
+  background-repeat: repeat-x;
+}
+
+/* Barcode pseudo-simulation lines */
+.barcode-line-group span {
+  display: inline-block;
+  height: 42px;
+  background-color: #0f172a;
+}
+
+/* Pulse animation for active broadcast / status */
+@keyframes emerald-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.15); }
+}
+.pulse-dot {
+  animation: emerald-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Hide scrollbars for POS touch carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

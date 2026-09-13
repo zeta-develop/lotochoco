@@ -20,7 +20,7 @@ import { useGamesManager } from '@/features/games/hooks/use-games-manager'
 import { useSettingsManager } from '@/features/settings/hooks/use-settings-manager'
 import { useCurrentSession } from '@/features/cash/hooks/use-cash-manager'
 import { printerService } from '@/features/settings/services/printer.service'
-import { formatTime12h, isDateGame, formatDateNumber, getDaysInMonth } from '@/lib/utils'
+import { formatTime12h, isDateGame, formatDateNumber, getDaysInMonth, cn } from '@/lib/utils'
 import {
   AlertCircle,
   Check,
@@ -33,7 +33,10 @@ import {
   X,
   Ticket,
   Gamepad2,
-  User
+  User,
+  Sparkles,
+  RotateCcw,
+  Delete
 } from 'lucide-react'
 import type { Game, Ticket as AppTicket, TicketItem } from '@/lib/types'
 import { CalendarDays } from 'lucide-react'
@@ -73,6 +76,24 @@ export function SalesTerminal() {
   const [dateDay, setDateDay] = useState('')
   const [dateMonth, setDateMonth] = useState('')
   const isCurrentGameDate = isDateGame(selectedGame?.digitCount || 0)
+
+  const quickAmounts = [10, 20, 50, 100, 200, 500]
+
+  const handleKeypadPress = (digit: string) => {
+    if (isCurrentGameDate) return
+    const maxLen = selectedGame?.digitCount || 2
+    if (number.length < maxLen) {
+      setNumber((prev) => prev + digit)
+    }
+  }
+
+  const handleKeypadClear = () => {
+    setNumber('')
+  }
+
+  const handleKeypadBackspace = () => {
+    setNumber((prev) => prev.slice(0, -1))
+  }
 
   useEffect(() => {
     if (games.length > 0 && !selectedGame) {
@@ -267,325 +288,432 @@ export function SalesTerminal() {
   }
 
   return (
-    <div className="space-y-8 pb-24 max-w-4xl mx-auto">
-      {/* Header Premium */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
-        <div className="space-y-1">
-          <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase px-3 py-0.5 rounded-full mb-2">Terminal de Venta</Badge>
-          <h1 className="text-4xl font-black tracking-tighter text-foreground">Nueva Jugada</h1>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest opacity-60">Registro de tickets y ventas directas</p>
+    <div className="space-y-4 pb-20 max-w-4xl mx-auto">
+      {/* Telemetry Status Bar */}
+      <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-[#10b981]">
+            <Gamepad2 className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-xs text-slate-100 uppercase tracking-tight">
+                {settings.businessName || 'LOTOCHOCO'} • {settings.terminalNumber || 'T-J081'}
+              </span>
+              <span className="w-2 h-2 rounded-full bg-[#10b981] pulse-dot"></span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+              <span>Terminal Activa</span>
+              <span>•</span>
+              <span className="text-[#10b981] font-bold">Papel OK</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="bg-[#060e20] px-2.5 py-1 rounded-xl border border-[#1e293b] flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-400">Total:</span>
+            <span className="font-mono text-xs text-[#10b981] font-bold">
+              {currency}{getCartTotal().toFixed(2)}
+            </span>
+          </div>
         </div>
       </div>
 
       {!isCashOpen && (
-        <div className="p-5 bg-orange-500/10 border-2 border-orange-500/20 rounded-2xl flex gap-4 animate-in fade-in slide-in-from-top-2">
-          <div className="bg-orange-500 h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-white"><AlertCircle /></div>
-          <p className="text-sm font-bold text-orange-700 dark:text-orange-400 leading-relaxed my-auto">
-            La caja registradora está <span className="font-black uppercase tracking-widest">cerrada</span>. Abre la caja en el panel de Estado para poder registrar ventas.
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3 animate-in fade-in">
+          <div className="bg-amber-500 text-slate-950 p-2 rounded-xl shrink-0">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <p className="text-xs font-bold text-amber-300">
+            La caja registradora está <span className="uppercase font-black">cerrada</span>. Abre la caja en el módulo de Caja para emitir ventas.
           </p>
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-5">
-        <div className="lg:col-span-3 space-y-6">
-          <Card className="border-none shadow-xl bg-card/40 rounded-3xl overflow-hidden animate-in fade-in slide-in-from-bottom-3">
-            <CardHeader className="bg-primary/5 pb-6 border-b border-primary/5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Gamepad2 className="h-5 w-5" /></div>
-                <CardTitle className="text-lg font-black uppercase tracking-tighter">Detalles de Jugada</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Juego</label>
-                  <select
-                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedGame?.id || ''}
-                    onChange={(event) => {
-                      const game = games.find((item) => item.id === event.target.value)
-                      if (game) handleGameSelect(game as any)
-                    }}
+      {/* Main Operator Layout (2-cols on desktop, 1-col on mobile) */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        {/* Left Column: Game selection, schedules, readout & tactile keypad */}
+        <div className="lg:col-span-3 space-y-3">
+          {/* GAME SELECTOR PILLS */}
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modalidad de Juego</span>
+              <span className="text-[10px] font-mono text-cyan-400">
+                {selectedGame?.name || 'Selecciona un juego'}
+              </span>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
+              {games.map((game) => {
+                const isSelected = selectedGame?.id === game.id
+                return (
+                  <button
+                    key={game.id}
+                    type="button"
                     disabled={isLocked}
-                  >
-                    {games.map((game) => (
-                      <option key={game.id} value={game.id}>
-                        {game.name} ({game.digitCount} dígito{game.digitCount > 1 ? 's' : ''})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Horario</label>
-                  <select
-                    className="h-14 w-full rounded-2xl border-2 border-muted bg-background px-4 text-sm font-bold focus:border-primary transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={selectedSchedule?.id || ''}
-                    onChange={(event) => {
-                      const schedule = selectedGame?.schedules?.find((item) => item.id === event.target.value)
-                      setSelectedSchedule(schedule || null)
-                      if (schedule) {
-                        updateAllCartItems({ schedule: schedule.time, scheduleName: schedule.name })
-                        toast({ title: `Horario actualizado a ${schedule.name}` })
-                      }
-                    }}
-                    disabled={!selectedGame || !selectedGame.schedules?.length || isLocked}
-                  >
-                    {selectedGame?.schedules?.length ? (
-                      selectedGame.schedules.map((schedule) => (
-                        <option key={schedule.id} value={schedule.id}>
-                          {schedule.name} - {formatTime12h(schedule.time)}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">Sin horarios configurados</option>
+                    onClick={() => handleGameSelect(game as any)}
+                    className={cn(
+                      "flex-shrink-0 rounded-xl px-3 py-2 flex flex-col items-start border transition-all active:scale-95 text-left min-w-[100px]",
+                      isSelected
+                        ? "bg-[#10b981] text-slate-950 border-[#10b981] active-glow font-bold shadow-md"
+                        : "bg-[#060e20] text-slate-300 hover:bg-[#1e293b] border-[#1e293b] hover:text-white"
                     )}
-                  </select>
-                </div>
-              </div>
+                  >
+                    <span className="text-xs font-black leading-tight truncate w-full">{game.name}</span>
+                    <span className={cn("text-[9px] font-mono mt-0.5", isSelected ? "text-slate-900" : "text-slate-400")}>
+                      {isDateGame(game.digitCount) ? 'DÍA / MES' : `${game.digitCount} DÍGITO${game.digitCount > 1 ? 'S' : ''}`}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-3">
-                  {isCurrentGameDate ? (
-                    <>
-                      <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3" /> Fecha Jugada
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-bold uppercase tracking-widest ml-1 text-muted-foreground/60">Día</label>
-                          <select
-                            value={dateDay}
-                            onChange={(e) => setDateDay(e.target.value)}
-                            className="h-16 w-full rounded-2xl border-2 border-muted bg-background px-3 text-center text-2xl font-black focus:border-primary transition-all outline-none"
-                          >
-                            <option value="">--</option>
-                            {Array.from({ length: getDaysInMonth(parseInt(dateMonth) || 12) }, (_, i) => i + 1).map(d => (
-                              <option key={d} value={d.toString().padStart(2, '0')}>
-                                {d.toString().padStart(2, '0')}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-bold uppercase tracking-widest ml-1 text-muted-foreground/60">Mes</label>
-                          <select
-                            value={dateMonth}
-                            onChange={(e) => {
-                              setDateMonth(e.target.value)
-                              // Ajustar día si excede los días del nuevo mes
-                              const maxDays = getDaysInMonth(parseInt(e.target.value) || 12)
-                              if (parseInt(dateDay) > maxDays) setDateDay(maxDays.toString().padStart(2, '0'))
-                            }}
-                            className="h-16 w-full rounded-2xl border-2 border-muted bg-background px-3 text-center text-lg font-black focus:border-primary transition-all outline-none"
-                          >
-                            <option value="">--</option>
-                            {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
-                              <option key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
-                                {m}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      {dateDay && dateMonth && (
-                        <div className="text-center py-2 bg-primary/5 rounded-xl border border-primary/10">
-                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Fecha: </span>
-                          <span className="text-lg font-black text-primary">{formatDateNumber(dateDay.padStart(2, '0') + dateMonth.padStart(2, '0'))}</span>
-                        </div>
+          {/* DRAW SCHEDULE SELECTOR */}
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sorteos Programados</span>
+              <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {selectedSchedule ? `${selectedSchedule.name} (${formatTime12h(selectedSchedule.time)})` : 'Sin horario'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+              {selectedGame?.schedules && selectedGame.schedules.length > 0 ? (
+                selectedGame.schedules.map((schedule) => {
+                  const isSelected = selectedSchedule?.id === schedule.id
+                  return (
+                    <button
+                      key={schedule.id}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => {
+                        setSelectedSchedule(schedule)
+                        updateAllCartItems({ schedule: schedule.time, scheduleName: schedule.name })
+                        toast({ title: `Horario: ${schedule.name}` })
+                      }}
+                      className={cn(
+                        "rounded-xl p-2 flex flex-col items-center border transition-all active:scale-95 text-center relative overflow-hidden",
+                        isSelected
+                          ? "bg-[#171f33] border-2 border-amber-400 amber-glow text-white font-bold"
+                          : "bg-[#060e20] border-[#1e293b] text-slate-300 hover:bg-[#171f33] hover:text-white"
                       )}
-                    </>
-                  ) : (
-                    <>
-                      <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Número Jugado</label>
-                      <Input
-                        value={number}
-                        onChange={(event) =>
-                          setNumber(event.target.value.replace(/\D/g, '').slice(0, selectedGame?.digitCount || 2))
-                        }
-                        placeholder={`Ingrese ${selectedGame?.digitCount || 2} dígitos`}
-                        className="h-16 text-center text-3xl font-black rounded-2xl border-2 border-muted focus:border-primary transition-all tracking-[0.25em]"
-                        inputMode="numeric"
-                        maxLength={selectedGame?.digitCount || 2}
-                      />
-                    </>
-                  )}
+                    >
+                      <span className="text-xs font-mono font-bold">{formatTime12h(schedule.time)}</span>
+                      <span className={cn("text-[9px] truncate mt-0.5", isSelected ? "text-amber-400 font-bold" : "text-slate-400")}>
+                        {schedule.name}
+                      </span>
+                    </button>
+                  )
+                })
+              ) : (
+                <div className="col-span-4 py-2 text-center text-xs text-slate-400 font-mono">
+                  Sin horarios asignados a este juego
                 </div>
+              )}
+            </div>
+          </div>
 
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Monto de Apuesta ({currency})</label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-5 font-black text-muted-foreground">{currency}</div>
-                    <Input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={amount}
-                      onChange={(event) => setAmount(Number(event.target.value) || 0)}
-                      className="h-16 pl-10 text-2xl font-black rounded-2xl border-2 border-muted focus:border-primary transition-all"
-                    />
+          {/* LIVE READOUT DISPLAY CARD */}
+          <div className="bg-[#131b2e] rounded-2xl p-3 border border-[#1e293b] shadow-lg relative overflow-hidden space-y-3">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Número Jugado
+                </span>
+                <span className="text-xs font-mono text-cyan-400 font-semibold">
+                  {selectedGame?.name} • {selectedSchedule?.name || 'Sorteo'}
+                </span>
+              </div>
+              <div className="bg-[#10b981]/15 border border-[#10b981]/40 px-2 py-0.5 rounded-full flex items-center gap-1 text-[#10b981]">
+                <Sparkles className="h-3 w-3" />
+                <span className="text-[10px] font-mono font-bold">Paga {selectedGame?.multiplier || 70}x</span>
+              </div>
+            </div>
+
+            {/* Readout Display & Action */}
+            {isCurrentGameDate ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] font-mono font-bold uppercase text-slate-400 block mb-1">Día</label>
+                    <select
+                      value={dateDay}
+                      onChange={(e) => setDateDay(e.target.value)}
+                      className="h-12 w-full rounded-xl border border-[#1e293b] bg-[#060e20] text-center text-lg font-mono font-black text-white focus:border-[#10b981] outline-none"
+                    >
+                      <option value="">--</option>
+                      {Array.from({ length: getDaysInMonth(parseInt(dateMonth) || 12) }, (_, i) => i + 1).map(d => (
+                        <option key={d} value={d.toString().padStart(2, '0')}>
+                          {d.toString().padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-mono font-bold uppercase text-slate-400 block mb-1">Mes</label>
+                    <select
+                      value={dateMonth}
+                      onChange={(e) => {
+                        setDateMonth(e.target.value)
+                        const maxDays = getDaysInMonth(parseInt(e.target.value) || 12)
+                        if (parseInt(dateDay) > maxDays) setDateDay(maxDays.toString().padStart(2, '0'))
+                      }}
+                      className="h-12 w-full rounded-xl border border-[#1e293b] bg-[#060e20] text-center text-xs font-mono font-black text-white focus:border-[#10b981] outline-none"
+                    >
+                      <option value="">--</option>
+                      {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                        <option key={i + 1} value={(i + 1).toString().padStart(2, '0')}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Nombre del Cliente (opcional)</label>
-                <div className="relative group">
-                  <div className="absolute top-4 left-4 text-muted-foreground group-focus-within:text-primary"><User size={20} /></div>
-                  <Input
-                    value={client}
-                    onChange={(event) => setClient(event.target.value)}
-                    placeholder="Identificador del cliente..."
-                    className="h-14 pl-12 rounded-2xl border-2 border-muted focus:border-primary transition-all font-bold"
-                  />
+                {dateDay && dateMonth && (
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-[#060e20] border border-[#1e293b]">
+                    <span className="text-[10px] font-mono text-slate-400">Fecha: <strong className="text-white">{formatDateNumber(dateDay.padStart(2, '0') + dateMonth.padStart(2, '0'))}</strong></span>
+                    <Button
+                      onClick={handleAddToCart}
+                      disabled={!selectedGame || !selectedSchedule || !dateDay || !dateMonth || amount <= 0 || !isCashOpen || cart.length >= 15}
+                      className="h-10 bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 font-black text-xs px-4 rounded-xl active-glow"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      + Agregar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-16 rounded-2xl bg-[#060e20] border-2 border-[#10b981] active-glow flex items-center justify-center">
+                    <span className="font-mono text-3xl font-black text-[#10b981] tracking-tighter">
+                      {number || '--'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Premio Estimado</span>
+                    <span className="font-mono text-base font-black text-[#10b981]">
+                      {currency}{((amount || 0) * (selectedGame?.multiplier || 70)).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <Button
-                size="lg"
-                className="h-14 w-full text-sm font-black uppercase tracking-tighter rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95"
-                onClick={handleAddToCart}
-                disabled={!selectedGame || !selectedSchedule || (!isCurrentGameDate && !number) || (isCurrentGameDate && (!dateDay || !dateMonth)) || amount <= 0 || !isCashOpen || cart.length >= 15}
-              >
-                <Plus className="mr-2 h-5 w-5" />
-                Añadir al Ticket
-              </Button>
-            </CardContent>
-          </Card>
+                <Button
+                  onClick={handleAddToCart}
+                  disabled={!selectedGame || !selectedSchedule || !number || amount <= 0 || !isCashOpen || cart.length >= 15}
+                  className="h-12 bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 font-black text-xs px-4 rounded-xl active-glow shadow-lg transition-transform active:scale-95"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  + Agregar
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* QUICK AMOUNT CHIPS */}
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Monto de Apuesta ({currency})
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono text-slate-400">C$</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                  className="w-16 h-7 rounded-lg bg-[#060e20] border border-[#1e293b] text-center font-mono font-bold text-xs text-white outline-none focus:border-[#10b981]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-6 gap-1.5">
+              {quickAmounts.map((q) => {
+                const isSelected = amount === q
+                return (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => setAmount(q)}
+                    className={cn(
+                      "py-2 rounded-xl font-mono text-xs font-bold border transition-all active:scale-95",
+                      isSelected
+                        ? "bg-[#10b981] text-slate-950 border-[#10b981] active-glow"
+                        : "bg-[#060e20] text-slate-300 hover:bg-[#1e293b] border-[#1e293b]"
+                    )}
+                  >
+                    {q}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* TACTILE 3x4 KEYPAD */}
+          {!isCurrentGameDate && (
+            <div className="bg-[#131b2e] rounded-2xl p-2.5 border border-[#1e293b] space-y-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                  <button
+                    key={digit}
+                    type="button"
+                    onClick={() => handleKeypadPress(digit)}
+                    className="h-12 bg-[#060e20] hover:bg-[#171f33] active:bg-[#10b981]/20 text-white font-mono text-lg font-black rounded-xl border border-[#1e293b] flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                  >
+                    {digit}
+                  </button>
+                ))}
+
+                {/* Clear */}
+                <button
+                  type="button"
+                  onClick={handleKeypadClear}
+                  className="h-12 bg-[#060e20] hover:bg-[#171f33] text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Limpiar</span>
+                </button>
+
+                {/* Zero */}
+                <button
+                  type="button"
+                  onClick={() => handleKeypadPress('0')}
+                  className="h-12 bg-[#060e20] hover:bg-[#171f33] active:bg-[#10b981]/20 text-white font-mono text-lg font-black rounded-xl border border-[#1e293b] flex items-center justify-center active:scale-95 transition-all shadow-sm"
+                >
+                  0
+                </button>
+
+                {/* Backspace */}
+                <button
+                  type="button"
+                  onClick={handleKeypadBackspace}
+                  className="h-12 bg-[#060e20] hover:bg-[#171f33] text-red-400 font-bold text-xs rounded-xl border border-red-500/30 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                >
+                  <Delete className="h-4 w-4" />
+                  <span>Borrar</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Client Input */}
+          <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-2.5 flex items-center gap-2">
+            <User className="h-4 w-4 text-slate-400 ml-1 shrink-0" />
+            <Input
+              value={client}
+              onChange={(e) => setClient(e.target.value)}
+              placeholder="Cliente (opcional)..."
+              className="h-9 bg-[#060e20] border-[#1e293b] text-xs font-bold text-white placeholder:text-slate-500 rounded-xl"
+            />
+          </div>
         </div>
 
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-none shadow-xl bg-card/40 rounded-3xl overflow-hidden flex flex-col h-full animate-in fade-in slide-in-from-bottom-4">
-            <CardHeader className="bg-primary/5 pb-4 border-b border-primary/5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Ticket className="h-5 w-5" /></div>
-                <CardTitle className="text-lg font-black uppercase tracking-tighter">Ticket Actual</CardTitle>
-                <Badge className="ml-auto bg-primary text-white border-none rounded-full px-3">{cart.length}/15</Badge>
+        {/* Right Column: Live Ticket Drawer / Receipt Preview & Checkout */}
+        <div className="lg:col-span-2 space-y-3">
+          <Card className="border border-[#1e293b] shadow-xl bg-[#131b2e] rounded-2xl overflow-hidden flex flex-col h-full">
+            <CardHeader className="bg-[#060e20] py-3 px-4 border-b border-[#1e293b]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-[#10b981]" />
+                  <CardTitle className="text-xs font-black uppercase tracking-wider text-slate-100">
+                    Ticket en Curso
+                  </CardTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/40 font-mono text-[10px] font-bold">
+                    {cart.length}/15
+                  </Badge>
+                  {cart.length > 0 && (
+                    <button
+                      onClick={clearCart}
+                      className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5"
+                      type="button"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Vaciar
+                    </button>
+                  )}
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-3 space-y-1.5">
+
+            <CardContent className="flex-1 overflow-y-auto p-3 space-y-2 min-h-[180px] max-h-[360px]">
               {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
-                  <div className="p-4 bg-muted/50 rounded-full"><ShoppingCart className="h-8 w-8 opacity-30" /></div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">El ticket está vacío</p>
+                <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-500">
+                  <ShoppingCart className="h-8 w-8 opacity-40" />
+                  <p className="text-[10px] font-mono uppercase tracking-wider">Sin jugadas añadidas</p>
                 </div>
-              ) : cart.length <= 4 ? (
-                /* Vista detallada para pocas jugadas (1-4) */
-                cart.map((item) => (
-                  <div key={item.id} className="group flex flex-col gap-1.5 rounded-2xl border-2 border-muted bg-background p-3 transition-all hover:border-primary/30 shadow-sm relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                    <div className="flex items-center justify-between">
-                      <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase">
-                        {item.gameName}
-                      </Badge>
+              ) : (
+                cart.map((item) => {
+                  const prize = (item.amount || 0) * (item.multiplier || 0)
+                  return (
+                    <div
+                      key={item.id}
+                      className="group flex items-center justify-between p-2 rounded-xl bg-[#060e20] border border-[#1e293b] hover:border-[#10b981]/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-lg bg-[#10b981]/15 border border-[#10b981]/40 text-[#10b981] flex items-center justify-center font-mono text-sm font-black">
+                          {item.number.length === 4 ? formatDateNumber(item.number, true) : item.number}
+                        </span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-200">
+                            {item.gameName} • <span className="font-mono text-[#10b981]">{currency}{item.amount.toFixed(0)}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {item.scheduleName} • Gana: {currency}{prize.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-colors"
                         onClick={() => handleRemoveFromCart(item.id)}
+                        className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                          <Clock className="h-2.5 w-2.5" /> {item.scheduleName}
-                        </div>
-                        <div className="font-mono text-2xl font-black text-foreground">
-                          {item.number.length === 4 ? formatDateNumber(item.number) : item.number}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-black text-primary">
-                          {currency}{item.amount.toFixed(2)}
-                        </div>
-                        <div className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
-                          Gana: {currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                /* Vista compacta tipo tabla para muchas jugadas (5-15) */
-                <div className="space-y-0.5">
-                  {/* Encabezado de tabla */}
-                  <div className="grid grid-cols-12 gap-1 px-2 py-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground border-b border-muted">
-                    <div className="col-span-3">Juego</div>
-                    <div className="col-span-3 text-center">Número</div>
-                    <div className="col-span-2 text-right">Monto</div>
-                    <div className="col-span-3 text-right">Premio</div>
-                    <div className="col-span-1"></div>
-                  </div>
-                  {cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group grid grid-cols-12 gap-1 items-center px-2 py-1.5 rounded-xl hover:bg-muted/30 transition-colors border border-transparent hover:border-primary/10"
-                    >
-                      <div className="col-span-3 min-w-0">
-                        <div className="text-[10px] font-black text-foreground truncate">{item.gameName}</div>
-                        <div className="text-[8px] font-bold text-muted-foreground flex items-center gap-0.5">
-                          <Clock className="h-2 w-2 shrink-0" /> {item.scheduleName}
-                        </div>
-                      </div>
-                      <div className="col-span-3 text-center">
-                        <span className="font-mono text-sm font-black text-foreground">
-                          {item.number.length === 4 ? formatDateNumber(item.number, true) : item.number}
-                        </span>
-                      </div>
-                      <div className="col-span-2 text-right">
-                        <span className="text-xs font-black text-primary">{currency}{item.amount.toFixed(0)}</span>
-                      </div>
-                      <div className="col-span-3 text-right">
-                        <span className="text-[10px] font-bold text-muted-foreground">{currency}{((item.amount || 0) * (item.multiplier || 0)).toLocaleString()}</span>
-                      </div>
-                      <div className="col-span-1 flex justify-end">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                          onClick={() => handleRemoveFromCart(item.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Indicador de límite */}
-              {cart.length >= 15 && (
-                <div className="text-center py-2 bg-orange-500/10 border border-orange-500/20 rounded-xl">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400">Límite de 15 jugadas alcanzado</p>
-                </div>
+                  )
+                })
               )}
             </CardContent>
 
-            <div className="border-t-2 border-dashed border-muted p-4 space-y-4 bg-muted/10">
-              <div className="flex items-center justify-between font-black uppercase tracking-tighter">
-                <span className="text-sm">Total a Pagar</span>
-                <span className="text-2xl text-primary">{currency}{getCartTotal().toFixed(2)}</span>
+            {/* Total and Checkout Strip */}
+            <div className="border-t border-[#1e293b] p-3 bg-[#060e20] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Total a Pagar
+                </span>
+                <span className="font-mono text-2xl font-black text-[#10b981]">
+                  {currency}{getCartTotal().toFixed(2)}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={clearCart} 
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={clearCart}
                   disabled={cart.length === 0}
-                  className="h-12 rounded-2xl font-black uppercase text-[10px] border-2 shadow-sm"
+                  className="h-11 bg-[#131b2e] border-[#1e293b] text-slate-300 hover:text-white rounded-xl text-xs font-bold"
                 >
-                  <X className="mr-2 h-4 w-4" />
+                  <X className="h-4 w-4 mr-1" />
                   Descartar
                 </Button>
-                <Button 
-                  onClick={() => setShowConfirmDialog(true)} 
+
+                <Button
+                  onClick={() => setShowConfirmDialog(true)}
                   disabled={cart.length === 0 || !isCashOpen}
-                  className="h-12 rounded-2xl font-black uppercase text-[11px] shadow-xl shadow-primary/20 active:scale-95 transition-all"
+                  className="h-11 bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 font-black text-xs rounded-xl active-glow shadow-lg active:scale-95 transition-all"
                 >
-                  <Check className="mr-2 h-4 w-4" />
-                  Imprimir Venta
+                  <Printer className="h-4 w-4 mr-1" />
+                  Verificar (F2)
                 </Button>
               </div>
             </div>
@@ -593,23 +721,31 @@ export function SalesTerminal() {
         </div>
       </div>
 
+      {/* Success Dialog */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="rounded-3xl border-none shadow-2xl sm:max-w-sm p-0 overflow-hidden text-center">
+        <DialogContent className="rounded-3xl border border-[#1e293b] bg-[#0b1326] shadow-2xl sm:max-w-sm p-0 overflow-hidden text-center text-slate-100">
           <DialogTitle className="sr-only">Venta Exitosa</DialogTitle>
-          <div className="p-10 flex flex-col items-center justify-center gap-4">
-            <div className="h-16 w-16 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/30">
-              <Check className="h-8 w-8" />
+          <div className="p-8 flex flex-col items-center justify-center gap-3">
+            <div className="h-14 w-14 bg-[#10b981]/20 border-2 border-[#10b981] rounded-full flex items-center justify-center text-[#10b981] active-glow">
+              <Check className="h-7 w-7" />
             </div>
             <DialogHeader className="text-center">
-              <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-green-700 dark:text-green-400">Ticket generado</DialogTitle>
-              <DialogDescription className="text-xs font-bold uppercase tracking-widest mt-1">La venta se registró correctamente.</DialogDescription>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight text-[#10b981]">
+                Venta Registrada
+              </DialogTitle>
+              <DialogDescription className="text-xs font-mono text-slate-400 mt-1">
+                Ticket emitido e impreso correctamente.
+              </DialogDescription>
             </DialogHeader>
           </div>
 
-          <div className="p-6 pt-0 bg-background">
+          <div className="p-4 pt-0">
             <DialogFooter className="w-full">
-              <Button onClick={() => setShowSuccessDialog(false)} className="w-full h-12 rounded-xl font-black uppercase text-[10px] shadow-lg">
-                Cerrar
+              <Button
+                onClick={() => setShowSuccessDialog(false)}
+                className="w-full h-11 rounded-xl bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 font-bold text-xs shadow-lg"
+              >
+                Continuar Venta
               </Button>
             </DialogFooter>
           </div>
@@ -618,3 +754,4 @@ export function SalesTerminal() {
     </div>
   )
 }
+

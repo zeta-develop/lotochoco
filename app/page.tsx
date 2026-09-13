@@ -51,7 +51,7 @@ export default function HomePage() {
       case "cash":
         return <CashRegister />;
       case "pyramid":
-        return <LuckyPyramid />;
+        return <LuckyPyramid onNavigate={(mod) => setActiveModule(mod as any)} />;
       case 'settings': return <SettingsManager />;
       default:
         return <Dashboard onNavigate={setActiveModule} />;

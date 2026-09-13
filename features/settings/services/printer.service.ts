@@ -68,13 +68,40 @@ class EscPosBuilder {
     return this
   }
 
+  qrCode(data: string, size: number = 6) {
+    // 1. GS ( k Function 165: Select QR model 2
+    this.buffer.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00)
+
+    // 2. GS ( k Function 167: Set QR module size (1-16, typical 5-6 for 58mm)
+    const moduleSize = Math.max(1, Math.min(16, size))
+    this.buffer.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize)
+
+    // 3. GS ( k Function 169: Set error correction level M (49 / 0x31)
+    this.buffer.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31)
+
+    // 4. GS ( k Function 180: Store data in symbol storage
+    const cleanData = (data || 'LOTERIA').normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const len = cleanData.length + 3
+    const pL = len & 0xFF
+    const pH = (len >> 8) & 0xFF
+
+    this.buffer.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30)
+    for (let i = 0; i < cleanData.length; i++) {
+      this.buffer.push(cleanData.charCodeAt(i))
+    }
+
+    // 5. GS ( k Function 181: Print symbol data in storage
+    this.buffer.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30)
+    return this
+  }
+
   build(): Uint8Array {
     return new Uint8Array(this.buffer)
   }
 }
 
 export const printerService = {
-  async printTicket(ticket: Ticket, settings: Record<string, string>): Promise<boolean> {
+  async printTicket(ticket: Ticket, settings: Record<string, string>, isReprint: boolean = false): Promise<boolean> {
     try {
       console.log('Iniciando impresión de ticket:', ticket.ticketNumber);
       
@@ -88,24 +115,6 @@ export const printerService = {
         console.error('No hay ID de dispositivo Bluetooth configurado');
         throw new Error('No hay impresora configurada')
       }
-
-      const template = settings.ticketTemplate || `# {{businessName}}
-RECIBO DE VENTA
---------------------------------
-TICKET: #{{ticketNumber}}
-FECHA: {{date}}
-{{#if client}}CLIENTE: {{client}}{{/if}}
---------------------------------
-JUEGO      NUM       MONTO
---------------------------------
-{{#items}}
-{{game}}  {{number}}  {{currency}}{{amount}}  Prem: {{currency}}{{prize}}
-{{/items}}
---------------------------------
-**TOTAL: {{currency}}{{total}}**
-
-{{ticketMessage}}
-*** CONSERVE ESTE TICKET ***`
 
       const builder = new EscPosBuilder()
       builder.init()
@@ -122,64 +131,78 @@ JUEGO      NUM       MONTO
       }
 
       const currency = settings.currency || 'C$'
-      const ticketMessage = settings.ticketMessage || '¡Gracias por su compra!'
-      const businessName = settings.businessName || 'LOTOCHOCO'
+      const businessName = (settings.businessName || 'LOTERIA').toUpperCase()
+      const vendorName = settings.vendorName || 'Yamileth'
+      const formattedDate = format(ticketDate, 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
       
-      // Obtener info del primer item para el encabezado si es necesario
       const firstItem = ticket.items?.[0] as any
-      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Diaria'
-      const scheduleSource = firstItem?.scheduleName || firstItem?.schedule || 'Sorteo'
-      const scheduleName = scheduleSource === 'Sorteo' ? scheduleSource : formatTime12h(scheduleSource)
-
-      let processed = template
-        .replace(/{{businessName}}/g, businessName)
-        .replace(/{{ticketNumber}}/g, ticket.ticketNumber || 'N/A')
-        .replace(/{{date}}/g, format(ticketDate, 'dd-MM-yyyy hh:mm:ss a', { locale: es }))
-        .replace(/{{gameName}}/g, gameName)
-        .replace(/{{scheduleName}}/g, scheduleName)
-        .replace(/{{vendorName}}/g, 'Yamileth') // TODO: Vincular con usuario real
-        .replace(/{{terminalName}}/g, '= J081 =') // TODO: Vincular con terminal real
-        .replace(/{{currency}}/g, currency)
-        .replace(/{{total}}/g, (ticket.totalAmount || 0).toFixed(0))
-        .replace(/{{ticketMessage}}/g, ticketMessage)
-        .replace(/{{#if client}}([\s\S]*?){{\/if}}/g, ticket.client ? `$1`.replace(/{{client}}/g, ticket.client.toUpperCase()) : '')
-        .replace(/{{client}}/g, ticket.client ? ticket.client.toUpperCase() : '')
-
-      const itemsRegex = /{{#items}}([\s\S]*?){{\/items}}/g
-      processed = processed.replace(itemsRegex, (match, content) => {
-        return (ticket.items || []).map(item => {
-          const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
-          const prizePotential = item.amount * multiplier
-
-          // Formateo de columnas simple (suponiendo 32 chars de ancho)
-          // APUESTA(10) MONTO(10) PREMIO(12)
-          return content
-            .replace(/{{game}}/g, (item as any).gameName || (item as any).game?.name || 'Diaria')
-            .replace(/{{number}}/g, (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number).padEnd(8))
-            .replace(/{{amount}}/g, item.amount.toFixed(0).padEnd(8))
-            .replace(/{{prize}}/g, prizePotential.toFixed(0).padStart(8))
-            .replace(/{{currency}}/g, currency)
-        }).join('\n')
-      })
-
-      const lines = processed.split('\n')
-      for (const line of lines) {
-        const trimmedLine = line.trim()
-        if (trimmedLine.startsWith('# ')) {
-          builder.alignCenter().doubleSize(true).bold(true).text(trimmedLine.replace('# ', '')).doubleSize(false).bold(false).newline()
-        } else if (trimmedLine.startsWith('## ')) {
-          builder.alignCenter().doubleHeight(true).bold(true).text(trimmedLine.replace('## ', '')).doubleHeight(false).bold(false).newline()
-        } else {
-          const parts = line.split('**')
-          for (let i = 0; i < parts.length; i++) {
-            if (i % 2 === 1) builder.bold(true)
-            builder.text(parts[i])
-            if (i % 2 === 1) builder.bold(false)
-          }
-          builder.newline()
-        }
+      const gameName = firstItem?.gameName || firstItem?.game?.name || 'Tica'
+      const rawSchedule = firstItem?.scheduleName || firstItem?.schedule || '7:30 pm'
+      let scheduleName = rawSchedule
+      try {
+        const formattedSch = formatTime12h(rawSchedule)
+        if (formattedSch) scheduleName = formattedSch.toLowerCase()
+      } catch {
+        scheduleName = rawSchedule
       }
-      
+
+      const receiptType = isReprint ? 'RECIBO DE COPIA' : 'RECIBO DE VENTA'
+      const separator = '--------------------------------'
+
+      // 1. ENCABEZADO
+      builder.alignCenter().bold(true).doubleHeight(true).text(businessName).doubleHeight(false).bold(false).newline()
+      builder.text(separator).newline()
+
+      // 2. METADATA (Centrado)
+      builder.text(receiptType).newline()
+      builder.text(`Folio: ${ticket.ticketNumber || 'N/A'}`).newline()
+      builder.text(`Fecha: ${formattedDate}`).newline()
+      builder.text(`Juego: ${gameName}`).newline()
+      builder.text(`Sorteo: ${scheduleName}`).newline()
+      if (ticket.client && ticket.client.trim()) {
+        builder.text(`Cliente: ${ticket.client.trim()}`).newline()
+      }
+      builder.text(`Vendedor: ${vendorName}`).newline()
+      builder.text(separator).newline()
+
+      // 3. TABLA DE APUESTAS (32 columnas estándar para 58mm)
+      builder.alignLeft().bold(true)
+      builder.text('Apuesta'.padEnd(16) + 'Monto'.padEnd(8) + 'Premio'.padStart(8)).newline()
+      builder.bold(false)
+      builder.text(separator).newline()
+
+      for (const item of (ticket.items || [])) {
+        const multiplier = (item as any).multiplier || (item as any).game?.multiplier || 70
+        const prize = item.amount * multiplier
+        const numStr = (item.number.length === 4 ? formatDateNumber(item.number, true) : item.number)
+        const amtStr = item.amount.toFixed(0)
+        const prizeStr = prize.toFixed(0)
+
+        const col1 = numStr.padEnd(16)
+        const col2 = amtStr.padEnd(8)
+        const col3 = prizeStr.padStart(8)
+        builder.text(`${col1}${col2}${col3}`).newline()
+      }
+
+      builder.text(separator).newline()
+
+      // 4. TOTAL (Centrado)
+      const totalStr = ticket.totalAmount % 1 === 0 
+        ? ticket.totalAmount.toFixed(0) 
+        : ticket.totalAmount.toFixed(2)
+
+      builder.alignCenter().bold(true)
+      builder.text(`TOTAL: ${currency} ${totalStr}`).bold(false).newline()
+      builder.newline()
+
+      // 5. TEXTO LEGAL (Centrado)
+      builder.text('Valido para 1 sorteo').newline()
+      builder.text('Por favor revise su boleto').newline()
+      builder.text('Premio valido por 7 dias').newline()
+      builder.newline()
+
+      // 6. CÓDIGO QR NATIVO ESC/POS
+      builder.qrCode(ticket.ticketNumber || 'LOTERIA', 6)
       builder.feed(4)
 
       console.log('Conectando a impresora:', deviceId);

@@ -1,8 +1,11 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import type { Ticket, TicketItem } from "@/lib/types";
 import { formatTime12h } from '@/lib/utils';
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import QRCode from "qrcode";
 
 interface TicketReceiptProps {
   ticket: Ticket & { items: (TicketItem & { game?: { name: string; multiplier?: number } })[] };
@@ -11,87 +14,135 @@ interface TicketReceiptProps {
 
 export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
   ({ ticket, settings }, ref) => {
-    const template = settings?.ticketTemplate || `# {{businessName}}
-RECIBO DE VENTA
---------------------------------
-TICKET: #{{ticketNumber}}
-FECHA: {{date}}
---------------------------------
-JUEGO      NUM       MONTO
---------------------------------
-{{#items}}
-{{game}}  {{number}}  {{currency}}{{amount}}
-{{/items}}
---------------------------------
-**TOTAL: {{currency}}{{total}}**
+    const [qrCodeUrl, setQrCodeUrl] = useState<string>('')
 
-{{ticketMessage}}
-*** CONSERVE ESTE TICKET ***`
-
-    const renderTemplate = (tpl: string) => {
-      let rendered = tpl
-        .replace(/{{businessName}}/g, settings?.businessName || 'LOTOCHOCO')
-        .replace(/{{ticketNumber}}/g, ticket.ticketNumber)
-        .replace(/{{date}}/g, new Date(ticket.createdAt).toLocaleString('es-NI', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }))
-        .replace(/{{currency}}/g, settings?.currency || 'C$')
-        .replace(/{{total}}/g, ticket.totalAmount.toFixed(2))
-        .replace(/{{ticketMessage}}/g, settings?.ticketMessage || '')
-        .replace(/{{#if client}}.*?{{\/if}}/g, ticket.client ? `CLIENTE: ${ticket.client.toUpperCase()}` : '')
-
-      const itemsRegex = /{{#items}}([\\s\\S]*?){{\/items}}/g
-      rendered = rendered.replace(itemsRegex, (match, content) => {
-        return ticket.items.map(item => {
-          const multiplier = (item as any).game?.multiplier || 70
-          const prizePotential = item.amount * multiplier
-
-          return content
-            .replace(/{{game}}/g, (item as any).game?.name || 'JUEGO')
-            .replace(/{{number}}/g, item.number)
-            .replace(/{{amount}}/g, item.amount.toFixed(0))
-            .replace(/{{prize}}/g, prizePotential.toFixed(0))
-        }).join('\\n')
+    useEffect(() => {
+      const code = ticket?.ticketNumber || 'LOTERIA'
+      QRCode.toDataURL(code, {
+        width: 140,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
       })
+        .then(setQrCodeUrl)
+        .catch((err) => console.error('Error generating QR code in receipt:', err))
+    }, [ticket?.ticketNumber])
 
-
-      return rendered.split('\n').map((line, i) => {
-        let content = line
-          .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
-          .replace(/_(.*?)_/g, '<em>$1</em>')
-        
-        let className = "text-xs font-mono leading-tight whitespace-pre-wrap break-all min-h-[1em]"
-        if (line.startsWith('# ')) {
-          className = "text-xl font-black text-center uppercase mb-1"
-          content = content.replace('# ', '')
-        } else if (line.startsWith('## ')) {
-          className = "text-base font-bold text-center uppercase mb-1"
-          content = content.replace('## ', '')
-        }
-
-        return (
-          <div key={i} className={className} dangerouslySetInnerHTML={{ __html: content || '&nbsp;' }} />
-        )
-      })
+    const businessName = settings?.businessName || 'LOTERIA'
+    const currency = settings?.currency || 'C$'
+    const firstItem = ticket.items?.[0]
+    const gameName = firstItem?.game?.name || 'Tica'
+    const rawSchedule = (firstItem as any)?.scheduleName || firstItem?.schedule || '7:30 pm'
+    let scheduleName = rawSchedule
+    try {
+      const formattedSch = formatTime12h(rawSchedule)
+      if (formattedSch) scheduleName = formattedSch.toLowerCase()
+    } catch {
+      scheduleName = rawSchedule
     }
 
-    const paperWidth = settings?.ticketWidth === '80mm' ? '300px' : '220px'
+    let formattedDate = ''
+    try {
+      const d = ticket.createdAt ? new Date(ticket.createdAt) : new Date()
+      formattedDate = format(d, 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
+    } catch {
+      formattedDate = format(new Date(), 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
+    }
+
+    const paperWidth = settings?.ticketWidth === '80mm' ? '300px' : '260px'
 
     return (
       <div
         ref={ref}
-        className="bg-white text-black p-6 font-mono mx-auto w-full max-w-[320px] print:w-[58mm] print:p-0"
+        className="bg-white text-black p-4 font-mono mx-auto w-full max-w-[320px] print:w-[58mm] print:p-0"
       >
         <div 
           style={{ width: paperWidth }}
-          className="border-2 border-black/5 p-4 rounded-sm shadow-inner bg-slate-50/50 mx-auto print:bg-transparent print:border-none print:shadow-none print:p-0 print:w-full"
+          className="p-3 bg-white text-black mx-auto print:p-0 print:w-full font-mono text-[12px] leading-snug"
         >
-          {renderTemplate(template)}
+          {/* Header */}
+          <div className="text-center font-bold text-base tracking-wider uppercase text-black">
+            {businessName}
+          </div>
+
+          {/* Separator */}
+          <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+            --------------------------------
+          </div>
+
+          {/* Metadata (Centrado) */}
+          <div className="text-center space-y-0.5 text-xs text-black font-mono">
+            <div className="font-bold text-[13px]">
+              RECIBO DE VENTA
+            </div>
+            <div>Folio: {ticket.ticketNumber}</div>
+            <div>Fecha: {formattedDate}</div>
+            <div>Juego: {gameName}</div>
+            <div>Sorteo: {scheduleName}</div>
+            {ticket.client ? (
+              <div>Cliente: {ticket.client}</div>
+            ) : null}
+            <div>Vendedor: {settings?.vendorName || 'Yamileth'}</div>
+          </div>
+
+          {/* Separator */}
+          <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+            --------------------------------
+          </div>
+
+          {/* Column Header */}
+          <div className="flex justify-between items-center text-xs font-bold text-black font-mono px-1">
+            <span className="w-1/3 text-left">Apuesta</span>
+            <span className="w-1/3 text-center">Monto</span>
+            <span className="w-1/3 text-right">Premio</span>
+          </div>
+
+          {/* Separator */}
+          <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+            --------------------------------
+          </div>
+
+          {/* Items */}
+          <div className="space-y-1 my-1 px-1">
+            {ticket.items.map((item, index) => {
+              const multiplier = item.game?.multiplier || 70
+              const prize = item.amount * multiplier
+              return (
+                <div key={index} className="flex justify-between items-center text-xs font-mono text-black">
+                  <span className="w-1/3 text-left font-bold">{item.number}</span>
+                  <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
+                  <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Separator */}
+          <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+            --------------------------------
+          </div>
+
+          {/* Total */}
+          <div className="text-center font-bold text-base text-black font-mono my-2.5 tracking-wide">
+            TOTAL: {currency} {ticket.totalAmount % 1 === 0 ? ticket.totalAmount.toFixed(0) : ticket.totalAmount.toFixed(2)}
+          </div>
+
+          {/* Legal / Disclaimers */}
+          <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-3">
+            <div>Valido para 1 sorteo</div>
+            <div>Por favor revise su boleto</div>
+            <div>Premio valido por 7 dias</div>
+          </div>
+
+          {/* Native QR Code Display */}
+          {qrCodeUrl && (
+            <div className="flex justify-center my-3">
+              <img src={qrCodeUrl} alt="QR Code" className="w-28 h-28 object-contain" />
+            </div>
+          )}
         </div>
       </div>
     );

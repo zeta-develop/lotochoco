@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import QRCode from 'qrcode'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Check, Printer, Repeat, Share2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, Printer, Repeat, Share2, Trash2, ShieldCheck } from 'lucide-react'
+import { formatTime12h } from '@/lib/utils'
 import type { CartItem } from '../domain/types'
 import type { Ticket, TicketItem, Game } from '@/lib/types'
 
@@ -101,23 +103,60 @@ export function PurchaseVerification({
     [cart, ticket]
   )
 
-  // Metadata de compra (solo modo view con ticket)
+  const totalMaxPrize = useMemo(
+    () => items.reduce((sum, item) => sum + (item.amount || 0) * (item.multiplier || 0), 0),
+    [items]
+  )
+
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('')
+
+  // Metadata de compra (formato exacto de recibo térmico)
   const purchaseMeta = useMemo(() => {
-    if (!ticket) return null
-    const firstItem = ticket.items?.[0]
-    const gameName = firstItem?.game?.name || 'Juego'
-    const scheduleName = firstItem?.schedule || firstItem?.game?.schedules?.[0]?.name || 'Sorteo'
-    const ticketNumber = ticket.ticketNumber || 'N/A'
-    const ticketDate = format(new Date(ticket.createdAt), "dd/MM/yyyy '·' hh:mm a", { locale: es })
-    const clientName = ticket.client || '-'
+    const firstItem = items[0]
+    const gameName = firstItem?.gameName || 'Tica'
+
+    const rawSchedule = firstItem?.scheduleName || '7:30 pm'
+    let scheduleName = rawSchedule
+    try {
+      const formatted = formatTime12h(rawSchedule)
+      if (formatted) scheduleName = formatted.toLowerCase()
+    } catch {
+      scheduleName = rawSchedule
+    }
+
+    const ticketNumber = ticket?.ticketNumber || 'PREVIEW'
+
+    let ticketDate = ''
+    try {
+      const d = ticket?.createdAt ? new Date(ticket.createdAt) : new Date()
+      ticketDate = format(d, 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
+    } catch {
+      ticketDate = format(new Date(), 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
+    }
+
+    const clientName = ticket?.client?.trim() || ''
     const finalVendorName = vendorName || 'Yamileth'
     const finalTerminalName = terminalName || '= J081 ='
     return { gameName, scheduleName, ticketNumber, ticketDate, clientName, vendorName: finalVendorName, terminalName: finalTerminalName }
-  }, [ticket, vendorName, terminalName])
+  }, [ticket, items, vendorName, terminalName])
 
-  // Información agrupada: si todas las jugadas comparten juego/sorteo, se
-  // muestra una sola vez (no repetida en cada fila)
-  const gameName = items[0]?.gameName || ''
+  useEffect(() => {
+    const code = purchaseMeta.ticketNumber || 'LOTERIA'
+    QRCode.toDataURL(code, {
+      width: 140,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    })
+      .then(setQrCodeUrl)
+      .catch((err) => console.error('Error generating QR code:', err))
+  }, [purchaseMeta.ticketNumber])
+
+  // Información agrupada: si todas las jugadas comparten juego/sorteo
+  const gameName = items[0]?.gameName || 'LOTERIA'
   const scheduleName = items[0]?.scheduleName || ''
   const allSameGame = items.every((i) => i.gameName === gameName)
   const allSameSchedule = items.every((i) => i.scheduleName === scheduleName)
@@ -139,201 +178,244 @@ export function PurchaseVerification({
     }
   }, [onBack])
 
-  const headerTitle = isViewMode ? `Ticket ${ticket?.ticketNumber || ''}` : 'Verificar compra'
+  const headerTitle = isViewMode ? `Ticket #${ticket?.ticketNumber || ''}` : 'Verificar compra'
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      {/* Header compacto: navegación propia, área táctil 44px+ */}
-      <header className="flex items-center gap-2 px-1 pt-1 pb-1.5 shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11 rounded-xl text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-          onClick={onBack}
-          aria-label="Volver"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="min-w-0">
-          <h1 className="text-[15px] font-black uppercase tracking-tighter text-foreground leading-tight truncate">
-            {headerTitle}
-          </h1>
+    <div className="flex h-full min-h-0 flex-col bg-[#0b1326] text-slate-100 overflow-y-auto">
+      {/* Top Header / Modal Navigation */}
+      <header className="sticky top-0 z-30 bg-[#060e20]/95 backdrop-blur-md px-3 py-2 flex items-center justify-between border-b border-[#1e293b] shrink-0">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 rounded-xl bg-[#131b2e] hover:bg-[#1e293b] text-slate-300 hover:text-white active:scale-95 transition-transform"
+            onClick={onBack}
+            aria-label="Volver"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-bold text-sm text-slate-100 truncate">
+                {headerTitle}
+              </h1>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#10b981]/15 border border-[#10b981]/40 text-[#10b981] text-[10px] font-black uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] pulse-dot"></span>
+                {isViewMode ? 'Vendido' : 'En Curso'}
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+              <Printer className="h-3 w-3 text-[#10b981]" />
+              PT-210 Térmica
+            </p>
+          </div>
         </div>
 
-        <Badge className="ml-auto bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] rounded-full px-2.5">
-          {items.length}
+        <Badge className="bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/40 font-mono font-bold text-xs px-2.5 py-0.5 rounded-full">
+          {items.length} {items.length === 1 ? 'Jugada' : 'Jugadas'}
         </Badge>
       </header>
 
-      {/* Boleto capturable como imagen (ref) */}
-      <div ref={captureRef} className="flex-1 min-h-0 flex flex-col bg-white">
-
-        {/* Header context y metadata ahora dentro de la captura */}
-        <div className="px-2 pt-2 pb-1.5 shrink-0">
-          {isViewMode && purchaseMeta ? (
-            <div className="flex flex-col items-center gap-0.5 text-xs font-bold uppercase leading-tight text-slate-700">
-              <div className="text-base font-black text-slate-950 tracking-tight">
-                {purchaseMeta.gameName} · {purchaseMeta.scheduleName}
-              </div>
-              <div className="flex flex-wrap justify-center items-center gap-x-3 text-xs mt-0.5">
-                <span>FECHA: <strong className="text-slate-950 font-black">{purchaseMeta.ticketDate}</strong></span>
-                <span>VENTA #: <strong className="text-slate-950 font-mono font-black text-sm">#{purchaseMeta.ticketNumber}</strong></span>
-              </div>
-              {purchaseMeta.clientName && purchaseMeta.clientName !== '-' && (
-                <div className="text-xs">
-                  CLIENTE: <strong className="text-slate-950 font-black">{purchaseMeta.clientName}</strong>
-                </div>
-              )}
-              <div className="flex gap-3 text-[11px] text-slate-600 font-bold mt-0.5">
-                <span>VENDEDOR: <span className="text-slate-900 font-black">{purchaseMeta.vendorName}</span></span>
-                <span>PUESTO: <span className="text-slate-900 font-black">{purchaseMeta.terminalName}</span></span>
-              </div>
+      {/* Main Content: Thermal Ticket */}
+      <main className="flex-1 w-full max-w-md mx-auto px-3 py-4 flex flex-col items-center">
+        {/* Quick Status Banner */}
+        <div className="w-full bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 mb-3 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-[#10b981]">
+              <ShieldCheck className="h-5 w-5" />
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-0.5 text-slate-700">
-              <div className="text-base md:text-lg font-black text-slate-950 tracking-tight uppercase">
-                {gameName || 'LOTERIA'} {scheduleName ? `· ${scheduleName}` : ''}
-              </div>
-              <div className="text-[11px] font-bold text-slate-600 uppercase">
-                COMPROBANTE DE VENTA
-              </div>
+            <div>
+              <span className="text-xs font-bold text-slate-200 block">
+                {isViewMode ? 'Transacción Confirmada' : 'Listo para emitir'}
+              </span>
+              <span className="text-[11px] font-mono text-slate-400">
+                #{purchaseMeta.ticketNumber}
+              </span>
             </div>
-          )}
-        </div>
-
-        {/* Lista compacta de jugadas: flex-1 para repartir el espacio vertical equitativamente */}
-        <div className="flex-1 min-h-0 overflow-hidden px-2 flex flex-col border-t border-muted/30 pt-1">
-          <div className="grid grid-cols-12 items-center gap-1 px-2 py-1.5 border-b border-muted/60 text-[11px] font-black uppercase tracking-wider text-slate-700 shrink-0">
-            <div className="col-span-4 pl-1">NÚMERO</div>
-            <div className="col-span-3 text-right">MONTO</div>
-            <div className="col-span-5 text-right pr-1">PREMIO</div>
           </div>
-
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-            {items.map((item) => {
-              const prize = (item.amount || 0) * (item.multiplier || 0)
-
-              return (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-12 items-center gap-0 px-2 py-1 border-b border-muted/30"
-                >
-                  <div className="col-span-4 flex items-center gap-1 min-w-0">
-                    <span className="font-mono text-lg md:text-xl font-black text-slate-950 leading-none tracking-tight">
-                      {item.number}
-                    </span>
-
-                    {!showContext && (
-                      <span className="text-[9px] font-bold text-slate-600 uppercase truncate">
-                        {item.gameName}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="col-span-3 text-right">
-                    <span className="font-mono text-base md:text-lg font-black text-slate-950 leading-none tracking-tight">
-                      {currency}{item.amount.toFixed(0)}
-                    </span>
-                  </div>
-
-                  <div className="col-span-5 text-right pr-0.5">
-                    <span className="font-mono text-base md:text-lg font-black text-slate-950 leading-none tracking-tight">
-                      {currency}{prize.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Total fijo, siempre visible */}
-        <div className="shrink-0 border-t-2 border-muted/60 px-4 py-2 flex items-center justify-between bg-muted/10">
-          <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-            Total
-          </span>
-          <span className="text-2xl font-black text-primary leading-none tracking-tighter">
+          <span className="font-mono text-lg font-black text-[#10b981]">
             {currency}{total.toFixed(2)}
           </span>
         </div>
-      </div>
 
-      {/* Acciones: Imprimir primaria, secundarias compactas */}
-      <div className="shrink-0 grid grid-cols-4 gap-1.5 pt-2 pb-[env(safe-area-inset-bottom,0px)]">
-        <Button
-          variant="outline"
-          onClick={() => onShare(captureRef?.current ?? null)}
-          disabled={isProcessing}
-          className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] border-2 flex flex-col gap-0.5 px-1"
-        >
-          <Share2 className="h-4 w-4 shrink-0" />
-          <span className="truncate">Compartir</span>
-        </Button>
+        {/* REALISTIC THERMAL PAPER TICKET CARD */}
+        <div className="w-full max-w-[290px] shadow-2xl relative filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.7)]">
+          {/* Serrated Top Edge */}
+          <div className="w-full h-2.5 thermal-rip-top -mb-[1px]"></div>
 
-        {isViewMode && onRepeat ? (
+          {/* Ticket Body matching exact user photo */}
+          <div ref={captureRef} className="bg-[#ffffff] text-[#000000] px-4 py-4 font-mono text-[12px] leading-snug select-text">
+            {/* Header */}
+            <div className="text-center font-bold text-base tracking-wider uppercase text-black">
+              LOTERIA
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Metadata (Centered) */}
+            <div className="text-center space-y-0.5 text-xs text-black font-mono">
+              <div className="font-bold text-[13px]">
+                {isViewMode ? 'RECIBO DE COPIA' : 'RECIBO DE VENTA'}
+              </div>
+              <div>Folio: {purchaseMeta.ticketNumber}</div>
+              <div>Fecha: {purchaseMeta.ticketDate}</div>
+              <div>Juego: {purchaseMeta.gameName}</div>
+              <div>Sorteo: {purchaseMeta.scheduleName}</div>
+              {purchaseMeta.clientName ? (
+                <div>Cliente: {purchaseMeta.clientName}</div>
+              ) : null}
+              <div>Vendedor: {purchaseMeta.vendorName}</div>
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Column Header */}
+            <div className="flex justify-between items-center text-xs font-bold text-black font-mono px-1">
+              <span className="w-1/3 text-left">Apuesta</span>
+              <span className="w-1/3 text-center">Monto</span>
+              <span className="w-1/3 text-right">Premio</span>
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Items */}
+            <div className="space-y-1 my-1 px-1">
+              {items.map((item) => {
+                const prize = (item.amount || 0) * (item.multiplier || 70)
+                return (
+                  <div key={item.id} className="flex justify-between items-center text-xs font-mono text-black">
+                    <span className="w-1/3 text-left font-bold">{item.number}</span>
+                    <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
+                    <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Total */}
+            <div className="text-center font-bold text-base text-black font-mono my-2.5 tracking-wide">
+              TOTAL: {currency} {total % 1 === 0 ? total.toFixed(0) : total.toFixed(2)}
+            </div>
+
+            {/* Legal / Disclaimers */}
+            <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-3">
+              <div>Valido para 1 sorteo</div>
+              <div>Por favor revise su boleto</div>
+              <div>Premio valido por 7 dias</div>
+            </div>
+
+            {/* Native QR Code Display */}
+            {qrCodeUrl ? (
+              <div className="flex justify-center my-3">
+                <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32 object-contain" />
+              </div>
+            ) : (
+              <div className="w-32 h-32 mx-auto my-3 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">
+                Cargando QR...
+              </div>
+            )}
+          </div>
+
+          {/* Serrated Bottom Edge */}
+          <div className="w-full h-2.5 thermal-rip-bottom -mt-[1px]"></div>
+        </div>
+
+        {/* Copy footnote */}
+        <p className="mt-3 text-center text-xs text-slate-400 font-mono">
+          Copia de auditoría registrada localmente en SQLite DB
+        </p>
+      </main>
+
+      {/* FIXED BOTTOM ACTIONS DOCK */}
+      <footer className="sticky bottom-0 left-0 w-full z-40 bg-[#060e20]/95 backdrop-blur-lg border-t border-[#1e293b] px-3 pt-2 pb-4 shadow-2xl shrink-0">
+        <div className="max-w-md mx-auto flex flex-col space-y-2">
+          {/* Secondary Actions */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onShare(captureRef?.current ?? null)}
+              disabled={isProcessing}
+              className="h-11 bg-[#131b2e] hover:bg-[#1e293b] border-[#1e293b] text-cyan-400 hover:text-cyan-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+            >
+              <Share2 className="h-4 w-4" />
+              <span>Compartir Imagen</span>
+            </Button>
+
+            {isViewMode && onRepeat ? (
+              <Button
+                variant="outline"
+                onClick={onRepeat}
+                disabled={isProcessing}
+                className="h-11 bg-[#131b2e] hover:bg-[#1e293b] border-[#1e293b] text-amber-400 hover:text-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+              >
+                <Repeat className="h-4 w-4" />
+                <span>Repetir Jugada</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={onBack}
+                disabled={isProcessing}
+                className="h-11 bg-[#131b2e] hover:bg-[#1e293b] border-[#1e293b] text-slate-300 hover:text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+              >
+                <Repeat className="h-4 w-4" />
+                <span>Modificar</span>
+              </Button>
+            )}
+          </div>
+
+          {/* Primary Action Button */}
           <Button
-            variant="secondary"
-            onClick={onRepeat}
-            disabled={isProcessing}
-            className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] flex flex-col gap-0.5 px-1"
+            onClick={isViewMode ? onReprint : onConfirm}
+            disabled={isProcessing || items.length === 0}
+            className="w-full h-14 bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active-glow active:scale-98 transition-all shadow-lg"
           >
-            <Repeat className="h-4 w-4 shrink-0" />
-            <span className="truncate">Repetir</span>
+            {isProcessing ? (
+              <>
+                <span className="h-5 w-5 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                <span>PROCESANDO VENTA...</span>
+              </>
+            ) : (
+              <>
+                <Printer className="h-5 w-5" />
+                <span>{isViewMode ? 'REIMPRIMIR TICKET (PT-210)' : 'CONFIRMAR E IMPRIMIR'}</span>
+              </>
+            )}
           </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={onBack}
-            disabled={isProcessing}
-            className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] flex flex-col gap-0.5 px-1"
-          >
-            <Repeat className="h-4 w-4 shrink-0" />
-            <span className="truncate">Repetir</span>
-          </Button>
-        )}
 
-        <Button
-          onClick={isViewMode ? onReprint : onConfirm}
-          disabled={isProcessing || items.length === 0}
-          className="h-11 min-w-0 rounded-xl font-black uppercase text-[8px] bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-95 transition-all flex flex-col gap-0.5 px-1"
-        >
-          {isProcessing ? (
-            <>
-              <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-              <span className="truncate">Procesando</span>
-            </>
-          ) : (
-            <>
-              <Printer className="h-4 w-4 shrink-0" />
-              <span className="truncate">
-                {isViewMode ? 'Reimprimir' : 'Imprimir'}
+          {/* Anular option if in view mode */}
+          {isViewMode && onDelete && (
+            <div className="flex items-center justify-between pt-1">
+              <button
+                onClick={onDelete}
+                className="text-xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                type="button"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Anular Ticket</span>
+              </button>
+              <span className="text-[11px] font-mono text-slate-400">
+                Impresora lista
               </span>
-            </>
+            </div>
           )}
-        </Button>
-
-        {isViewMode && onDelete ? (
-          <Button
-            variant="ghost"
-            className="h-11 w-full min-w-0 rounded-xl text-red-500 hover:bg-red-500/10 active:scale-95 transition-all flex flex-col gap-0.5 px-1"
-            onClick={onDelete}
-            aria-label="Anular ticket"
-          >
-            <Trash2 className="h-4 w-4 shrink-0" />
-            <span className="text-[8px] font-black uppercase truncate">
-              Anular
-            </span>
-          </Button>
-        ) : (
-          <div />
-        )}
-      </div>
-
-      {/* Nota de confirmación */}
-      <p className="shrink-0 text-center text-[9px] font-bold text-muted-foreground/70 uppercase tracking-widest pb-1 flex items-center justify-center gap-1">
-        <Check className="h-3 w-3 text-primary" />
-        {isViewMode ? 'Ticket ya vendido · Reimprimir no genera nueva compra' : 'Verifica el monto antes de generar el ticket'}
-      </p>
+        </div>
+      </footer>
     </div>
   )
 }
+

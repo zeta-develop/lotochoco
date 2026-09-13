@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,6 +6,9 @@ import type { Ticket, TicketItem, Game } from "@/lib/types"
 import { formatTime12h } from '@/lib/utils'
 import { printerService } from "@/features/settings/services/printer.service"
 import { toast } from "@/components/ui/use-toast"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import QRCode from "qrcode"
 
 interface TicketPreviewProps {
   ticket: Ticket & { items: (TicketItem & { game: Game })[] }
@@ -73,16 +74,40 @@ export function TicketPreview({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  const formatDate = (date: Date | string) => {
-    const d = new Date(date)
-    return d.toLocaleDateString("es-NI", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('')
+
+  useEffect(() => {
+    const code = ticket?.ticketNumber || 'LOTERIA'
+    QRCode.toDataURL(code, {
+      width: 140,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
     })
+      .then(setQrCodeUrl)
+      .catch((err) => console.error('Error generating QR code in preview:', err))
+  }, [ticket?.ticketNumber])
+
+  const firstItem = ticket.items?.[0]
+  const gameName = firstItem?.game?.name || 'Tica'
+  const rawSchedule = firstItem?.schedule || '7:30 pm'
+  let scheduleName = rawSchedule
+  try {
+    const formattedSch = formatTime12h(rawSchedule)
+    if (formattedSch) scheduleName = formattedSch.toLowerCase()
+  } catch {
+    scheduleName = rawSchedule
+  }
+
+  let formattedDate = ''
+  try {
+    const d = ticket.createdAt ? new Date(ticket.createdAt) : new Date()
+    formattedDate = format(d, 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
+  } catch {
+    formattedDate = format(new Date(), 'dd/MM/yyyy h:mm a', { locale: es }).toLowerCase()
   }
 
   return (
@@ -92,102 +117,94 @@ export function TicketPreview({
       role="dialog"
       aria-modal="true"
     >
-      <Card className="w-full max-w-[320px] bg-white text-black shadow-2xl border-0 overflow-hidden" onClick={(event) => event.stopPropagation()}>
+      <Card className="w-full max-w-[310px] bg-white text-black shadow-2xl border-0 overflow-hidden" onClick={(event) => event.stopPropagation()}>
         <CardContent className="p-0 flex flex-col max-h-[85vh]">
-          {/* Ticket Content - Simula papel termico */}
-          <div ref={ticketRef} className="p-5 overflow-y-auto" style={{ fontFamily: "'Courier New', Courier, monospace" }}>
-            <div className="text-sm">
-              {/* Header */}
-              <div className="text-center border-b border-dashed border-gray-400 pb-3 mb-3">
-                <h2 className="text-2xl font-black uppercase leading-tight">{businessName}</h2>
-                <p className="text-sm font-bold mt-1">Ticket de Lotería</p>
-              </div>
-
-              {/* Ticket Info */}
-              <div className="space-y-1 mb-3 text-xs">
-                <div className="flex justify-between">
-                  <span className="font-bold">TICKET:</span>
-                  <span className="font-black text-sm">#{ticket.ticketNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-bold">FECHA:</span>
-                  <span className="font-semibold">{formatDate(ticket.createdAt)}</span>
-                </div>
-              </div>
-
-              {/* Separator */}
-              <div className="border-t border-dashed border-gray-400 my-2" />
-
-              {/* Items */}
-              <table className="w-full text-left text-sm mb-2">
-                <thead>
-                  <tr className="border-b border-gray-300 text-xs font-black">
-                    <th className="py-1 w-1/4">JUEGO</th>
-                    <th className="py-1 w-1/4 text-center">NUM</th>
-                    <th className="py-1 w-1/4 text-right">MONTO</th>
-                    <th className="py-1 w-1/4 text-right">PREMIO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ticket.items.map((item, index) => {
-                    const multiplier = item.game?.multiplier || 70;
-                    const prize = item.amount * multiplier;
-                    return (
-                      <tr key={index} className="align-top border-b border-gray-100">
-                        <td className="py-1.5">
-                          <div className="truncate pr-1 font-semibold text-xs">{item.game?.name}</div>
-                          <div className="text-[10px] text-gray-600">{formatTime12h(item.schedule)}</div>
-                        </td>
-                        <td className="py-1.5 text-center font-black text-lg">
-                          {item.number}
-                        </td>
-                        <td className="py-1.5 text-right font-black text-base">
-                          {currency}{item.amount.toFixed(0)}
-                        </td>
-                        <td className="py-1.5 text-right font-black text-base">
-                          {currency}{prize.toFixed(0)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {/* Separator */}
-              <div className="border-t border-dashed border-gray-400 my-2" />
-
-              {/* Total */}
-              <div className="flex justify-between text-lg font-bold my-3">
-                <span>TOTAL:</span>
-                <span>{currency}{ticket.totalAmount.toFixed(2)}</span>
-              </div>
-
-              {/* Separator */}
-              <div className="border-t border-dashed border-gray-400 my-2" />
-
-              {/* Footer */}
-              <div className="text-center text-sm space-y-2 mt-4">
-                <p className="font-semibold">{ticketMessage}</p>
-
-                {/* Barcode simulation */}
-                <div className="flex justify-center mt-3 mb-1">
-                  <div className="flex gap-px items-end h-12 w-full justify-center">
-                    {ticket.ticketNumber.split("").map((char, i) => (
-                      <div
-                        key={i}
-                        className="bg-black h-full"
-                        style={{
-                          width: (char.charCodeAt(0) % 3 === 0) ? "3px" : (char.charCodeAt(0) % 2 === 0) ? "2px" : "1px",
-                          marginRight: "1px"
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs tracking-widest">{ticket.ticketNumber}</p>
-                <p className="text-[11px] font-bold mt-4">*** CONSERVE SU TICKET ***</p>
-              </div>
+          {/* Ticket Content - Réplica exacta de papel térmico */}
+          <div ref={ticketRef} className="p-4 overflow-y-auto font-mono text-[12px] leading-snug bg-white text-black select-text">
+            {/* Header */}
+            <div className="text-center font-bold text-base tracking-wider uppercase text-black">
+              {businessName || 'LOTERIA'}
             </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Metadata (Centrado) */}
+            <div className="text-center space-y-0.5 text-xs text-black font-mono">
+              <div className="font-bold text-[13px]">
+                RECIBO DE COPIA
+              </div>
+              <div>Folio: {ticket.ticketNumber}</div>
+              <div>Fecha: {formattedDate}</div>
+              <div>Juego: {gameName}</div>
+              <div>Sorteo: {scheduleName}</div>
+              {ticket.client ? (
+                <div>Cliente: {ticket.client}</div>
+              ) : null}
+              <div>Vendedor: Yamileth</div>
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Column Header */}
+            <div className="flex justify-between items-center text-xs font-bold text-black font-mono px-1">
+              <span className="w-1/3 text-left">Apuesta</span>
+              <span className="w-1/3 text-center">Monto</span>
+              <span className="w-1/3 text-right">Premio</span>
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Items */}
+            <div className="space-y-1 my-1 px-1">
+              {ticket.items.map((item, index) => {
+                const multiplier = item.game?.multiplier || 70
+                const prize = item.amount * multiplier
+                return (
+                  <div key={index} className="flex justify-between items-center text-xs font-mono text-black">
+                    <span className="w-1/3 text-left font-bold">{item.number}</span>
+                    <span className="w-1/3 text-center">{item.amount.toFixed(0)}</span>
+                    <span className="w-1/3 text-right">{prize.toFixed(0)}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Separator */}
+            <div className="text-center text-[11px] text-gray-500 tracking-tighter select-none font-mono my-1 overflow-hidden">
+              --------------------------------
+            </div>
+
+            {/* Total */}
+            <div className="text-center font-bold text-base text-black font-mono my-2.5 tracking-wide">
+              TOTAL: {currency} {ticket.totalAmount % 1 === 0 ? ticket.totalAmount.toFixed(0) : ticket.totalAmount.toFixed(2)}
+            </div>
+
+            {/* Legal / Disclaimers */}
+            <div className="text-center text-[11px] leading-snug text-gray-800 font-mono space-y-0.5 my-3">
+              <div>Valido para 1 sorteo</div>
+              <div>Por favor revise su boleto</div>
+              <div>Premio valido por 7 dias</div>
+            </div>
+
+            {/* Native QR Code Display */}
+            {qrCodeUrl ? (
+              <div className="flex justify-center my-3">
+                <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32 object-contain" />
+              </div>
+            ) : (
+              <div className="w-32 h-32 mx-auto my-3 bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">
+                Cargando QR...
+              </div>
+            )}
           </div>
 
           {/* Actions */}
