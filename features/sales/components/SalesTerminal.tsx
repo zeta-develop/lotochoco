@@ -133,11 +133,6 @@ export function SalesTerminal() {
   }
 
   const handleAddToCart = () => {
-    if (cart.length >= 15) {
-      toast({ variant: 'destructive', title: 'Límite alcanzado', description: 'Máximo 15 jugadas por ticket' })
-      return
-    }
-
     if (!selectedGame || !selectedSchedule || amount <= 0) {
       toast({ variant: 'destructive', title: 'Completa todos los campos' })
       return
@@ -477,7 +472,7 @@ export function SalesTerminal() {
                     <span className="text-[10px] font-mono text-slate-400">Fecha: <strong className="text-white">{formatDateNumber(dateDay.padStart(2, '0') + dateMonth.padStart(2, '0'))}</strong></span>
                     <Button
                       onClick={handleAddToCart}
-                      disabled={!selectedGame || !selectedSchedule || !dateDay || !dateMonth || amount <= 0 || !isCashOpen || cart.length >= 15}
+                      disabled={!selectedGame || !selectedSchedule || !dateDay || !dateMonth || amount <= 0 || !isCashOpen}
                       className="h-10 bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 font-black text-xs px-4 rounded-xl active-glow"
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -504,7 +499,7 @@ export function SalesTerminal() {
 
                 <Button
                   onClick={handleAddToCart}
-                  disabled={!selectedGame || !selectedSchedule || !number || amount <= 0 || !isCashOpen || cart.length >= 15}
+                  disabled={!selectedGame || !selectedSchedule || !number || amount <= 0 || !isCashOpen}
                   className="h-12 bg-[#10b981] hover:bg-[#10b981]/90 text-slate-950 font-black text-xs px-4 rounded-xl active-glow shadow-lg transition-transform active:scale-95"
                 >
                   <Plus className="h-4 w-4 mr-1" />
@@ -626,7 +621,7 @@ export function SalesTerminal() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/40 font-mono text-[10px] font-bold">
-                    {cart.length}/15
+                    {cart.length} {cart.length === 1 ? 'jugada' : 'jugadas'}
                   </Badge>
                   {cart.length > 0 && (
                     <button
