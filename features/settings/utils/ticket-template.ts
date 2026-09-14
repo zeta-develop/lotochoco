@@ -330,21 +330,14 @@ export function parseTemplateToBlocks(
     const line = rawLine.trimEnd()
 
     if (line.trim() === ITEMS_PLACEHOLDER) {
-      // Expandir items respetando exactamente el espaciado que el usuario configure en la plantilla
       for (const item of data.items) {
-        let rowText = ''
-        if (itemRowTemplate) {
-          rowText = itemRowTemplate
-            .replace(/{{game}}/g, item.game)
-            .replace(/{{number}}/g, item.number)
-            .replace(/{{amount}}/g, item.amount)
-            .replace(/{{prize}}/g, item.prize)
-            .replace(/{{currency}}/g, item.currency)
-            .replace(/\*\*/g, '')
-            .trimEnd()
-        } else {
-          rowText = `  ${item.number.padEnd(4)}${item.amount.padEnd(5)}${item.prize}`
-        }
+        const num = (item.number || '').trim()
+        const amt = (item.amount || '').trim()
+        const prz = (item.prize || '').trim()
+        const col1 = num.padStart(Math.min(num.length + 1, 3)).padEnd(3)
+        const col2 = amt.padStart(amt.length <= 2 ? 4 : 5).padEnd(6)
+        const col3 = prz.padStart(7)
+        const rowText = `${col1}${col2}${col3}`
 
         blocks.push({
           type: 'item_row',
@@ -374,8 +367,7 @@ export function parseTemplateToBlocks(
 
     // QR Code
     if (/(\[QR\]|{{qrCode}})/i.test(trimmed)) {
-      const leadingSpaces = line.match(/^(\s*)/)?.[1].length || 0
-      blocks.push({ type: 'qr', code: data.qrCode || data.ticketNumber, leadingSpaces })
+      blocks.push({ type: 'qr', code: data.qrCode || data.ticketNumber })
       continue
     }
 
@@ -385,14 +377,14 @@ export function parseTemplateToBlocks(
       continue
     }
 
-    // Encabezado de columnas de items (preservar los espacios que el usuario configure)
+    // Encabezado de columnas de items
     if (/apuesta/i.test(trimmed) && (/monto/i.test(trimmed) || /premio/i.test(trimmed))) {
       blocks.push({
         type: 'items_header',
         col1: 'Apuesta',
         col2: 'Monto',
         col3: 'Premio',
-        rawText: line.replace(/\*\*/g, '').trimEnd(),
+        rawText: '   Apuesta       Monto    Premio',
         isBold: trimmed.includes('**')
       })
       continue

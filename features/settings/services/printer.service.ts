@@ -179,35 +179,30 @@ export const printerService = {
 
           case 'items_header':
             if (block.isBold) builder.bold(true)
-            if (block.rawText) {
-              builder.alignLeft().text(block.rawText).newline()
-            } else {
-              builder.alignLeft().text(block.col1.padEnd(10) + block.col2.padEnd(10) + block.col3.padStart(12)).newline()
-            }
+            // Encabezado estándar de 32 columnas alineado con las columnas de los números
+            builder.alignLeft().text('   Apuesta       Monto    Premio').newline()
             if (block.isBold) builder.bold(false)
             break
 
-          case 'item_row':
-            if (block.customText) {
-              builder.alignLeft().bold(true)
-              if (block.customText.length <= 16) {
-                builder.doubleWidth(true)
-                builder.text(block.customText)
-                builder.doubleWidth(false)
-              } else {
-                builder.text(block.customText)
-              }
-              builder.bold(false).newline()
-            } else {
-              // 5 columnas doble ancho para apuesta + 5 para monto + 6 para premio = 16 columnas doble ancho (32 cols 58mm)
-              const col1 = block.number.padEnd(5)
-              const col2 = block.amount.padEnd(5)
-              const col3 = block.prize.padStart(6)
-              builder.bold(true).doubleWidth(true)
-              builder.text(`${col1}${col2}${col3}`)
-              builder.doubleWidth(false).bold(false).newline()
-            }
+          case 'item_row': {
+            builder.alignLeft().bold(true).doubleWidth(true)
+            const num = (block.number || '').trim()
+            const amt = (block.amount || '').trim()
+            const prz = (block.prize || '').trim()
+
+            // 16 columnas de doble ancho (equivalen a las 32 columnas físicas de 58mm):
+            // Col 1 (Apuesta): 3 cols (ej: " 09", " 22", "123")
+            // Col 2 (Monto):   6 cols centradas (ej: "   5  ", "  100 ")
+            // Col 3 (Premio):  7 cols alineadas a la derecha (ej: "    400", "   8000", "  35000")
+            // Suma total: 3 + 6 + 7 = 16 columnas exactas
+            const col1 = num.padStart(Math.min(num.length + 1, 3)).padEnd(3)
+            const col2 = amt.padStart(amt.length <= 2 ? 4 : 5).padEnd(6)
+            const col3 = prz.padStart(7)
+
+            builder.text(`${col1}${col2}${col3}`)
+            builder.doubleWidth(false).bold(false).newline()
             break
+          }
 
           case 'total':
             if (block.isBold !== false) {
