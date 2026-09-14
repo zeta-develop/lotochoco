@@ -265,6 +265,46 @@ export type TicketBlock =
   | { type: 'qr'; code: string; leadingSpaces?: number }
   | { type: 'empty' }
 
+export function formatDoubleWidthItemRow(
+  number: string,
+  amount: string,
+  prize: string,
+  templateRow?: string | null
+): string {
+  const num = (number || '').trim()
+  const amt = (amount || '').trim()
+  const prz = (prize || '').trim()
+
+  // Extraer sangría inicial configurada por el usuario antes de {{number}}
+  let leadingSpacesCount = 2
+  if (templateRow) {
+    const match = templateRow.match(/^(\s*)/)
+    if (match && match[1]) {
+      leadingSpacesCount = match[1].length
+    }
+  }
+
+  // 16 columnas de doble ancho para papel de 58mm (equivalen a 32 columnas normales)
+  const TOTAL_COLS = 16
+  const leading = ' '.repeat(Math.max(0, Math.min(6, leadingSpacesCount)))
+  const col1 = `${leading}${num}`
+  const col3 = prz
+
+  // Espacio restante para la columna central (Monto) y los espacios de separación
+  const remainingSpaces = TOTAL_COLS - col1.length - col3.length
+
+  if (remainingSpaces <= amt.length) {
+    return `${col1} ${amt} ${col3}`
+  }
+
+  // Centrar el Monto dentro del espacio restante
+  const gapTotal = remainingSpaces - amt.length
+  const gap1 = Math.floor(gapTotal / 2)
+  const gap2 = gapTotal - gap1
+
+  return `${col1}${' '.repeat(gap1)}${amt}${' '.repeat(gap2)}${col3}`
+}
+
 export function parseTemplateToBlocks(
   rawTemplate: string | undefined | null,
   ticket: TicketLike,
@@ -292,8 +332,6 @@ export function parseTemplateToBlocks(
   if (itemsMatch) {
     // Quitar únicamente los saltos de línea iniciales y finales, PRESERVANDO los espacios horizontales (sangría)
     const raw = itemsMatch[1].replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '')
-    // Si la plantilla tiene las variables pegadas sin separación de columnas (ej. {{number}}{{amount}}{{prize}}),
-    // formatear automáticamente con columnas centradas
     if (raw.includes('{{number}}') && raw.includes('{{amount}}') && !raw.includes('  ')) {
       itemRowTemplate = '  {{number}}    {{amount}}   {{prize}}'
     } else {
@@ -331,13 +369,7 @@ export function parseTemplateToBlocks(
 
     if (line.trim() === ITEMS_PLACEHOLDER) {
       for (const item of data.items) {
-        const num = (item.number || '').trim()
-        const amt = (item.amount || '').trim()
-        const prz = (item.prize || '').trim()
-        const col1 = num.padStart(Math.min(num.length + 1, 3)).padEnd(3)
-        const col2 = amt.padStart(amt.length <= 2 ? 4 : 5).padEnd(6)
-        const col3 = prz.padStart(7)
-        const rowText = `${col1}${col2}${col3}`
+        const rowText = formatDoubleWidthItemRow(item.number, item.amount, item.prize, itemRowTemplate)
 
         blocks.push({
           type: 'item_row',
@@ -384,7 +416,7 @@ export function parseTemplateToBlocks(
         col1: 'Apuesta',
         col2: 'Monto',
         col3: 'Premio',
-        rawText: '   Apuesta       Monto    Premio',
+        rawText: line.replace(/\*\*/g, '').trimEnd(),
         isBold: trimmed.includes('**')
       })
       continue

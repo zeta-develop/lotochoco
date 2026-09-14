@@ -76,19 +76,41 @@ export function TicketBodyView({
 
           case 'items_header': {
             const boldClass = block.isBold ? "font-bold text-black" : "font-normal text-black"
+            if (block.rawText) {
+              return (
+                <div
+                  key={idx}
+                  className={`font-mono text-xs leading-snug whitespace-pre px-1 ${boldClass}`}
+                >
+                  {block.rawText}
+                </div>
+              )
+            }
             return (
               <div
                 key={idx}
                 className={`flex justify-between items-center text-xs font-mono px-1 ${boldClass}`}
               >
-                <span className="w-[25%] text-left">{block.col1 || 'Apuesta'}</span>
-                <span className="w-[35%] text-center">{block.col2 || 'Monto'}</span>
-                <span className="w-[40%] text-right">{block.col3 || 'Premio'}</span>
+                <span className="w-1/3 text-left">{block.col1}</span>
+                <span className="w-1/3 text-center">{block.col2}</span>
+                <span className="w-1/3 text-right">{block.col3}</span>
               </div>
             )
           }
 
           case 'item_row':
+            if (block.customText) {
+              const isDoubleWidth = block.customText.length <= 16
+              return (
+                <div
+                  key={idx}
+                  className="font-mono text-sm font-black text-black leading-snug whitespace-pre px-1"
+                  style={isDoubleWidth ? { letterSpacing: '0.95ch' } : undefined}
+                >
+                  {block.customText}
+                </div>
+              )
+            }
             return (
               <div
                 key={idx}
