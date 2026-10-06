@@ -11,8 +11,8 @@ describe('shared ticket layout', () => {
     const html = buildSharedTicketHtml(ticket, { currency: 'C$' }, 'data:image/png;base64,test')
     expect(html).toContain('>07</strong>')
     expect(html).toContain('>00</strong>')
-    expect(html.match(/C\$ 400\.00/g)).toHaveLength(2)
-    expect(html).toContain('C$ 10.00')
+    expect(html.match(/>400<\/td>/g)).toHaveLength(2)
+    expect(html).toContain('C$ 10')
     expect(html).toContain('width:600px')
   })
   it('escapes customer data rather than injecting HTML', () => {

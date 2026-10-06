@@ -270,7 +270,7 @@ export const printerService = {
     try {
       const businessName = settings.businessName || 'LOTOCHOCO'
 
-      const qrUrl = await QRCode.toDataURL(generateTicketQrHash(ticket), { width: 232, margin: 4, errorCorrectionLevel: 'M' })
+      const qrUrl = await QRCode.toDataURL(generateTicketQrHash(ticket), { width: 440, margin: 4, errorCorrectionLevel: 'M' })
       capture = document.createElement('div')
       Object.assign(capture.style, { position: 'fixed', left: '-10000px', top: '0', width: `${SHARED_TICKET_WIDTH}px`, background: '#ffffff', overflow: 'visible' })
       capture.innerHTML = buildSharedTicketHtml(ticket, settings, qrUrl)
