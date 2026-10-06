@@ -2,6 +2,11 @@ name: Build Android release candidate
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a public prerelease signed with the replacement identity
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -78,11 +83,21 @@ jobs:
           name: lotochoco-release-candidate
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-      - name: Create draft for manual validation and publication
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+      - name: Create release candidate
         uses: ncipollo/release-action@v1
         with:
           artifacts: android/app/build/outputs/apk/release/*.apk
           tag: 'v${{ env.APP_VERSION }}-${{ github.run_number }}'
           name: 'LotoChoco v${{ env.APP_VERSION }} candidate'
-          draft: true
-          prerelease: false
+          draft: ${{ !inputs.publish }}
+          prerelease: ${{ inputs.publish }}
+          body: |
+            Comprobante digital rediseñado para compartir imágenes completas por WhatsApp.
+            Correcciones de aislamiento por empresa, operaciones financieras y autenticación.
+
+            APK firmado con una identidad de reemplazo. No se instala como una actualización normal sobre el APK firmado con la identidad anterior. Verificar y resolver ventas pendientes antes de cualquier reinstalación; conservar los datos locales necesarios.
+            Release de prueba: validar instalación, OAuth e impresora en un dispositivo antes de distribución general.

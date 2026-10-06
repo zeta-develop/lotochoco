@@ -1,6 +1,6 @@
 # Correcciones de la auditoría
 
-Los cambios están subidos a la rama `main` de GitHub. No se han aplicado a una instancia remota de Supabase ni publicado un APK para distribución.
+Los cambios están subidos a la rama `main` de GitHub. La migración de Supabase se aplicó desde PrestaFacil el 6 de octubre de 2026; ver [DEPLOYMENT-20261006.md](DEPLOYMENT-20261006.md) para validación, conservación de datos y conciliación pendiente.
 
 - **Seguridad y aislamiento:** políticas RLS por empresa, comprobación de pertenencia, cambios de rol protegidos, OAuth PKCE y limpieza de datos locales al cambiar de cuenta.
 - **Operaciones financieras:** ventas, anulaciones, premios y caja mediante transacciones RPC, reintentos idempotentes, bloqueo concurrente, importes decimales y multiplicador conservado por jugada.
@@ -25,6 +25,6 @@ Los cambios están subidos a la rama `main` de GitHub. No se han aplicado a una 
 2. Seguir [SIGNING-RECOVERY.md](SIGNING-RECOVERY.md) para reemplazar la firma comprometida. Retirar los archivos del árbol de trabajo no elimina las copias del historial Git.
 3. Probar OAuth, instalación y la impresora en dispositivos reales. La compilación con Android SDK ya fue verificada en GitHub Actions; la transición desde la firma anterior sigue pendiente de validación en un dispositivo.
 
-La conexión directa de Supabase proporcionada es IPv6 y el entorno de ejecución no puede alcanzarla. El primer intento de respaldo falló antes de modificar producción. Para continuar se necesita la URI Session pooler del diálogo Connect de Supabase, guardada como `SUPABASE_DB_URL`. Se confirmó `America/Managua` para la migración y se verificó la preparación transaccional en una base desechable.
+La conexión directa de Supabase es IPv6. El primer intento desde GitHub no pudo alcanzarla y no modificó producción. Se completó el respaldo y la migración desde la VPS PrestaFacil, con `America/Managua` y preparación transaccional validada sobre una copia del respaldo real.
 
 No se modificaron automáticamente saldos ni registros financieros históricos.

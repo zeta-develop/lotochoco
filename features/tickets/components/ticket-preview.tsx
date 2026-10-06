@@ -40,6 +40,7 @@ export function TicketPreview({
       const result = await printerService.shareTicketImage(
         ticket as any,
         {
+          ...settings,
           businessName,
           currency,
           ticketMessage

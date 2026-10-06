@@ -195,14 +195,14 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION pos_private.lock_company(uuid,text[]) FROM PUBLIC, anon, authenticated;
 
--- A draw has one result, including soft-deleted results. Business-day keys use
--- the company's configured timezone; hiding a processed draw must not reopen sales.
+-- Active draws are unique. The trigger also rejects reuse of archived draw keys,
+-- while allowing audited historical duplicate rows to remain archived.
 DO $$ BEGIN
   IF EXISTS(SELECT 1 FROM public.companies c WHERE NOT EXISTS(SELECT 1 FROM pg_timezone_names z WHERE z.name=c.time_zone)) THEN RAISE EXCEPTION 'Configura una zona horaria IANA válida para cada empresa'; END IF;
 END $$;
 UPDATE public.results r SET draw_day=(r.draw_date AT TIME ZONE c.time_zone)::date FROM public.companies c WHERE c.id=r.company_id;
 ALTER TABLE public.results ALTER COLUMN draw_day SET NOT NULL;
-ALTER TABLE public.results ADD CONSTRAINT result_draw_unique UNIQUE(company_id,game_id,schedule_id,draw_day);
+CREATE UNIQUE INDEX result_draw_unique ON public.results(company_id,game_id,schedule_id,draw_day) WHERE deleted_at IS NULL;
 CREATE OR REPLACE FUNCTION pos_private.guard_result()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_zone text;
@@ -214,6 +214,11 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.draw_schedules WHERE id=NEW.schedule_id AND game_id=NEW.game_id AND company_id=NEW.company_id) THEN RAISE EXCEPTION 'Horario de otra empresa o juego'; END IF;
   SELECT time_zone INTO v_zone FROM public.companies WHERE id=NEW.company_id;
   NEW.draw_day := (NEW.draw_date AT TIME ZONE v_zone)::date;
+  IF TG_OP='INSERT' OR (NEW.company_id,NEW.game_id,NEW.schedule_id,NEW.draw_day) IS DISTINCT FROM (OLD.company_id,OLD.game_id,OLD.schedule_id,OLD.draw_day) THEN
+    IF EXISTS(SELECT 1 FROM public.results r WHERE r.company_id=NEW.company_id AND r.game_id=NEW.game_id AND r.schedule_id=NEW.schedule_id AND r.draw_day=NEW.draw_day AND r.id<>NEW.id) THEN
+      RAISE EXCEPTION 'Ya existe un resultado para este sorteo y fecha' USING ERRCODE='23505';
+    END IF;
+  END IF;
   RETURN NEW;
 END $$;
 REVOKE ALL ON FUNCTION pos_private.guard_result() FROM PUBLIC, anon, authenticated;
@@ -424,4 +429,5 @@ DO $$ DECLARE f record; BEGIN
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated',f.signature);
   END LOOP;
 END $$;
+NOTIFY pgrst, 'reload schema';
 COMMIT;

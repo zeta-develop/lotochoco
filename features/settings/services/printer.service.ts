@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import { formatTime12h, formatDateNumber } from '@/lib/utils'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
+import { buildSharedTicketHtml, SHARED_TICKET_WIDTH } from '@/features/tickets/utils/shared-ticket'
 import { parseTemplateToBlocks, DEFAULT_TICKET_TEMPLATE, generateTicketQrHash, formatDoubleWidthItemRow } from '../utils/ticket-template'
 
 class EscPosBuilder {
@@ -265,22 +266,29 @@ export const printerService = {
   },
 
   async shareTicketImage(ticket: Ticket, settings: Record<string, string>, element: HTMLElement | null) {
+    let capture: HTMLDivElement | undefined
     try {
       const businessName = settings.businessName || 'LOTOCHOCO'
 
-      if (!element) {
-        throw new Error('No se pudo capturar el ticket')
-      }
-
-      // Capturar el boleto como imagen PNG (estilo captura de pantalla)
-      const dataUrl = await toPng(element, {
+      const qrUrl = await QRCode.toDataURL(generateTicketQrHash(ticket), { width: 232, margin: 4, errorCorrectionLevel: 'M' })
+      capture = document.createElement('div')
+      Object.assign(capture.style, { position: 'fixed', left: '-10000px', top: '0', width: `${SHARED_TICKET_WIDTH}px`, background: '#ffffff', overflow: 'visible' })
+      capture.innerHTML = buildSharedTicketHtml(ticket, settings, qrUrl)
+      document.body.appendChild(capture)
+      if (document.fonts) await document.fonts.ready
+      await Promise.all(Array.from(capture.querySelectorAll('img')).map(image => image.decode()))
+      const receipt = capture.firstElementChild as HTMLElement
+      const dataUrl = await toPng(receipt, {
         pixelRatio: 2,
+        width: SHARED_TICKET_WIDTH,
+        height: receipt.scrollHeight,
         backgroundColor: '#ffffff',
-        cacheBust: true,
+        skipFonts: true,
       })
 
       const base64 = dataUrl.split(',')[1]
-      const fileName = `ticket_${ticket.ticketNumber || 'preview'}.png`
+      const safeNumber = (ticket.ticketNumber || 'preview').replace(/[^a-zA-Z0-9_-]/g, '_')
+      const fileName = `ticket_${safeNumber}_${Date.now()}.png`
 
       await Filesystem.writeFile({
         path: fileName,
@@ -296,7 +304,7 @@ export const printerService = {
       await Share.share({
         title: `Ticket #${ticket.ticketNumber}`,
         text: `Comprobante de Ticket #${ticket.ticketNumber} - ${businessName}`,
-        url: fileUri.uri,
+        files: [fileUri.uri],
         dialogTitle: 'Compartir Comprobante',
       })
 
@@ -304,6 +312,8 @@ export const printerService = {
     } catch (error) {
       console.error('Error sharing ticket image:', error)
       return { success: false, message: 'No se pudo generar o compartir la imagen del ticket' }
+    } finally {
+      capture?.remove()
     }
   },
 
@@ -337,4 +347,3 @@ export const printerService = {
     }
   }
 }
-

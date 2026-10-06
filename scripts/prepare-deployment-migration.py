@@ -10,4 +10,15 @@ ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS time_zone text NOT NULL DE
 UPDATE public.companies SET time_zone = :'verified_zone';
 """
 validation = "SELECT name AS verified_zone FROM pg_timezone_names WHERE name = :'company_time_zone' \\gset\n"
+if '--legacy-compatibility' in sys.argv[2:]:
+    preparation += Path('supabase/legacy-compatibility.sql').read_text() + '\n'
+    conservation = """DO $$ BEGIN
+ IF (SELECT fingerprint FROM legacy_financial_baseline) IS DISTINCT FROM pg_temp.financial_fingerprint() THEN
+  RAISE EXCEPTION 'Financial conservation check failed; migration rolled back';
+ END IF;
+END $$;
+COMMIT;"""
+    if source.count('\nCOMMIT;') != 1:
+        raise SystemExit('Expected exactly one migration commit')
+    source = source.replace('\nCOMMIT;', '\n' + conservation, 1)
 Path(sys.argv[1]).write_text(validation + source.replace('BEGIN;\n', preparation, 1))
