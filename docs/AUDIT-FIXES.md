@@ -1,6 +1,6 @@
 # Correcciones de la auditoría
 
-Los cambios están preparados en el repositorio local. No se han aplicado a una instancia remota de Supabase ni publicado un APK.
+Los cambios están subidos a la rama `main` de GitHub. No se han aplicado a una instancia remota de Supabase ni publicado un APK para distribución.
 
 - **Seguridad y aislamiento:** políticas RLS por empresa, comprobación de pertenencia, cambios de rol protegidos, OAuth PKCE y limpieza de datos locales al cambiar de cuenta.
 - **Operaciones financieras:** ventas, anulaciones, premios y caja mediante transacciones RPC, reintentos idempotentes, bloqueo concurrente, importes decimales y multiplicador conservado por jugada.

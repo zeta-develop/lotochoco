@@ -19,3 +19,5 @@ Referencia: [Android Developers: firma, recuperación de upload key y actualizac
 ## Candidato preparado el 6 de octubre de 2026
 
 Se creó una identidad nueva en `/root/lotochoco-replacement-signing` (directorio 0700), respaldada allí y configurada en los secretos de reemplazo de GitHub. Los secretos anteriores se conservaron para no alterar otros procesos. El candidato 1.8.7 queda en borrador hasta completar la migración del backend y verificar la transición de instalaciones. Esto no revoca la identidad anterior.
+
+El operador confirmó distribución por APK directo. No presentar este candidato como actualización instalable sobre el APK anterior: la identidad de firma cambió. Antes de cualquier reinstalación, resolver y verificar ventas pendientes, confirmar que los registros financieros están en Supabase y respaldar los datos locales necesarios. La recuperación de registros del servidor no garantiza la recuperación del carrito ni de otros datos exclusivamente locales. Validar primero el proceso en un dispositivo de prueba; una estrategia de rotación compatible requiere comprobación adicional según la versión Android.
