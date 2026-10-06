@@ -24,7 +24,7 @@ android {
         applicationId "com.zetadevelop.lotochoco"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv('ANDROID_VERSION_CODE') ?: '127').toInteger()
+        versionCode = (System.getenv('ANDROID_VERSION_CODE') ?: '127').toInteger()
         versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
