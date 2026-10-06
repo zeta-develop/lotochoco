@@ -14,6 +14,7 @@ Los cambios están subidos a la rama `main` de GitHub. No se han aplicado a una 
 - TypeScript y ESLint sin errores.
 - 44 tests del cliente aprobados.
 - Compilación web estática y sincronización Android aprobadas.
+- Compilación Android release aprobada en GitHub Actions con Java 21, SDK 36 y firma nueva; APK 1.8.7 disponible en borrador `v1.8.7-175`.
 - Esquema nuevo y migración desde el esquema original comprobados en PostgreSQL local.
 - Regresiones financieras, aislamiento por empresa y pruebas concurrentes aprobadas.
 - Diferencias sin errores de espacios (`git diff --check`).
@@ -22,6 +23,8 @@ Los cambios están subidos a la rama `main` de GitHub. No se han aplicado a una 
 
 1. Seguir [SUPABASE_SETUP.md](../SUPABASE_SETUP.md), revisar los datos históricos y aplicar `supabase/migrations/202610060001_secure_pos.sql` en Supabase. Configurar la zona horaria de cada empresa antes de operar.
 2. Seguir [SIGNING-RECOVERY.md](SIGNING-RECOVERY.md) para reemplazar la firma comprometida. Retirar los archivos del árbol de trabajo no elimina las copias del historial Git.
-3. Compilar y comprobar el APK con Android SDK y probar OAuth, instalación y la impresora en dispositivos reales. El entorno local no dispone del SDK Android para verificar esa compilación.
+3. Probar OAuth, instalación y la impresora en dispositivos reales. La compilación con Android SDK ya fue verificada en GitHub Actions; la transición desde la firma anterior sigue pendiente de validación en un dispositivo.
+
+La conexión directa de Supabase proporcionada es IPv6 y el entorno de ejecución no puede alcanzarla. El primer intento de respaldo falló antes de modificar producción. Para continuar se necesita la URI Session pooler del diálogo Connect de Supabase, guardada como `SUPABASE_DB_URL`. Se confirmó `America/Managua` para la migración y se verificó la preparación transaccional en una base desechable.
 
 No se modificaron automáticamente saldos ni registros financieros históricos.
