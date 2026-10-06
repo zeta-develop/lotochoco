@@ -114,6 +114,7 @@ export const usePOSStore = create<POSState>()(
       getCartCount: () => get().cart.length
     }),
     {
+      version: 1, // Discard legacy device-wide account data on upgrade.
       name: 'lottery-pos-storage',
       partialize: (state) => ({
         settings: state.settings,

@@ -1,5 +1,6 @@
 'use client'
 
+import { useUpdater } from '@/features/updater/hooks/use-updater';
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -190,7 +191,7 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
                 <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 font-mono">
                   <span>Papel OK</span>
                   <span>•</span>
-                  <span className="text-[#10b981]">Offline-Ready</span>
+                  <span className="text-[#10b981]">Supabase</span>
                 </div>
               </div>
             </div>
@@ -304,13 +305,13 @@ export function MainLayout({ children, activeModule, onModuleChange }: MainLayou
 }
 
 function VersionInfo() {
-  const { currentVersion, latestVersion, isUpdateAvailable } = require('@/features/updater/hooks/use-updater').useUpdater();
+  const { currentVersion, latestVersion, isUpdateAvailable } = useUpdater();
 
   return (
     <div className="flex flex-col gap-1 mt-1">
       <div className="flex items-center gap-2">
         <span>v{currentVersion}</span>
-        <span className="text-[10px] bg-green-500/20 text-green-600 px-1.5 rounded-full">Offline</span>
+        <span className="text-[10px] bg-green-500/20 text-green-600 px-1.5 rounded-full">Requiere red</span>
       </div>
       {isUpdateAvailable && (
         <div className="text-[10px] text-primary font-medium animate-pulse">

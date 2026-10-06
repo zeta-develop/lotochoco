@@ -54,8 +54,6 @@ export function SettingsManager() {
   const [currency, setCurrency] = useState(settings.currency || 'C$')
   const [ticketFontSize, setTicketFontSize] = useState(settings.ticketFontSize || 'large')
   const [showBarcode, setShowBarcode] = useState(settings.showBarcode !== 'false')
-  const [autoSync, setAutoSync] = useState(true)
-  const [forcedOffline, setForcedOffline] = useState(false)
 
   useEffect(() => {
     if (settings.ticketFontSize) setTicketFontSize(settings.ticketFontSize)
@@ -309,13 +307,13 @@ export function SettingsManager() {
                     Sincronización en la Nube
                   </h2>
                   <p className="font-mono text-xs text-[#bbcabf]">
-                    Arquitectura híbrida local y Supabase
+                    Operaciones registradas en Supabase
                   </p>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30 font-mono text-[11px] font-bold">
                 <span className="w-2 h-2 rounded-full bg-[#10b981]"></span>
-                AL DÍA (0 pendientes)
+                REQUIERE CONEXIÓN
               </span>
             </div>
 
@@ -323,7 +321,7 @@ export function SettingsManager() {
             <div className="grid grid-cols-2 gap-2 bg-[#0b1326] p-3 rounded-lg border border-[#3c4a42] font-mono text-xs">
               <div className="space-y-0.5">
                 <span className="text-[10px] text-[#86948a] uppercase flex items-center gap-1">
-                  Último Sync
+                  Hora del dispositivo
                 </span>
                 <p className="text-[#dae2fd] font-semibold">{format(new Date(), "hh:mm a")}</p>
               </div>
@@ -331,7 +329,7 @@ export function SettingsManager() {
                 <span className="text-[10px] text-[#86948a] uppercase flex items-center gap-1">
                   Servidor Supabase
                 </span>
-                <p className="text-[#4cd7f6] font-semibold">Online (Cloud OK)</p>
+                <p className="text-[#4cd7f6] font-semibold">Conexión necesaria</p>
               </div>
               <div className="space-y-0.5 pt-1.5 border-t border-[#3c4a42]/40">
                 <span className="text-[10px] text-[#86948a] uppercase flex items-center gap-1">
@@ -349,164 +347,6 @@ export function SettingsManager() {
 
             {/* Sync Toggles */}
             <div className="space-y-2 text-xs font-mono">
-              <label className="flex items-center justify-between p-2.5 rounded-lg bg-[#171f33] border border-[#3c4a42]/50 hover:bg-[#222a3d] transition-colors cursor-pointer">
-                <div className="flex flex-col">
-                  <span className="text-[#dae2fd] font-bold">Modo Offline Forzado</span>
-                  <span className="text-[11px] text-[#86948a]">Opera localmente y encola boletos</span>
-                </div>
-                <input 
-                  type="checkbox"
-                  checked={forcedOffline}
-                  onChange={(e) => setForcedOffline(e.target.checked)}
-                  className="w-4 h-4 rounded bg-[#0b1326] border-[#3c4a42] text-[#10b981] focus:ring-0 cursor-pointer"
-                />
-              </label>
-              <label className="flex items-center justify-between p-2.5 rounded-lg bg-[#171f33] border border-[#3c4a42]/50 hover:bg-[#222a3d] transition-colors cursor-pointer">
-                <div className="flex flex-col">
-                  <span className="text-[#dae2fd] font-bold">Auto-sincronizar ventas</span>
-                  <span className="text-[11px] text-[#86948a]">Transmite boletos emitidos automáticamente</span>
-                </div>
-                <input 
-                  type="checkbox"
-                  checked={autoSync}
-                  onChange={(e) => setAutoSync(e.target.checked)}
-                  className="w-4 h-4 rounded bg-[#0b1326] border-[#3c4a42] text-[#10b981] focus:ring-0 cursor-pointer"
-                />
-              </label>
-            </div>
-
-            {/* Action */}
-            <Button
-              className="h-11 w-full rounded-xl bg-[#171f33] border border-[#4cd7f6]/40 text-[#4cd7f6] hover:bg-[#4cd7f6] hover:text-[#001f26] font-mono font-bold text-xs flex items-center justify-center gap-2 active:scale-98 transition-all"
-              onClick={handleManualSync}
-              disabled={isSyncing}
-            >
-              <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-              Sincronizar Ahora con Supabase
-            </Button>
-          </section>
-
-          {/* SECTION 3: Business & Ticket Customization */}
-          <section className="bg-[#131b2e] rounded-xl border border-[#3c4a42]/70 p-4 space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-[#f59e0b]/15 flex items-center justify-center text-[#f59e0b]">
-                <Receipt className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="font-mono text-sm font-bold text-[#dae2fd]">
-                  Datos del Ticket Térmico
-                </h2>
-                <p className="font-mono text-xs text-[#bbcabf]">
-                  Encabezado y pie de página de venta
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3 font-mono text-xs">
-              {/* Field 1: Business Name */}
-              <div className="space-y-1">
-                <label className="text-[11px] text-[#86948a] uppercase font-bold">
-                  Nombre Comercial en Recibo
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    className="bg-[#0b1326] border-[#3c4a42] text-xs font-mono text-[#dae2fd] h-10 rounded-lg"
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                  />
-                  <Button
-                    size="sm"
-                    className="h-10 px-3 bg-[#10b981] text-[#003824] font-bold text-xs font-mono"
-                    onClick={() => handleSaveField({ businessName })}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Fields 2: Moneda & Terminal ID */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[11px] text-[#86948a] uppercase font-bold">
-                    Moneda
-                  </label>
-                  <div className="flex gap-1.5">
-                    <Input
-                      className="bg-[#0b1326] border-[#3c4a42] text-xs font-mono text-[#dae2fd] h-10 rounded-lg"
-                      value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
-                    />
-                    <Button
-                      size="sm"
-                      className="h-10 px-2.5 bg-[#171f33] border border-[#3c4a42] text-[#dae2fd] font-mono text-xs"
-                      onClick={() => handleSaveField({ currency })}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] text-[#86948a] uppercase font-bold">
-                    Terminal ID
-                  </label>
-                  <div className="flex gap-1.5">
-                    <Input
-                      className="bg-[#0b1326] border-[#3c4a42] text-xs font-mono text-[#4cd7f6] h-10 rounded-lg font-bold"
-                      value={terminalId}
-                      onChange={(e) => setTerminalId(e.target.value)}
-                    />
-                    <Button
-                      size="sm"
-                      className="h-10 px-2.5 bg-[#171f33] border border-[#3c4a42] text-[#dae2fd] font-mono text-xs"
-                      onClick={() => handleSaveField({ terminalId })}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Field 3: Ticket Footer Message */}
-              <div className="space-y-1">
-                <label className="text-[11px] text-[#86948a] uppercase font-bold">
-                  Mensaje de Pie del Boleto
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    className="bg-[#0b1326] border-[#3c4a42] text-xs font-mono text-[#dae2fd] h-10 rounded-lg"
-                    value={ticketMessage}
-                    onChange={(e) => setTicketMessage(e.target.value)}
-                  />
-                  <Button
-                    size="sm"
-                    className="h-10 px-3 bg-[#10b981] text-[#003824] font-bold text-xs font-mono"
-                    onClick={() => handleSaveField({ ticketMessage })}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Field 4: Ticket Font Size / Numbers Size */}
-              <div className="space-y-1">
-                <label className="text-[11px] text-[#86948a] uppercase font-bold">
-                  Tamaño de Números en Boleto Térmico
-                </label>
-                <select
-                  className="w-full bg-[#0b1326] border border-[#3c4a42] text-xs font-mono text-[#dae2fd] h-10 rounded-lg px-3 focus:outline-none focus:border-[#10b981]"
-                  value={ticketFontSize}
-                  onChange={(e) => {
-                    setTicketFontSize(e.target.value)
-                    handleSaveField({ ticketFontSize: e.target.value })
-                  }}
-                >
-                  <option value="large">Grande - Doble Altura y Negrita (Estándar Lotería)</option>
-                  <option value="extra-large">Extra Grande - Doble Tamaño (16 columnas)</option>
-                  <option value="normal">Normal - Altura Estándar</option>
-                </select>
-              </div>
-
-              {/* Toggle: Barcode */}
               <label className="flex items-center justify-between p-2.5 rounded-lg bg-[#171f33] border border-[#3c4a42]/50 hover:bg-[#222a3d] transition-colors cursor-pointer mt-1">
                 <div className="flex flex-col">
                   <span className="text-[#dae2fd] font-bold text-xs">Mostrar Código de Barras / QR</span>
@@ -533,10 +373,10 @@ export function SettingsManager() {
               </div>
               <div>
                 <h2 className="font-mono text-sm font-bold text-[#dae2fd]">
-                  Base de Datos Local
+                  Datos del dispositivo
                 </h2>
                 <p className="font-mono text-xs text-[#bbcabf]">
-                  Almacenamiento Offline-First SQLite / IndexedDB
+                  Carrito y ajustes locales del dispositivo
                 </p>
               </div>
             </div>
@@ -545,24 +385,25 @@ export function SettingsManager() {
             <div className="bg-[#0b1326] p-3 rounded-lg border border-[#3c4a42] font-mono text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[#bbcabf]">Estado almacenamiento local:</span>
-                <span className="text-[#10b981] font-bold">Activo & Encriptado</span>
+                <span className="text-[#10b981] font-bold">Persistencia local</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#bbcabf]">Copia de seguridad:</span>
-                <span className="text-[#dae2fd]">Automática en cada venta</span>
+                <span className="text-[#dae2fd]">Gestionada por el administrador</span>
               </div>
               <div className="pt-2 border-t border-[#3c4a42]/40 flex items-center gap-1.5 text-[#10b981] text-[11px] font-bold">
                 <Lock className="h-3.5 w-3.5" />
-                Seguridad Criptográfica AES-256 (Local OK)
+                Los datos locales no tienen cifrado propio
               </div>
             </div>
 
             <Button
               className="h-10 w-full rounded-xl bg-[#171f33] text-[#dae2fd] border border-[#3c4a42] hover:bg-[#222a3d] font-mono text-xs font-bold flex items-center justify-center gap-2 active:scale-98 transition-transform"
               onClick={handleExportBackup}
+              disabled
             >
               <Download className="h-4 w-4 text-[#4cd7f6]" />
-              Exportar Copia de Seguridad (.json)
+              Exportación local no disponible
             </Button>
           </section>
 

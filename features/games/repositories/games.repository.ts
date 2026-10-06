@@ -1,3 +1,4 @@
+import { requireCompanyId } from '@/lib/supabase/company'
 import { supabase } from '@/lib/supabase/client';
 import { generateId } from '@/lib/utils';
 import type { Game, DrawSchedule, GameInput, GameUpdateInput } from '../domain/types';
@@ -33,12 +34,12 @@ export const gamesRepository = {
   async getAll(): Promise<Game[]> {
     const { data: games, error } = await supabase
       .from('games')
-      .select(`*, draw_schedules (*)`)
+      .select(`*, draw_schedules (*)`).eq('company_id', await requireCompanyId())
       .is('deleted_at', null)
       .order('name', { ascending: true });
-      
-    if (error) { 
-      console.error('Error fetching games:', error); 
+
+    if (error) {
+      console.error('Error fetching games:', error);
       return [];
     }
     return (games || []).map((g: any) => {
@@ -54,16 +55,16 @@ export const gamesRepository = {
   async getActive(): Promise<Game[]> {
     const { data: games, error } = await supabase
       .from('games')
-      .select(`*, draw_schedules (*)`)
+      .select(`*, draw_schedules (*)`).eq('company_id', await requireCompanyId())
       .eq('is_active', 1)
       .is('deleted_at', null)
       .order('name', { ascending: true });
-      
-    if (error) { 
-      console.error('Error fetching active games:', error); 
+
+    if (error) {
+      console.error('Error fetching active games:', error);
       return [];
     }
-    
+
     return (games || []).map((g: any) => {
       const game = mapGame(g);
       if (game.schedules) {
@@ -77,13 +78,13 @@ export const gamesRepository = {
   async getById(id: string): Promise<Game | null> {
     const { data: game, error } = await supabase
       .from('games')
-      .select(`*, draw_schedules (*)`)
+      .select(`*, draw_schedules (*)`).eq('company_id', await requireCompanyId())
       .eq('id', id)
       .is('deleted_at', null)
       .single();
-      
+
     if (error || !game) return null;
-    
+
     const mappedGame = mapGame(game);
     if (mappedGame.schedules) {
       mappedGame.schedules = mappedGame.schedules.filter((s: DrawSchedule) => !s.deletedAt);
@@ -94,99 +95,105 @@ export const gamesRepository = {
 
   async create(data: GameInput): Promise<Game> {
     const gameId = generateId();
-    
+    const companyId = await requireCompanyId();
+
     const { error: gameError } = await supabase
       .from('games')
-      .insert({ 
-        id: gameId, 
-        name: data.name, 
-        digit_count: data.digitCount, 
-        multiplier: data.multiplier, 
-        is_active: 1 
+      .insert({
+        id: gameId,
+        company_id: companyId,
+        name: data.name,
+        digit_count: data.digitCount,
+        multiplier: data.multiplier,
+        is_active: 1
       });
-      
+
     if (gameError) throw gameError;
 
     if (data.schedules && data.schedules.length > 0) {
-      const schedulesToInsert = data.schedules.map((s) => ({ 
-        id: generateId(), 
-        game_id: gameId, 
-        name: s.name, 
-        time: s.time, 
-        is_active: 1 
+      const schedulesToInsert = data.schedules.map((s) => ({
+        id: generateId(),
+        game_id: gameId,
+        company_id: companyId,
+        name: s.name,
+        time: s.time,
+        is_active: 1
       }));
       const { error: scheduleError } = await supabase.from('draw_schedules').insert(schedulesToInsert);
       if (scheduleError) throw scheduleError;
     }
-    
+
     const game = await this.getById(gameId);
     if (!game) throw new Error('Error recuperando el juego creado');
     return game;
   },
 
   async update(id: string, data: GameUpdateInput): Promise<Game> {
+    if (!await this.getById(id)) throw new Error('Juego no encontrado en la empresa seleccionada')
+    const companyId = await requireCompanyId();
     const updates: any = { updated_at: new Date().toISOString() };
     if (data.name !== undefined) updates.name = data.name;
     if (data.digitCount !== undefined) updates.digit_count = data.digitCount;
     if (data.multiplier !== undefined) updates.multiplier = data.multiplier;
     if (data.isActive !== undefined) updates.is_active = data.isActive ? 1 : 0;
-    
+
     if (Object.keys(updates).length > 1) {
-      const { error } = await supabase.from('games').update(updates).eq('id', id);
+      const { error } = await supabase.from('games').update(updates).eq('company_id', await requireCompanyId()).eq('id', id);
       if (error) throw error;
     }
-    
+
     if (data.schedules !== undefined) {
       const { data: existing } = await supabase
         .from('draw_schedules')
         .select('*')
-        .eq('game_id', id)
+        .eq('company_id', companyId).eq('game_id', id)
         .eq('is_active', 1)
         .is('deleted_at', null);
-        
+
       const newIds = data.schedules.map((s) => s.id).filter(Boolean) as string[];
-      
+
       if (existing) {
         for (const ex of existing) {
           if (!newIds.includes(ex.id)) {
             await supabase
               .from('draw_schedules')
               .update({ is_active: 0, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-              .eq('id', ex.id);
+              .eq('company_id', companyId).eq('game_id', id).eq('id', ex.id);
           }
         }
       }
-      
+
       for (const s of data.schedules) {
         if (s.id) {
           await supabase
             .from('draw_schedules')
             .update({ name: s.name, time: s.time, updated_at: new Date().toISOString() })
-            .eq('id', s.id);
+            .eq('company_id', companyId).eq('game_id', id).eq('id', s.id);
         } else {
           await supabase
             .from('draw_schedules')
-            .insert({ id: generateId(), game_id: id, name: s.name, time: s.time, is_active: 1 });
+            .insert({ id: generateId(), company_id: companyId, game_id: id, name: s.name, time: s.time, is_active: 1 });
         }
       }
     }
-    
+
     const game = await this.getById(id);
     if (!game) throw new Error('Error recuperando el juego actualizado');
     return game;
   },
 
   async delete(id: string): Promise<void> {
+    if (!await this.getById(id)) throw new Error('Juego no encontrado en la empresa seleccionada')
     const now = new Date().toISOString();
-    const { error: gameError } = await supabase.from('games').update({ deleted_at: now, updated_at: now }).eq('id', id);
+    const { error: gameError } = await supabase.from('games').update({ deleted_at: now, updated_at: now }).eq('company_id', await requireCompanyId()).eq('id', id);
     if (gameError) throw gameError;
-    
-    const { error: schedulesError } = await supabase.from('draw_schedules').update({ deleted_at: now, updated_at: now }).eq('game_id', id);
+
+    const { error: schedulesError } = await supabase.from('draw_schedules').update({ deleted_at: now, updated_at: now }).eq('company_id', await requireCompanyId()).eq('game_id', id);
     if (schedulesError) throw schedulesError;
   },
 
   async count(): Promise<number> {
-    const { count, error } = await supabase.from('games').select('*', { count: 'exact', head: true }).is('deleted_at', null);
+    const { count, error } = await supabase.from('games').select('*', { count: 'exact', head: true }).eq('company_id', await requireCompanyId()).is('deleted_at', null);
     if (error) throw error;
     return count || 0;
   }

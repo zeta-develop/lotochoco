@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth-store";
 import { App } from "@capacitor/app";
+import type { PluginListenerHandle } from "@capacitor/core";
 import { Capacitor } from "@capacitor/core";
+import { getNativeOAuthCode } from '@/lib/supabase/oauth-callback';
 import { Browser } from "@capacitor/browser";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setSession, setUser, session: currentSession } = useAuthStore();
+  const { setSession, user, selectedCompanyId } = useAuthStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
@@ -16,7 +18,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
 
         if (event === "SIGNED_IN") {
 
@@ -29,36 +30,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Configurar listener para deep links (redirección después del login OAuth)
-    let appListener: any = null;
+    let appListener: Promise<PluginListenerHandle> | null = null;
 
     if (Capacitor.isNativePlatform()) {
-      appListener = App.addListener('appUrlOpen', async (data) => {
-        if (data.url.includes('supabase.co') || data.url.includes('lotochoco://')) {
-          const url = new URL(data.url);
-
-          // Supabase v2 uses PKCE by default and returns a 'code' parameter in the query string
-          const code = url.searchParams.get('code');
-
-          if (code) {
-            await supabase.auth.exchangeCodeForSession(code);
-            // Close the browser after successful exchange
-            Browser.close().catch(() => {});
-          } else {
-            // Fallback for implicit flow (legacy)
-            const hashParams = new URLSearchParams(url.hash.substring(1));
-            const accessToken = hashParams.get('access_token');
-            const refreshToken = hashParams.get('refresh_token');
-
-            if (accessToken && refreshToken) {
-              await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              Browser.close().catch(() => {});
-            }
-          }
+      let lastCode: string | null = null;
+      const handleUrl = async (rawUrl: string) => {
+        const code = getNativeOAuthCode(rawUrl);
+        if (!code || code === lastCode) return;
+        lastCode = code;
+        try {
+          // exchangeCodeForSession verifies the PKCE verifier generated for this login.
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) await Browser.close().catch(() => {});
+        } catch {
+          // Invalid or unsolicited callbacks must not replace the active session.
         }
-      });
+      };
+      appListener = App.addListener('appUrlOpen', data => { void handleUrl(data.url); });
+      void App.getLaunchUrl().then(data => {
+        if (data?.url) void handleUrl(data.url);
+      }).catch(() => {});
     }
 
     // Inicializar el estado de sesión (offline first approach)
@@ -68,10 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       if (appListener) {
-        appListener.then((listener: any) => listener.remove());
+        void appListener.then(listener => listener.remove()).catch(() => {});
       }
     };
-  }, [setSession, setUser]);
+  }, [setSession]);
 
   // Si no tenemos internet, aún podemos tener la sesión persistida
   // No bloqueamos la renderización, permitimos que la app se cargue
@@ -86,5 +77,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <div key={`${user?.id ?? 'signed-out'}:${selectedCompanyId ?? 'no-company'}`} className="contents">{children}</div>;
 }

@@ -1,3 +1,4 @@
+import { requireCompanyId } from '@/lib/supabase/company'
 import { supabase } from '@/lib/supabase/client'
 import { generateId } from '@/lib/utils'
 import type { Result, Game, DrawSchedule } from '@/lib/types'
@@ -40,19 +41,20 @@ function mapScheduleFromJoin(row: any): DrawSchedule {
 
 export const resultsRepository = {
   async getResults(options?: { startDate?: Date; endDate?: Date; gameId?: string; limit?: number; }): Promise<Result[]> {
-    let query = supabase.from('results').select(`*, games (*), draw_schedules (*), winners (*)`).is('deleted_at', null).order('draw_date', { ascending: false })
+    let query = supabase.from('results').select(`*, games (*), draw_schedules (*), winners (*)`).eq('company_id', await requireCompanyId()).is('deleted_at', null).order('draw_date', { ascending: false })
     if (options?.startDate) { query = query.gte('draw_date', options.startDate.toISOString()) }
     if (options?.endDate) { query = query.lte('draw_date', options.endDate.toISOString()) }
     if (options?.gameId) { query = query.eq('game_id', options.gameId) }
     if (options?.limit) { query = query.limit(options.limit) }
     
     const { data: results, error } = await query
-    if (error || !results) return []
+    if (error) throw error
+    if (!results) return []
     return results.map(mapResult)
   },
 
   async getResultById(id: string): Promise<Result | null> {
-    const { data: result, error } = await supabase.from('results').select(`*, games (*), draw_schedules (*), winners (*)`).eq('id', id).single()
+    const { data: result, error } = await supabase.from('results').select(`*, games (*), draw_schedules (*), winners (*)`).eq('company_id', await requireCompanyId()).eq('id', id).single()
     if (error || !result) return null
     return mapResult(result)
   },
@@ -61,7 +63,8 @@ export const resultsRepository = {
     const id = generateId()
     const drawDate = data.drawDate || new Date()
     const { error } = await supabase.from('results').insert({ 
-      id, 
+      id,
+      company_id: await requireCompanyId(),
       game_id: data.gameId, 
       schedule_id: data.scheduleId, 
       winning_number: data.winningNumber, 
@@ -73,49 +76,12 @@ export const resultsRepository = {
     return newResult!
   },
 
-  async updateResultStatus(id: string, isProcessed: boolean): Promise<void> {
-    const now = new Date().toISOString()
-    const { error } = await supabase.from('results').update({ is_processed: isProcessed ? 1 : 0, updated_at: now }).eq('id', id)
-    if (error) throw error
-  },
-
-  async findMatchingTicketsForProcessing(gameId: string, scheduleTime: string, scheduleName: string, winningNumber: string, drawDate: Date) {
-    // Calcular inicio y fin del día del sorteo para filtrar solo tickets de esa fecha
-    const startOfDay = new Date(drawDate)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(drawDate)
-    endOfDay.setHours(23, 59, 59, 999)
-
-    const { data: matchingItems } = await supabase
-      .from('ticket_items')
-      .select(`*, tickets!inner(status, created_at)`)
-      .eq('game_id', gameId)
-      .eq('number', winningNumber)
-      .eq('tickets.status', 'active')
-      .or(`schedule.eq.${scheduleTime},schedule.eq.${scheduleName}`)
-      .gte('tickets.created_at', startOfDay.toISOString())
-      .lte('tickets.created_at', endOfDay.toISOString())
-    
-    return matchingItems || []
-  },
-
   async getHotColdNumbers(gameId?: string, limit?: number): Promise<{ hot: { number: string; frequency: number }[]; cold: { number: string; frequency: number }[] }> {
-    let query = supabase.from('results').select('winning_number').is('deleted_at', null)
-    if (gameId) {
-      query = query.eq('game_id', gameId)
-    }
-    const { data: results, error } = await query
-    if (error || !results) return { hot: [], cold: [] }
-
-    const frequencies: Record<string, number> = {}
-    for (const res of results) {
-      if (res.winning_number) {
-        frequencies[res.winning_number] = (frequencies[res.winning_number] || 0) + 1
-      }
-    }
-
-    const sorted = Object.entries(frequencies).map(([number, frequency]) => ({ number, frequency })).sort((a, b) => b.frequency - a.frequency)
-    const n = limit || 5
-    return { hot: sorted.slice(0, n), cold: sorted.slice(-n).reverse() }
+    const { data, error } = await supabase.rpc('pos_hot_cold_numbers', {
+      p_company_id: await requireCompanyId(), p_game_id: gameId || null, p_limit: limit || 5
+    })
+    if (error) throw error
+    const rows = data || []
+    return { hot: rows.filter((r: any) => r.type === 'hot'), cold: rows.filter((r: any) => r.type === 'cold') }
   }
 }

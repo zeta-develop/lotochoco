@@ -96,31 +96,17 @@ export const bluetoothService = {
       // Ignorar si el dispositivo no soporta cambio de prioridad
     }
 
-    // Buscamos el servicio y característica que soporte escritura
+    // Only send ESC/POS to the supported printer profile, never an arbitrary
+    // writable characteristic (which may control unrelated device functions).
     const services = await BleClient.getServices(deviceId)
-    let targetService = ''
-    let targetCharacteristic = ''
-    let supportsWriteWithoutResponse = false
-
-    for (const service of services) {
-      for (const char of service.characteristics) {
-        if (char.properties.writeWithoutResponse) {
-          targetService = service.uuid
-          targetCharacteristic = char.uuid
-          supportsWriteWithoutResponse = true
-          break
-        } else if (char.properties.write && !targetService) {
-          targetService = service.uuid
-          targetCharacteristic = char.uuid
-          supportsWriteWithoutResponse = false
-        }
-      }
-      if (supportsWriteWithoutResponse) break
+    const service = services.find(s => s.uuid.toLowerCase() === PRINTER_SERVICE)
+    const characteristic = service?.characteristics.find(c => c.uuid.toLowerCase() === PRINTER_CHARACTERISTIC)
+    if (!service || !characteristic || (!characteristic.properties.write && !characteristic.properties.writeWithoutResponse)) {
+      throw new Error('La impresora no tiene el perfil Bluetooth de impresión compatible.')
     }
-
-    if (!targetService || !targetCharacteristic) {
-      throw new Error('La impresora no tiene servicios de escritura compatibles.')
-    }
+    const targetService = service.uuid
+    const targetCharacteristic = characteristic.uuid
+    const supportsWriteWithoutResponse = !!characteristic.properties.writeWithoutResponse
 
     // Negociación dinámica de MTU para BLE:
     // En Android, BleClient solicita MTU 512 al conectar. Si la impresora lo soporta,

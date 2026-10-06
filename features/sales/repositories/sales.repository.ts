@@ -1,95 +1,41 @@
-import { supabase } from '@/lib/supabase/client';
-import { generateId } from '@/lib/utils';
-import type { SaleRequest } from '../domain/types';
-import type { Ticket } from '@/lib/types';
-import { ticketsService } from '@/features/tickets/services/tickets.service'; // Reusing the mapper from existing service
-import { dbEvents } from '@/lib/events';
+import { useAuthStore } from '@/store/auth-store'
+import { supabase } from '@/lib/supabase/client'
+import { requireCompanyId } from '@/lib/supabase/company'
+import type { SaleRequest } from '../domain/types'
+import type { Ticket } from '@/lib/types'
+import { ticketsService } from '@/features/tickets/services/tickets.service'
+import { dbEvents } from '@/lib/events'
 
 export class SalesRepository {
-  private async generateTicketNumber(): Promise<string> {
-    const { data: result } = await supabase
-      .from('tickets')
-      .select('ticket_number')
-      .order('ticket_number', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!result || !result.ticket_number) {
-      return '#00000001';
-    }
-    const currentNum = parseInt(result.ticket_number.replace('#', ''));
-    return `#${(currentNum + 1).toString().padStart(8, '0')}`;
-  }
-
   async createSale(request: SaleRequest): Promise<Ticket> {
-    const ticketId = generateId();
-    const ticketNumber = await this.generateTicketNumber();
-    const totalAmount = request.items.reduce((sum, item) => sum + item.amount, 0);
-    const now = new Date().toISOString();
-
-    // 1. Insert Ticket
-    const { error: ticketError } = await supabase.from('tickets').insert({
-      id: ticketId,
-      ticket_number: ticketNumber,
-      total_amount: totalAmount,
-      status: 'active',
-      client: request.client || null,
-      created_at: now,
-      updated_at: now
-    });
-    if (ticketError) throw ticketError;
-
-    // 2. Insert Items
-    const itemsToInsert = request.items.map(item => ({
-      id: generateId(),
-      ticket_id: ticketId,
-      game_id: item.gameId,
-      number: item.number,
-      amount: item.amount,
-      schedule: item.schedule,
-      created_at: now,
-      updated_at: now
-    }));
-    
-    const { error: itemsError } = await supabase.from('ticket_items').insert(itemsToInsert);
-    if (itemsError) throw itemsError;
-
-    // 3. Update Cash Session & Register Movement
-    const { data: openSession } = await supabase
-      .from('cash_sessions')
-      .select('id, sales_total')
-      .eq('status', 'open')
-      .limit(1)
-      .single();
-
-    if (openSession) {
-      const sessionId = openSession.id;
-      
-      await supabase.from('cash_sessions').update({
-        sales_total: (openSession.sales_total || 0) + totalAmount,
-        updated_at: now
-      }).eq('id', sessionId);
-
-      await supabase.from('cash_movements').insert({
-        id: generateId(),
-        cash_session_id: sessionId,
-        type: 'sale',
-        amount: totalAmount,
-        description: `Venta Ticket ${ticketNumber}`,
-        created_at: now,
-        updated_at: now
-      });
+    const initialUserId = useAuthStore.getState().user?.id
+    const initialSelection = useAuthStore.getState().selectedCompanyId
+    const assertAccount = () => {
+      const current = useAuthStore.getState()
+      if (current.user?.id !== initialUserId || current.selectedCompanyId !== initialSelection) {
+        throw new Error('La cuenta cambió durante la venta. Recupera la operación con su cuenta original')
+      }
     }
-
-    // Emit events
-    dbEvents.emit('tickets:changed');
-    dbEvents.emit('cash:changed');
-
-    // Return created ticket
-    const newTicket = await ticketsService.getTicketById(ticketId);
-    if (!newTicket) throw new Error("Error retrieving created ticket");
-    return newTicket;
+    const companyId = await requireCompanyId()
+    assertAccount()
+    if (request.companyId && request.companyId !== companyId) throw new Error('La venta pertenece a otra empresa')
+    if (!request.requestId) throw new Error('La venta necesita una clave de operación')
+    const { data: ticketId, error } = await supabase.rpc('pos_create_sale', {
+      p_company_id: companyId, p_request_id: request.requestId,
+      p_client: request.client || null,
+      p_items: request.items.map(({ gameId, number, amount, schedule }) => ({ gameId, number, amount, schedule }))
+    })
+    assertAccount()
+    if (error) {
+      const rolledBack = /^(P0001|22[A-Z0-9]{3}|23[A-Z0-9]{3}|42501)$/.test(error.code || '')
+      throw Object.assign(new Error(error.message), { code: error.code, saleRolledBack: rolledBack })
+    }
+    const ticket = await ticketsService.getTicketById(ticketId)
+    assertAccount()
+    if (!ticket) throw new Error('Venta registrada; reintenta con la misma operación para recuperar el ticket')
+    dbEvents.emit('tickets:changed')
+    dbEvents.emit('cash:changed')
+    return ticket
   }
 }
-
-export const salesRepository = new SalesRepository();
+export const salesRepository = new SalesRepository()

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { requireCompanyId } from '@/lib/supabase/company'
 import { useAuthStore } from '@/store/auth-store'
 import { useCompany } from './use-company'
 
@@ -92,18 +93,18 @@ export function useCompanyAccess() {
       return { success: false, message: 'No tienes permisos para cambiar roles' }
     }
 
-    const { error: updateError } = await supabase
-      .from('company_users')
-      .update({ role })
-      .eq('company_id', company.id)
-      .eq('user_id', userId)
-
-    if (updateError) {
-      return { success: false, message: updateError.message }
+    try {
+      const companyId = await requireCompanyId()
+      if (companyId !== company.id) return { success: false, message: 'La empresa cambió. Intenta nuevamente' }
+      const { error: updateError } = await supabase.rpc('pos_set_member_role', {
+        p_company_id: companyId, p_user_id: userId, p_role: role
+      })
+      if (updateError) return { success: false, message: updateError.message }
+      await refresh()
+      return { success: true }
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'No se pudo cambiar el rol' }
     }
-
-    await refresh()
-    return { success: true }
   }, [company, isAdmin, refresh])
 
   const grantAccess = useCallback(async (managerUserId: string, managedUserId: string) => {
@@ -129,7 +130,7 @@ export function useCompanyAccess() {
 
     await refresh()
     return { success: true }
-  }, [company, isAdmin, memberById, refresh])
+  }, [company, isAdmin, user?.id, refresh])
 
   const revokeAccess = useCallback(async (managerUserId: string, managedUserId: string) => {
     if (!company || !isAdmin) {

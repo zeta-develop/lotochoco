@@ -13,5 +13,6 @@ export const winnersService = {
   async markAsPaid(winnerId: string) {
     await winnersRepository.markAsPaid(winnerId)
     dbEvents.emit('winners:changed')
+    dbEvents.emit('cash:changed')
   }
 }

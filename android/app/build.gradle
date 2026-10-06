@@ -1,18 +1,21 @@
 apply plugin: 'com.android.application'
 
+def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+
 android {
     namespace "com.zetadevelop.lotochoco"
     compileSdk rootProject.ext.compileSdkVersion
     
     // 1️⃣ CONFIGURACIÓN DE FIRMA ELECTRÓNICA
-    // Lee automáticamente las variables que genera GitHub Actions en gradle.properties
+    // Signing credentials are supplied by the environment, never by tracked files.
     signingConfigs {
         release {
-            if (project.hasProperty('RELEASE_STORE_FILE')) {
-                storeFile file(RELEASE_STORE_FILE)
-                storePassword RELEASE_STORE_PASSWORD
-                keyAlias RELEASE_KEY_ALIAS
-                keyPassword RELEASE_KEY_PASSWORD
+            def signingFile = System.getenv('RELEASE_STORE_FILE')
+            if (signingFile) {
+                storeFile file(signingFile)
+                storePassword System.getenv('RELEASE_STORE_PASSWORD')
+                keyAlias System.getenv('RELEASE_KEY_ALIAS')
+                keyPassword System.getenv('RELEASE_KEY_PASSWORD')
             }
         }
     }
@@ -21,8 +24,8 @@ android {
         applicationId "com.zetadevelop.lotochoco"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 127
-        versionName "1.8.0"
+        versionCode (System.getenv('ANDROID_VERSION_CODE') ?: '127').toInteger()
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

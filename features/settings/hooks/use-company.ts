@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/auth-store'
 
@@ -13,11 +13,15 @@ export interface CompanyInfo {
 export function useCompany() {
   const [company, setCompany] = useState<CompanyInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const { user } = useAuthStore()
+  const { user, selectedCompanyId, setCompanyId } = useAuthStore()
+  const [companies, setCompanies] = useState<CompanyInfo[]>([])
+  const requestId = useRef(0)
 
   const fetchCompany = useCallback(async () => {
+    const currentRequest = ++requestId.current
     if (!user) {
       setCompany(null)
+      setCompanies([])
       setIsLoading(false)
       return
     }
@@ -34,26 +38,32 @@ export function useCompany() {
           )
         `)
         .eq('user_id', user.id)
-        .limit(1)
 
       if (error) {
         console.error('Supabase error fetching company:', error.message, error.details)
         throw error
       }
 
-      if (data && data.length > 0 && data[0].company) {
-        const firstMatch = data[0]
-        const comp = firstMatch.company as any
-        setCompany({
-          id: comp.id,
-          name: comp.name,
-          role: firstMatch.role || 'user'
-        })
+      if (requestId.current !== currentRequest || useAuthStore.getState().user?.id !== user.id) return
+      const available: CompanyInfo[] = (data ?? []).flatMap((membership: any) => {
+        const comp = membership.company
+        return comp ? [{ id: comp.id, name: comp.name, role: membership.role || 'user' }] : []
+      })
+      setCompanies(available)
+      const selected = available.find(item => item.id === selectedCompanyId)
+      if (selected) {
+        setCompany(selected)
+      } else if (available.length === 1) {
+        setCompanyId(available[0].id)
+        setCompany(available[0])
       } else {
-        console.warn('No company membership found for user:', user.id)
         setCompany(null)
+        if (selectedCompanyId) setCompanyId(null)
       }
     } catch (error: any) {
+      if (requestId.current !== currentRequest) return
+      setCompany(null)
+      setCompanies([])
       console.error('Detailed error fetching company info:', {
         message: error.message,
         code: error.code,
@@ -61,9 +71,9 @@ export function useCompany() {
         hint: error.hint
       })
     } finally {
-      setIsLoading(false)
+      if (requestId.current === currentRequest) setIsLoading(false)
     }
-  }, [user])
+  }, [user, selectedCompanyId, setCompanyId])
 
   useEffect(() => {
     fetchCompany()
@@ -89,6 +99,7 @@ export function useCompany() {
         .subscribe()
 
       return () => {
+        requestId.current += 1
         supabase.removeChannel(roleChannel)
       }
     }
@@ -120,6 +131,11 @@ export function useCompany() {
 
   return {
     company,
+    companies,
+    selectCompany: (id: string) => {
+      if (!companies.some(item => item.id === id)) return
+      setCompanyId(id)
+    },
     isLoading,
     isOwner: role === 'owner',
     isAdmin: role === 'owner' || role === 'admin',

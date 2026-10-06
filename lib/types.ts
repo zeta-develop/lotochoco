@@ -99,7 +99,7 @@ export interface CashSession {
 export interface CashMovement {
   id: string
   cashSessionId: string
-  type: 'income' | 'expense' | 'sale' | 'prize_payment'
+  type: 'income' | 'expense' | 'sale' | 'sale_refund' | 'prize_payment'
   amount: number
   description: string
   createdAt: Date

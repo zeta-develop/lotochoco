@@ -1,0 +1,74 @@
+name: Supabase migration with encrypted backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect the existing database or apply the audited migration
+        type: choice
+        options: [preflight, apply]
+        default: preflight
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    container: postgres:18
+    environment: LotoChoco
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSWORD: ${{ secrets.SUPABASE_BACKUP_PASSWORD }}
+      MIGRATION_MODE: ${{ inputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required credentials
+        run: |
+          test -n "$DATABASE_URL" || { echo 'SUPABASE_DB_URL is required in environment LotoChoco'; exit 1; }
+          test -n "$BACKUP_PASSWORD" || { echo 'SUPABASE_BACKUP_PASSWORD is required'; exit 1; }
+          command -v openssl
+      - name: Back up application and authentication schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p migration-private
+          pg_dump "$DATABASE_URL" --format=custom --schema=public --schema=auth --no-owner --no-acl --file=migration-private/database.dump 2>migration-private/backup.log || { echo 'Backup failed; migration was not applied'; exit 1; }
+          pg_restore --list migration-private/database.dump > migration-private/backup-manifest.txt
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/preflight.sql > migration-private/preflight.txt 2>&1 || { echo 'Preflight failed; migration was not applied'; exit 1; }
+          tar -czf migration-private/backup.tar.gz -C migration-private database.dump backup-manifest.txt preflight.txt backup.log
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASSWORD -in migration-private/backup.tar.gz -out migration-private/backup.tar.gz.enc
+          rm migration-private/database.dump migration-private/backup.tar.gz migration-private/backup-manifest.txt migration-private/preflight.txt migration-private/backup.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: supabase-encrypted-backup-${{ github.run_id }}
+          path: migration-private/backup.tar.gz.enc
+          retention-days: 30
+          if-no-files-found: error
+      - name: Apply transactional migration
+        if: inputs.mode == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          if ! psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/migrations/202610060001_secure_pos.sql > migration-private/migration.log 2>&1; then
+            openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASSWORD -in migration-private/migration.log -out migration-private/migration.log.enc
+            rm migration-private/migration.log
+            echo 'Migration failed and its transaction rolled back; inspect encrypted diagnostics'
+            exit 1
+          fi
+          rm migration-private/migration.log
+          echo 'Transactional migration applied successfully'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: supabase-encrypted-diagnostics-${{ github.run_id }}
+          path: migration-private/*.enc
+          if-no-files-found: ignore
+          retention-days: 30

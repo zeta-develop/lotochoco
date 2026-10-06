@@ -18,30 +18,32 @@ function parseLocalDate(value?: string) {
 }
 
 export function useTickets(options?: { startDate?: string; endDate?: string }) {
+  const startDate = options?.startDate
+  const endDate = options?.endDate
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const parsedStartDate = useMemo(
     () => {
-      const parsedDate = parseLocalDate(options?.startDate)
+      const parsedDate = parseLocalDate(startDate)
       return parsedDate ? startOfDay(parsedDate) : undefined
     },
-    [options?.startDate]
+    [startDate]
   )
   
   const parsedEndDate = useMemo(
     () => {
-      const parsedDate = parseLocalDate(options?.endDate)
+      const parsedDate = parseLocalDate(endDate)
       return parsedDate ? endOfDay(parsedDate) : undefined
     },
-    [options?.endDate]
+    [endDate]
   )
 
   const refresh = useCallback(async () => {
     setIsLoading(true)
     try {
-      if (options?.startDate || options?.endDate) {
+      if (startDate || endDate) {
         const { tickets: fetchedTickets } = await ticketsService.getTickets({
           startDate: parsedStartDate,
           endDate: parsedEndDate
@@ -60,7 +62,7 @@ export function useTickets(options?: { startDate?: string; endDate?: string }) {
     } finally {
       setIsLoading(false)
     }
-  }, [options?.startDate, options?.endDate, parsedStartDate, parsedEndDate])
+  }, [startDate, endDate, parsedStartDate, parsedEndDate])
 
   useEffect(() => {
     refresh()

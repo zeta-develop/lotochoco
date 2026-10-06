@@ -137,7 +137,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
     // Inicializar los últimos 7 días o el rango seleccionado
     const start = new Date(dateRange.start)
     const end = new Date(dateRange.end)
-    let current = new Date(start)
+    const current = new Date(start)
     while (current <= end) {
       const dStr = format(current, 'yyyy-MM-dd')
       daysMap[dStr] = { date: dStr, sales: 0, prizes: 0 }
@@ -192,7 +192,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
   const handleReprintTicket = async (ticket: TicketWithDetails) => {
     setIsReprinting(true)
     try {
-      const result = await printerService.printTicket(ticket as any, settings as any)
+      const result = await printerService.printTicket(ticket as any, settings as any, true)
       if (!result) toast({ variant: 'destructive', title: 'Error al imprimir' })
       else toast({ title: 'Impresión iniciada' })
     } finally {
@@ -577,7 +577,7 @@ export function ReportsManager({ onModuleChange }: ReportsProps) {
                   <Button size="sm" variant="outline" className="flex-1 font-mono text-xs" onClick={() => openTicketDetails(foundTicket)}>
                     Ver Detalle
                   </Button>
-                  <Button size="sm" className="flex-1 bg-[#10b981] text-[#003824] font-mono text-xs" onClick={() => handleReprintTicket(foundTicket)}>
+                  <Button size="sm" className="flex-1 bg-[#10b981] text-[#003824] font-mono text-xs" onClick={() => handleReprintTicket(foundTicket)} disabled={isReprinting}>
                     <Printer className="h-3.5 w-3.5 mr-1" /> Imprimir
                   </Button>
                 </div>

@@ -80,7 +80,7 @@ export function LoginScreen() {
           </div>
         </CardContent>
         <CardFooter className="text-center text-sm text-muted-foreground">
-          Sistema de punto de venta con soporte offline y sincronización en la nube.
+          Sistema de punto de venta conectado a Supabase. Requiere conexión para registrar operaciones.
         </CardFooter>
       </Card>
     </div>

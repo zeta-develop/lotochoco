@@ -21,7 +21,7 @@ export const cashService = {
     return cashRepository.getSessions(options)
   },
 
-  async addMovement(data: { cashSessionId: string; type: 'income' | 'expense' | 'sale' | 'prize_payment'; amount: number; description: string }) {
+  async addMovement(data: { cashSessionId: string; type: 'income' | 'expense'; amount: number; description: string }) {
     return cashRepository.addMovement(data)
   },
 

@@ -11,6 +11,8 @@ export interface CartItem {
 }
 
 export interface SaleRequest {
+  requestId?: string
+  companyId?: string
   items: Omit<CartItem, 'id'>[]
   client?: string
 }

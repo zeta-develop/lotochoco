@@ -34,6 +34,7 @@ export const useSettingsStore = create<SettingsState>()(
       }
     }),
     {
+      version: 1, // Discard legacy device-wide account data on upgrade.
       name: 'lotochoco-settings-storage',
     }
   )

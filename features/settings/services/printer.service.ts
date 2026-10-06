@@ -146,8 +146,7 @@ export const printerService = {
       console.log('Iniciando impresión de ticket:', ticket.ticketNumber);
       
       if (settings.printerType !== 'bluetooth') {
-        console.warn('Solo Bluetooth soportado nativamente por ahora. Tipo actual:', settings.printerType)
-        return true
+        throw new Error('La impresión de red aún no está disponible. Configura una impresora Bluetooth.')
       }
 
       const deviceId = settings.bluetoothDeviceId
@@ -310,7 +309,7 @@ export const printerService = {
 
   async testPrinter(type: string, address: string, settings?: Record<string, string>): Promise<boolean> {
     try {
-      if (type !== 'bluetooth') return true
+      if (type !== 'bluetooth') throw new Error('La impresión de red aún no está disponible.')
 
       const deviceId = address || settings?.bluetoothDeviceId
       if (!deviceId) throw new Error('No hay impresora configurada')

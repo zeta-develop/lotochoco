@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useAuthStore } from '@/store/auth-store'
 import { dbEvents } from '@/lib/events'
 import { useSettingsStore } from '../store/settings.store'
 import { settingsService } from '../services/settings.service'
@@ -15,7 +16,11 @@ export function useSettingsManager() {
   const refresh = useCallback(async () => {
     try {
       setError(null)
+      const { user, selectedCompanyId } = useAuthStore.getState()
+      if (!user || !selectedCompanyId) return
       const remoteSettings = await settingsService.getAll()
+      const currentIdentity = useAuthStore.getState()
+      if (currentIdentity.user?.id !== user.id || currentIdentity.selectedCompanyId !== selectedCompanyId) return
       
       const currentLocalSettings = useSettingsStore.getState().settings
       const merged = { ...currentLocalSettings, ...remoteSettings }

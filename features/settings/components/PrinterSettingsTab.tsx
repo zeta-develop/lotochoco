@@ -39,7 +39,7 @@ export function PrinterSettingsTab() {
       <CardHeader className="relative">
         <CardTitle>Configuración de Impresión</CardTitle>
         <CardDescription>
-          Conecta tu impresora térmica Bluetooth (ej. PT-210) o de Red.
+          Conecta una impresora térmica Bluetooth compatible (ej. PT-210).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 relative">
@@ -59,10 +59,10 @@ export function PrinterSettingsTab() {
                   Impresora Bluetooth (PT-210, genéricas)
                 </div>
               </SelectItem>
-              <SelectItem value="network">
+              <SelectItem value="network" disabled>
                 <div className="flex items-center">
                   <Wifi className="h-4 w-4 mr-2" />
-                  Impresora de Red / Wi-Fi
+                  Red / Wi-Fi (no disponible)
                 </div>
               </SelectItem>
             </SelectContent>

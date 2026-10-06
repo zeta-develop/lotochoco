@@ -21,3 +21,9 @@ ignore
 .env
 graphify-out/
 .stitch_designs/
+
+# Signing credentials belong in protected CI secrets, never in the repository.
+*.keystore
+*.keystore.gpg
+*.jks
+keystore_base64.txt

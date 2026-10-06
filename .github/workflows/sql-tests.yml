@@ -1,0 +1,49 @@
+name: SQL integrity and isolation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  sql-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: lotochoco_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:test-only-password@localhost:5432/lotochoco_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fresh schema matches the migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          schema = Path('supabase_schema.sql').read_text()
+          migration = Path('supabase/migrations/202610060001_secure_pos.sql').read_text()
+          assert schema.endswith(migration), 'Fresh schema and migration have diverged'
+          PY
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Apply schema and run isolation and accounting regressions
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql -f supabase_schema.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/financial-regressions.sql
+      - name: Verify real concurrent operations
+        run: python3 scripts/test-sql-concurrency.py

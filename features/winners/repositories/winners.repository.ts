@@ -1,5 +1,5 @@
+import { requireCompanyId } from '@/lib/supabase/company'
 import { supabase } from '@/lib/supabase/client'
-import { generateId } from '@/lib/utils'
 import type { Winner } from '@/lib/types'
 
 function mapWinner(row: any): Winner {
@@ -50,28 +50,14 @@ function mapWinner(row: any): Winner {
 }
 
 export const winnersRepository = {
-  async insertWinners(winners: any[]): Promise<void> {
-    const winnersToInsert = winners.map((item) => ({
-      id: generateId(),
-      ticket_id: item.ticket_id,
-      result_id: item.result_id,
-      prize_amount: item.prize_amount,
-      is_paid: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }))
-
-    const { error } = await supabase.from('winners').insert(winnersToInsert)
-    if (error) throw error
-  },
-
   async getWinners(options?: { isPaid?: boolean }): Promise<Winner[]> {
-    let query = supabase.from('winners').select(`*, tickets (*), results (*, games (*), draw_schedules (*))`).order('created_at', { ascending: false })
+    let query = supabase.from('winners').select(`*, tickets (*), results (*, games (*), draw_schedules (*))`).eq('company_id', await requireCompanyId()).order('created_at', { ascending: false })
     if (options?.isPaid !== undefined) {
       query = query.eq('is_paid', options.isPaid ? 1 : 0)
     }
     const { data: winners, error } = await query
-    if (error || !winners) return []
+    if (error) throw error
+    if (!winners) return []
     return winners.map(mapWinner)
   },
 
@@ -80,13 +66,9 @@ export const winnersRepository = {
   },
 
   async markAsPaid(winnerId: string): Promise<void> {
-    const now = new Date().toISOString()
-    const { error } = await supabase.from('winners').update({
-      is_paid: 1,
-      paid_at: now,
-      updated_at: now
-    }).eq('id', winnerId)
-
+    const { error } = await supabase.rpc('pos_pay_winner', {
+      p_company_id: await requireCompanyId(), p_winner_id: winnerId
+    })
     if (error) throw error
   }
 }

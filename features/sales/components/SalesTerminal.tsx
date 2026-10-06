@@ -50,6 +50,7 @@ export function SalesTerminal() {
 
   const {
     cart,
+    pendingSale,
     addToCart,
     removeFromCart,
     clearCart,
@@ -178,7 +179,7 @@ export function SalesTerminal() {
   }
 
   const handleConfirmSale = async () => {
-    if (!isCashOpen) {
+    if (!isCashOpen && !pendingSale) {
       toast({ variant: 'destructive', title: 'Debes abrir la caja primero' })
       return
     }
@@ -283,6 +284,14 @@ export function SalesTerminal() {
 
   return (
     <div className="space-y-3 pb-24 max-w-4xl mx-auto w-full min-w-0 overflow-x-hidden">
+      {pendingSale && (
+        <div role="alert" className="rounded-xl border border-amber-500 p-3 space-y-2">
+          <p>Hay una venta pendiente de confirmar. El carrito conserva la operación para evitar cobros duplicados.</p>
+          <button type="button" disabled={isProcessing} className="underline" onClick={handleConfirmSale}>
+            {isProcessing ? 'Confirmando…' : 'Reintentar y recuperar ticket'}
+          </button>
+        </div>
+      )}
       {/* Telemetry Status Bar */}
       <div className="bg-[#131b2e] border border-[#1e293b] rounded-2xl p-3 flex items-center justify-between shadow-lg min-w-0 w-full gap-2">
         <div className="flex items-center gap-2 min-w-0">

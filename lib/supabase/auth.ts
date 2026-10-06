@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/store/auth-store';
 import { supabase } from './client';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
@@ -27,6 +28,7 @@ export async function signInWithGoogle() {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  useAuthStore.getState().signOut();
 }
 
 export async function getUser() {

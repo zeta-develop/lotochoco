@@ -1,6 +1,6 @@
+import { requireCompanyId } from '@/lib/supabase/company'
 import { dbEvents } from '@/lib/events'
 import type { CashSession, CashMovement } from '@/lib/types'
-import { generateId } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 
 function mapSession(row: any): CashSession {
@@ -32,19 +32,18 @@ function mapMovement(row: any): CashMovement {
 }
 
 export async function openCashSession(openingAmount: number): Promise<CashSession> {
-  const { count } = await supabase.from('cash_sessions').select('*', { count: 'exact', head: true }).eq('status', 'open')
-  if (count && count > 0) throw new Error('Ya existe una sesión de caja abierta')
-  const id = generateId()
-  const now = new Date().toISOString()
-  const { error } = await supabase.from('cash_sessions').insert({ id, opening_amount: openingAmount, status: 'open', sales_total: 0, prizes_total: 0, opened_at: now, created_at: now, updated_at: now })
+  const { data: id, error } = await supabase.rpc('pos_open_cash', {
+    p_company_id: await requireCompanyId(), p_opening_amount: openingAmount
+  })
   if (error) throw error
-  const retSession = await getCashSessionById(id);
-  dbEvents.emit('cash:changed');
-  return retSession!;
+  const session = await getCashSessionById(id)
+  if (!session) throw new Error('No se pudo recuperar la caja abierta')
+  dbEvents.emit('cash:changed')
+  return session
 }
 
 export async function getCurrentSession(): Promise<CashSession | null> {
-  const { data: session, error } = await supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('status', 'open').limit(1).single()
+  const { data: session, error } = await supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('company_id', await requireCompanyId()).eq('status', 'open').limit(1).single()
   if (error || !session) return null
   const mapped = mapSession(session)
   if (mapped.movements) { mapped.movements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) }
@@ -52,35 +51,38 @@ export async function getCurrentSession(): Promise<CashSession | null> {
 }
 
 export async function closeCashSession(sessionId: string, notes?: string): Promise<CashSession> {
-  const session = await getCashSessionById(sessionId)
-  if (!session) throw new Error('Sesión no encontrada')
-  if (session.status === 'closed') throw new Error('La sesión ya está cerrada')
-  const summary = await getCashSummary(sessionId)
-  const now = new Date().toISOString()
-  const { error } = await supabase.from('cash_sessions').update({ status: 'closed', closing_amount: summary.balance, closed_at: now, notes: notes || null, updated_at: now }).eq('id', sessionId)
+  const { error } = await supabase.rpc('pos_close_cash', {
+    p_company_id: await requireCompanyId(), p_session_id: sessionId, p_notes: notes || null
+  })
   if (error) throw error
-  const retSession = await getCashSessionById(sessionId);
-  dbEvents.emit('cash:changed');
-  return retSession!;
+  const session = await getCashSessionById(sessionId)
+  if (!session) throw new Error('No se pudo recuperar la caja cerrada')
+  dbEvents.emit('cash:changed')
+  return session
 }
 
-export async function addCashMovement(data: { cashSessionId: string; type: 'income' | 'expense' | 'sale' | 'prize_payment'; amount: number; description: string }): Promise<CashMovement> {
-  const id = generateId()
-  const now = new Date().toISOString()
-  const { error } = await supabase.from('cash_movements').insert({ id, cash_session_id: data.cashSessionId, type: data.type, amount: data.amount, description: data.description, created_at: now })
+export async function addCashMovement(data: { cashSessionId: string; type: 'income' | 'expense'; amount: number; description: string }): Promise<CashMovement> {
+  const companyId = await requireCompanyId()
+  const { data: id, error } = await supabase.rpc('pos_add_cash_movement', {
+    p_company_id: companyId, p_session_id: data.cashSessionId,
+    p_type: data.type, p_amount: data.amount, p_description: data.description
+  })
   if (error) throw error
-  const { data: movement } = await supabase.from('cash_movements').select('*').eq('id', id).single()
-  dbEvents.emit('cash:changed');
+  const { data: movement, error: readError } = await supabase.from('cash_movements')
+    .select('*').eq('company_id', companyId).eq('id', id).single()
+  if (readError) throw readError
+  dbEvents.emit('cash:changed')
   return mapMovement(movement)
 }
 
 export async function getCashSessions(options?: { startDate?: Date; endDate?: Date; limit?: number }): Promise<CashSession[]> {
-  let query = supabase.from('cash_sessions').select(`*, cash_movements (*)`).order('opened_at', { ascending: false })
+  let query = supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('company_id', await requireCompanyId()).order('opened_at', { ascending: false })
   if (options?.startDate) { query = query.gte('opened_at', options.startDate.toISOString()) }
   if (options?.endDate) { query = query.lte('opened_at', options.endDate.toISOString()) }
   if (options?.limit) { query = query.limit(options.limit) }
   const { data: sessions, error } = await query
-  if (error || !sessions) return []
+  if (error) throw error
+  if (!sessions) return []
   return sessions.map((s: any) => {
       const mapped = mapSession(s)
       if (mapped.movements) { mapped.movements.sort((a: CashMovement, b: CashMovement) => b.createdAt.getTime() - a.createdAt.getTime()) }
@@ -89,7 +91,7 @@ export async function getCashSessions(options?: { startDate?: Date; endDate?: Da
 }
 
 export async function getCashSessionById(id: string): Promise<CashSession | null> {
-  const { data: session, error } = await supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('id', id).single()
+  const { data: session, error } = await supabase.from('cash_sessions').select(`*, cash_movements (*)`).eq('company_id', await requireCompanyId()).eq('id', id).single()
   if (error || !session) return null
   const mapped = mapSession(session)
   if (mapped.movements) { mapped.movements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) }
@@ -97,18 +99,11 @@ export async function getCashSessionById(id: string): Promise<CashSession | null
 }
 
 export async function getCashSummary(sessionId?: string): Promise<{ openingAmount: number; salesTotal: number; prizesTotal: number; incomeTotal: number; expenseTotal: number; balance: number }> {
-  let session = null
-  if (sessionId) { session = await getCashSessionById(sessionId) } else { session = await getCurrentSession() }
-  if (!session) { return { openingAmount: 0, salesTotal: 0, prizesTotal: 0, incomeTotal: 0, expenseTotal: 0, balance: 0 } }
-  let incomes = 0
-  let expenses = 0
-  if (session.movements) {
-    for (const m of session.movements) {
-      if (m.type === 'income') incomes += m.amount
-      else if (m.type === 'expense') expenses += m.amount
-    }
-  }
-  return { openingAmount: session.openingAmount, salesTotal: session.salesTotal, prizesTotal: session.prizesTotal, incomeTotal: incomes, expenseTotal: expenses, balance: session.openingAmount + session.salesTotal + incomes - session.prizesTotal - expenses }
+  const { data, error } = await supabase.rpc('pos_cash_summary', {
+    p_company_id: await requireCompanyId(), p_session_id: sessionId || null
+  })
+  if (error) throw error
+  return data
 }
 
 export const cashRepository = { openSession: openCashSession, closeSession: closeCashSession, getCurrentSession, getSessionById: getCashSessionById, getSessions: getCashSessions, addMovement: addCashMovement, getSummary: getCashSummary }

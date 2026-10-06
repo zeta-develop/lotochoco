@@ -16,7 +16,7 @@ export function Updater() {
     }
   }, [isUpdateAvailable]);
 
-  if (!showNotification) return null;
+  if (!showNotification || !isUpdateAvailable) return null;
 
   return (
     <div className="fixed bottom-4 left-4 z-50 animate-in slide-in-from-bottom-5 fade-in-50">
