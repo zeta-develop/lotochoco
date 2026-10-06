@@ -36,7 +36,7 @@ export function buildSharedTicketHtml(ticket: TicketLike, settings: Record<strin
   }).join('')
   const preview = ticket.id === 'preview' || data.ticketNumber === 'VERIFICACIÓN'
   const status = preview ? 'VISTA PREVIA · SIN VENTA REGISTRADA' : ticket.status === 'cancelled' ? 'BOLETO ANULADO' : data.receiptType ? 'Copia reimpresa' : 'Boleto reenviado'
-  return `<article lang="es" style="box-sizing:border-box;width:${SHARED_TICKET_WIDTH}px;padding:28px;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;line-height:1.35;overflow:visible">
+  return `<article lang="es" style="box-sizing:border-box;width:${SHARED_TICKET_WIDTH}px;padding:28px;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;font-weight:700;line-height:1.35;overflow:visible">
     <header style="padding:0 8px 26px;text-align:center;color:${purple};font-size:27px;font-weight:700">
       <div style="margin-bottom:26px">${status}</div>
       ${detail('Juego', games.join(' / '))}
