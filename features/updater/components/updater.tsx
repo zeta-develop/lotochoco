@@ -14,7 +14,7 @@ export function Updater() {
     if (isUpdateAvailable) {
       setShowNotification(true);
     }
-  }, [isUpdateAvailable]);
+  }, [isUpdateAvailable, latestVersion]);
 
   if (!showNotification || !isUpdateAvailable) return null;
 

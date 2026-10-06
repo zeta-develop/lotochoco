@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish a public prerelease signed with the replacement identity
+        description: Publish a public release signed with the replacement identity
         type: boolean
         default: false
 
@@ -94,10 +94,11 @@ jobs:
           tag: 'v${{ env.APP_VERSION }}-${{ github.run_number }}'
           name: 'LotoChoco v${{ env.APP_VERSION }} candidate'
           draft: ${{ !inputs.publish }}
-          prerelease: ${{ inputs.publish }}
+          prerelease: false
+          makeLatest: ${{ inputs.publish }}
           body: |
             Comprobante digital rediseñado para compartir imágenes completas por WhatsApp.
             Correcciones de aislamiento por empresa, operaciones financieras y autenticación.
 
             APK firmado con una identidad de reemplazo. No se instala como una actualización normal sobre el APK firmado con la identidad anterior. Verificar y resolver ventas pendientes antes de cualquier reinstalación; conservar los datos locales necesarios.
-            Release de prueba: validar instalación, OAuth e impresora en un dispositivo antes de distribución general.
+            Comprobar instalación, OAuth e impresora en el dispositivo. La firma de reemplazo es compatible con las versiones 1.8.8 y posteriores.

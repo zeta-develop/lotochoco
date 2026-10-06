@@ -9,21 +9,7 @@ import { Capacitor } from "@capacitor/core";
 import { toast } from '@/components/ui/use-toast';
 import packageJson from "../../../package.json";
 import { isNewerRelease } from '../version';
-
-interface Release {
-  tag_name: string;
-  assets: { name: string; browser_download_url: string }[];
-}
-const RELEASE_URL = 'https://api.github.com/repos/zeta-develop/lotochoco/releases/latest';
-async function fetchRelease(): Promise<Release> {
-  const response = await fetch(RELEASE_URL);
-  if (!response.ok) throw new Error('No se pudo consultar la actualización.');
-  const data = await response.json();
-  if (typeof data.tag_name !== 'string' || !Array.isArray(data.assets)) {
-    throw new Error('La respuesta de actualización no es válida.');
-  }
-  return data;
-}
+import { fetchLatestApkRelease } from '../releases';
 
 export function useUpdater() {
   const [currentVersion, setCurrentVersion] = useState(packageJson.version);
@@ -41,22 +27,33 @@ export function useUpdater() {
     try {
       const current = await installedVersion();
       setCurrentVersion(current);
-      const release = await fetchRelease();
+      const release = await fetchLatestApkRelease();
       const latest = release.tag_name.replace(/^v/, '');
       setLatestVersion(latest);
       setIsUpdateAvailable(isNewerRelease(latest, current));
     } catch (error) {
+      setLatestVersion(null);
+      setIsUpdateAvailable(false);
       console.error('Error checking for updates:', error);
     }
   };
-  useEffect(() => { void checkUpdate(); }, []);
+  useEffect(() => {
+    void checkUpdate();
+    const checkWhenVisible = () => { if (document.visibilityState === 'visible') void checkUpdate(); };
+    document.addEventListener('visibilitychange', checkWhenVisible);
+    const listener = Capacitor.isNativePlatform() ? App.addListener('appStateChange', state => { if (state.isActive) void checkUpdate(); }) : null;
+    return () => {
+      document.removeEventListener('visibilitychange', checkWhenVisible);
+      if (listener) void listener.then(handle => handle.remove());
+    };
+  }, []);
 
   const downloadAndInstallUpdate = async () => {
     if (!latestVersion || isDownloading) return;
     setIsDownloading(true);
     setDownloadProgress(0);
     try {
-      const release = await fetchRelease();
+      const release = await fetchLatestApkRelease();
       const latest = release.tag_name.replace(/^v/, '');
       if (!isNewerRelease(latest, await installedVersion())) {
         setIsUpdateAvailable(false);
