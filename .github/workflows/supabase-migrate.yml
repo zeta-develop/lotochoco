@@ -9,6 +9,10 @@ on:
         options: [preflight, apply]
         default: preflight
         required: true
+      company_time_zone:
+        description: Confirmed IANA time zone for the existing companies (required to apply)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -26,17 +30,22 @@ jobs:
       DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_PASSWORD: ${{ secrets.SUPABASE_BACKUP_PASSWORD }}
       MIGRATION_MODE: ${{ inputs.mode }}
+      COMPANY_TIME_ZONE: ${{ inputs.company_time_zone }}
       PGSSLMODE: require
+      PGCONNECT_TIMEOUT: '15'
     steps:
       - uses: actions/checkout@v4
       - name: Install backup encryption tool
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends openssl ca-certificates
+          apt-get install -y --no-install-recommends openssl ca-certificates python3
       - name: Check required credentials
         run: |
           test -n "$DATABASE_URL" || { echo 'SUPABASE_DB_URL is required in environment LotoChoco'; exit 1; }
           test -n "$BACKUP_PASSWORD" || { echo 'SUPABASE_BACKUP_PASSWORD is required'; exit 1; }
+          if [ "$MIGRATION_MODE" = apply ]; then
+            test -n "$COMPANY_TIME_ZONE" || { echo 'Confirmed company_time_zone is required'; exit 1; }
+          fi
           command -v openssl
       - name: Back up application and authentication schemas
         shell: bash
@@ -62,7 +71,8 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          if ! psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/migrations/202610060001_secure_pos.sql > migration-private/migration.log 2>&1; then
+          python3 scripts/prepare-deployment-migration.py migration-private/prepared-migration.sql
+          if ! psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -v company_time_zone="$COMPANY_TIME_ZONE" -f migration-private/prepared-migration.sql > migration-private/migration.log 2>&1; then
             openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASSWORD -in migration-private/migration.log -out migration-private/migration.log.enc
             rm migration-private/migration.log
             echo 'Migration failed and its transaction rolled back; inspect encrypted diagnostics'
@@ -70,6 +80,17 @@ jobs:
           fi
           rm migration-private/migration.log
           echo 'Transactional migration applied successfully'
+      - name: Encrypt failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          if [ -d migration-private ] && [ -n "$BACKUP_PASSWORD" ]; then
+            tar -czf /tmp/migration-diagnostics.tar.gz -C migration-private .
+            openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASSWORD -in /tmp/migration-diagnostics.tar.gz -out migration-private/diagnostics.tar.gz.enc
+            rm /tmp/migration-diagnostics.tar.gz
+          fi
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
