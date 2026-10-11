@@ -14,7 +14,7 @@ Vendedor: {{vendorName}}
    Apuesta       Monto    Premio
 --------------------------------
 {{#items}}
-  {{number}}    {{amount}}   {{prize}}
+{{number}}    {{amount}}   {{prize}}
 {{/items}}
 --------------------------------
 **TOTAL: {{currency}} {{total}}**
@@ -26,7 +26,7 @@ Premio valido por 7 dias
 
 export const MOCK_PREVIEW_TICKET: Ticket = {
   id: 'preview-ticket-001',
-  ticketNumber: '2100305',
+  ticketNumber: 'HGFHVGTKLY',
   createdAt: new Date(),
   updatedAt: new Date(),
   totalAmount: 30,
@@ -276,10 +276,10 @@ export function formatDoubleWidthItemRow(
   const prz = (prize || '').trim()
 
   // Extraer sangría inicial configurada por el usuario antes de {{number}}
-  let leadingSpacesCount = 2
+  let leadingSpacesCount = 0
   if (templateRow) {
-    const match = templateRow.match(/^(\s*)/)
-    if (match && match[1]) {
+    const match = templateRow.match(/^([ \t]*)/)
+    if (match) {
       leadingSpacesCount = match[1].length
     }
   }
@@ -332,11 +332,7 @@ export function parseTemplateToBlocks(
   if (itemsMatch) {
     // Quitar únicamente los saltos de línea iniciales y finales, PRESERVANDO los espacios horizontales (sangría)
     const raw = itemsMatch[1].replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '')
-    if (raw.includes('{{number}}') && raw.includes('{{amount}}') && !raw.includes('  ')) {
-      itemRowTemplate = '  {{number}}    {{amount}}   {{prize}}'
-    } else {
-      itemRowTemplate = raw
-    }
+    itemRowTemplate = raw
   }
 
   // Marcador temporal para la posición de los items

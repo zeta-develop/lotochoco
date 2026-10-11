@@ -85,9 +85,10 @@ export async function searchTicket(searchNumber: string): Promise<Ticket | null>
     if (ticketById) return ticketById
   }
 
-  // 2. Búsqueda por folio (#00000001, etc.)
-  let formattedNumber = cleanSearch
-  if (!formattedNumber.startsWith('#')) { formattedNumber = `#${formattedNumber}` }
+  // 2. Folios de letras y folios numéricos anteriores.
+  const formattedNumber = /^#?\d+$/.test(cleanSearch)
+    ? (cleanSearch.startsWith('#') ? cleanSearch : `#${cleanSearch}`)
+    : cleanSearch.replace(/^#/, '').toUpperCase()
   const { data: ticket, error } = await supabase.from('tickets').select(`*, ticket_items (*, games (*, draw_schedules (*)))`).eq('company_id', await requireCompanyId()).eq('ticket_number', formattedNumber).single()
   if (error || !ticket) return null
   return mapTicket(ticket)

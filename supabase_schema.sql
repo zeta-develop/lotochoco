@@ -505,7 +505,7 @@ END $$;
 
 CREATE OR REPLACE FUNCTION public.pos_create_sale(p_company_id uuid,p_request_id text,p_client text,p_items jsonb)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_ticket text := gen_random_uuid()::text; v_session text; v_total numeric := 0; v_amount numeric; v_number bigint; item jsonb; g public.games; v_zone text; old public.tickets; v_payload jsonb; v_schedule public.draw_schedules; v_matches integer;
+DECLARE v_ticket text := gen_random_uuid()::text; v_session text; v_total numeric := 0; v_amount numeric; v_number text; item jsonb; g public.games; v_zone text; old public.tickets; v_payload jsonb; v_schedule public.draw_schedules; v_matches integer;
 BEGIN
   PERFORM pos_private.lock_company(p_company_id);
   IF nullif(btrim(p_request_id),'') IS NULL OR length(p_request_id)>128 THEN RAISE EXCEPTION 'Identificador de venta inválido'; END IF;
@@ -533,8 +533,13 @@ BEGIN
     IF EXISTS(SELECT 1 FROM public.results r JOIN public.draw_schedules s ON s.id=r.schedule_id WHERE r.company_id=p_company_id AND r.game_id=g.id AND (s.time=item->>'schedule' OR s.name=item->>'schedule') AND (r.draw_date AT TIME ZONE v_zone)::date=(now() AT TIME ZONE v_zone)::date) THEN RAISE EXCEPTION 'El resultado del sorteo ya está registrado'; END IF;
     v_total := v_total + v_amount;
   END LOOP;
-  SELECT coalesce(max(substring(ticket_number from '^#([0-9]+)$')::bigint),0)+1 INTO v_number FROM public.tickets WHERE company_id=p_company_id;
-  INSERT INTO public.tickets(id,company_id,ticket_number,client,total_amount,status,cash_session_id,request_id,request_payload) VALUES(v_ticket,p_company_id,'#'||lpad(v_number::text,greatest(8,length(v_number::text)),'0'),p_client,v_total,'active',v_session,p_request_id,v_payload);
+  -- Ten uppercase letters, with collision checks under the company lock.
+  LOOP
+    SELECT string_agg(chr(65 + (get_byte(uuid_send(gen_random_uuid()), 0) % 26)), '' ORDER BY n)
+      INTO v_number FROM generate_series(1,10) AS n;
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.tickets WHERE company_id=p_company_id AND ticket_number=v_number);
+  END LOOP;
+  INSERT INTO public.tickets(id,company_id,ticket_number,client,total_amount,status,cash_session_id,request_id,request_payload) VALUES(v_ticket,p_company_id,v_number,p_client,v_total,'active',v_session,p_request_id,v_payload);
   INSERT INTO public.ticket_items(id,company_id,ticket_id,game_id,number,amount,schedule,multiplier_snapshot)
     SELECT gen_random_uuid()::text,p_company_id,v_ticket,i->>'gameId',i->>'number',(i->>'amount')::numeric,i->>'schedule',catalog.multiplier FROM jsonb_array_elements(p_items) i JOIN public.games catalog ON catalog.id=i->>'gameId' AND catalog.company_id=p_company_id;
   UPDATE public.cash_sessions SET sales_total=sales_total+v_total,updated_at=now() WHERE id=v_session;

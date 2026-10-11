@@ -71,7 +71,7 @@ export function GeneralSettingsTab() {
     }
     let cleaned = t
     if (cleaned.includes('{{number}}') && cleaned.includes('{{amount}}') && !cleaned.includes('  {{amount}}') && !cleaned.includes('    {{amount}}')) {
-      cleaned = cleaned.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n  {{number}}    {{amount}}   {{prize}}\n{{/items}}`)
+      cleaned = cleaned.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n{{number}}    {{amount}}   {{prize}}\n{{/items}}`)
     }
     if (/apuesta\s+monto\s+premio/i.test(cleaned) && !cleaned.includes('   Apuesta')) {
       cleaned = cleaned.replace(/apuesta\s+monto\s+premio/i, '   Apuesta       Monto    Premio')
@@ -95,9 +95,14 @@ export function GeneralSettingsTab() {
   const alignColumnsCenter = () => {
     let t = localTemplate
     t = t.replace(/.*apuesta.*monto.*premio.*/i, '   Apuesta       Monto    Premio')
-    t = t.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n  {{number}}    {{amount}}   {{prize}}\n{{/items}}`)
+    t = t.replace(/{{#items}}[\s\S]*?{{\/items}}/i, `{{#items}}\n{{number}}    {{amount}}   {{prize}}\n{{/items}}`)
     setLocalTemplate(t)
     toast({ title: 'Columnas alineadas y centradas' })
+  }
+
+  const reduceBetIndent = () => {
+    setLocalTemplate(prev => prev.replace(/({{#items}})([\s\S]*?)({{\/items}})/i,
+      (_, open, rows, close) => open + rows.replace(/^[ \t]+(?=.*{{number}})/gm, '') + close))
   }
 
   const toggleBold = () => {
@@ -504,6 +509,9 @@ export function GeneralSettingsTab() {
                         </span>
                       </div>
                     </div>
+                    <Button type="button" variant="outline" size="sm" onClick={reduceBetIndent}>
+                      Reducir margen de apuestas
+                    </Button>
                     <Textarea
                       id="ticketTemplate"
                       value={localTemplate}
