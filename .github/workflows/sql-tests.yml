@@ -34,8 +34,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           schema = Path('supabase_schema.sql').read_text()
-          migration = Path('supabase/migrations/202610060001_secure_pos.sql').read_text()
-          assert schema.endswith(migration), 'Fresh schema and migration have diverged'
+          migrations = ''.join(path.read_text() for path in sorted(Path('supabase/migrations').glob('*.sql')))
+          assert schema.endswith(migrations), 'Fresh schema and migrations have diverged'
           PY
       - name: Install PostgreSQL client
         run: |
